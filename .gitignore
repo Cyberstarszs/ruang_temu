@@ -1,0 +1,30 @@
+# Dependencies & Build Outputs
+node_modules/
+*/node_modules/
+dist/
+*/dist/
+build/
+.next/
+
+# Environment files
+.env
+*.env
+*.env.local
+backend/.env
+!backend/.env.example
+
+# Excluded project folders (Per user instruction: only backend and .md files)
+/frontend/
+/refrensi_ui/
+/tools/
+/.agents/
+/.gemini/
+/start.bat
+/skills-lock.json
+/package.json
+/package-lock.json
+
+# Cache & OS files
+*.log
+.DS_Store
+Thumbs.db
