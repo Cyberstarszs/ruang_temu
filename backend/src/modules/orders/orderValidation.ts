@@ -13,6 +13,7 @@ export const directCheckoutSchema = z.object({
       quantity: z.number().int().positive({ message: 'Kuantitas harus bilangan positif' }),
       notes: z.string().optional(),
       modifiers: z.array(z.string()).optional(),
+      unitPriceAdjustment: z.number().optional(),
     })
   ).min(1, { message: 'Keranjang belanja tidak boleh kosong' }),
   payments: z.array(

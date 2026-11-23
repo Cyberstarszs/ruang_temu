@@ -130,6 +130,14 @@ export async function runSeed() {
       }
     }
 
+    // 7. SEED PROMOS
+    await client.query(`
+      INSERT INTO promos (code, name, discount_type, discount_value, min_spend, max_discount, start_date, end_date, is_active)
+      VALUES 
+        ('TEMUKOPI', 'Promo Temu Kopi 20%', 'PERCENT', 20, 50000, 20000, CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '30 days', TRUE)
+      ON CONFLICT (code) DO NOTHING;
+    `);
+
     await client.query('COMMIT');
     console.log('[Seed] Database successfully seeded with RUANG TEMU master data!');
   } catch (err: any) {

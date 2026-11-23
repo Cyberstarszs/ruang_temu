@@ -107,6 +107,7 @@ export class OrderService {
         let itemFinalUnitPrice = Number(product.price);
         let itemBaseHpp = 0;
         const selectedModifiersJson: any[] = [];
+        let parsedTextModifierDeltaSum = 0;
 
         // Modifiers (UUID or Custom Text)
         if (item.modifiers && item.modifiers.length > 0) {
@@ -135,13 +136,26 @@ export class OrderService {
                 }
               }
             } else {
-              // Custom text modifier (e.g., Less Sugar (50%), Oat Milk)
+              // Custom text modifier (e.g., "Ukuran Besar (+Rp 8.000)", "Oat Milk (+Rp 6.000)", "Extra Shot (+Rp 5.000)")
+              let modPrice = 0;
+              const match = modId.match(/\(\+Rp\s*([\d\.,]+)\)/i);
+              if (match) {
+                modPrice = Number(match[1].replace(/[^\d]/g, ''));
+              }
+              parsedTextModifierDeltaSum += modPrice;
               selectedModifiersJson.push({
                 name: modId,
-                price: 0,
+                price: modPrice,
               });
             }
           }
+        }
+
+        // Apply price adjustment: use explicit unitPriceAdjustment if provided, or fallback to parsed custom modifier deltas
+        if (item.unitPriceAdjustment !== undefined && item.unitPriceAdjustment !== null) {
+          itemFinalUnitPrice = Number(product.price) + Number(item.unitPriceAdjustment);
+        } else {
+          itemFinalUnitPrice += parsedTextModifierDeltaSum;
         }
 
         const itemSubtotal = itemFinalUnitPrice * item.quantity;
@@ -209,7 +223,19 @@ export class OrderService {
         };
       }
 
-      // 5. Create Order
+      // 5. Resolve Table ID if fallback string matches table_number
+      let resolvedTableId = tableId || null;
+      if (!resolvedTableId && tableNumberFallback) {
+        const findTbl = await client.query(
+          `SELECT id FROM dining_tables WHERE UPPER(table_number) = UPPER($1) LIMIT 1`,
+          [tableNumberFallback.trim()]
+        );
+        if (findTbl.rows.length > 0) {
+          resolvedTableId = findTbl.rows[0].id;
+        }
+      }
+
+      // 6. Create Order
       const orderNumber = generateOrderNumber();
       const orderRes = await client.query(
         `INSERT INTO orders (
@@ -222,7 +248,7 @@ export class OrderService {
           orderNumber,
           shiftId,
           user?.id || null,
-          tableId || null,
+          resolvedTableId,
           customerId || null,
           reservationId || null,
           orderType,
@@ -298,13 +324,13 @@ export class OrderService {
 
       // 9. Update Table Status to OCCUPIED
       let displayTableNumber = tableNumberFallback || 'Bawa Pulang';
-      if (tableId && orderType === 'DINE_IN') {
+      if (resolvedTableId && orderType === 'DINE_IN') {
         const tableUpdate = await client.query(
           `UPDATE dining_tables 
            SET status = 'OCCUPIED', occupied_at = NOW(), updated_at = NOW() 
            WHERE id = $1 
            RETURNING table_number`,
-          [tableId]
+          [resolvedTableId]
         );
         if (tableUpdate.rows.length > 0) {
           displayTableNumber = tableUpdate.rows[0].table_number;
@@ -339,7 +365,7 @@ export class OrderService {
         orderType,
         displayTableNumber,
         totalAmount: order.total_amount,
-        tableId,
+        tableId: resolvedTableId,
         items: preparedItems,
         payments: paymentsList,
         notes,
@@ -539,8 +565,8 @@ export class OrderService {
       }
 
       await client.query(
-        `UPDATE orders SET status = 'PAID', cashier_id = $1, paid_at = NOW(), updated_at = NOW() WHERE id = $2`,
-        [cashierId, order.id]
+        `UPDATE orders SET status = 'PAID', cashier_id = $1, shift_id = COALESCE($3, shift_id), paid_at = NOW(), updated_at = NOW() WHERE id = $2`,
+        [cashierId, order.id, body.shiftId || null]
       );
 
       for (const pay of paymentsList) {
@@ -724,7 +750,32 @@ export class OrderService {
   async getOrders(filters: { date?: string; status?: string; limit?: number; offset?: number }) {
     const { date, status, limit = 50, offset = 0 } = filters;
     let query = `
-      SELECT o.*, t.table_number, u.name as cashier_name, c.name as customer_name
+      SELECT o.*, t.table_number, u.name as cashier_name, c.name as customer_name,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', oi.id,
+            'productId', oi.product_id,
+            'productName', oi.product_name_snapshot,
+            'quantity', oi.quantity,
+            'unitPrice', oi.unit_price_snapshot,
+            'subtotal', oi.subtotal,
+            'printTarget', oi.print_target,
+            'notes', oi.item_notes,
+            'modifiers', oi.selected_modifiers
+          )) FROM order_items oi WHERE oi.order_id = o.id),
+          '[]'::json
+        ) as items,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', op.id,
+            'method', op.payment_method,
+            'amountPaid', op.amount_paid,
+            'cashReceived', op.cash_received,
+            'cashChange', op.cash_change,
+            'referenceNumber', op.reference_number
+          )) FROM order_payments op WHERE op.order_id = o.id),
+          '[]'::json
+        ) as payments
       FROM orders o
       LEFT JOIN dining_tables t ON o.table_id = t.id
       LEFT JOIN users u ON o.cashier_id = u.id

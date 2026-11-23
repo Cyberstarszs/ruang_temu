@@ -149,27 +149,14 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
     const diff = counted - systemExpected;
 
     let managerId: string | null = null;
-    if (diff !== 0) {
-      // If there is any cash discrepancy, require owner approval PIN
-      if (!managerPin) {
-        res.status(422).json({
-          success: false,
-          requiresManagerPin: true,
-          message: 'Terdapat selisih kas fisik dengan pembukuan sistem. Diperlukan PIN Owner untuk konfirmasi tutup shift.',
-        });
-        return;
-      }
-
+    if (managerPin) {
       const mgrRes = await pool.query(
         `SELECT id FROM users WHERE role = 'OWNER' AND pin_code = $1 AND is_active = TRUE`,
         [managerPin.trim()]
       );
-
-      if (mgrRes.rows.length === 0) {
-        res.status(403).json({ success: false, message: 'PIN Owner tidak valid.' });
-        return;
+      if (mgrRes.rows.length > 0) {
+        managerId = mgrRes.rows[0].id;
       }
-      managerId = mgrRes.rows[0].id;
     }
 
     const updated = await pool.query(

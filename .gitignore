@@ -13,16 +13,13 @@ build/
 backend/.env
 !backend/.env.example
 
-# Excluded project folders (Per user instruction: only backend and .md files)
-/frontend/
+# Excluded project folders
+/refrensi/
 /refrensi_ui/
 /tools/
 /.agents/
 /.gemini/
-/start.bat
 /skills-lock.json
-/package.json
-/package-lock.json
 
 # Cache & OS files
 *.log
