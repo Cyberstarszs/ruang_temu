@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const directCheckoutSchema = z.object({
-  shiftId: z.string().uuid({ message: 'Shift ID wajib berupa UUID yang valid' }),
+  shiftId: z.string().uuid({ message: 'Shift ID wajib berupa UUID yang valid' }).optional(),
   tableId: z.string().uuid().nullable().optional(),
   tableNumberFallback: z.string().optional(),
   orderType: z.enum(['DINE_IN', 'TAKEAWAY']).default('DINE_IN'),
@@ -34,20 +34,8 @@ export const directCheckoutSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const submitQrSchema = z.object({
-  tableNumber: z.string().min(1, { message: 'Nomor meja wajib diisi' }),
-  customerName: z.string().optional(),
-  items: z.array(
-    z.object({
-      productId: z.string().uuid(),
-      quantity: z.number().int().positive(),
-      notes: z.string().optional(),
-    })
-  ).min(1, { message: 'Daftar pesanan wajib diisi' }),
-  notes: z.string().optional(),
-});
-
 export const voidOrderSchema = z.object({
   managerPin: z.string().min(4, { message: 'PIN Owner wajib diisi' }),
   reason: z.string().min(3, { message: 'Alasan pembatalan wajib diisi minimal 3 karakter' }),
+  restock: z.boolean().default(false),
 });

@@ -92,12 +92,9 @@ Melalui analisis mendalam (*deep learning audit*), ditemukan 10 titik kritis ope
      - Status meja fisik: Tetap `OCCUPIED`.
      - Pembebasan Meja: Pelayan atau kasir memiliki tombol satu ketukan pada denah meja: **"Tamu Pulang / Kosongkan Meja"**. Status meja berubah menjadi `CLEANING` (kuning/abu-abu), lalu pelayan membersihkan cangkir kotor dan mengubahnya menjadi `AVAILABLE` (hijau).
 
-### 3.2 Alur QR Meja: Anti-Ghost Order & Batas Waktu Kedaluwarsa (15-Minute Timeout)
-* **Cacat Logika Awal:** Tamu iseng scan QR Meja 03, pesan 10 steak, lalu kabur tanpa bayar. Meja 03 terkunci selamanya dan dapur rugi jika makanan terlanjur dibuat.
-* **Solusi Operasional Nyata:**
-  1. Pemesanan QR dari HP tamu berstatus `PENDING_PAYMENT_AT_CASHIER`.
-  2. **Printer Bar & Dapur TIDAK AKAN MENCETAK TIKET** sebelum kasir menerima uang fisik / konfirmasi QRIS di counter.
-  3. **Auto-Expired Timer (15 Menit):** Backend Express menjalankan cron/timer otomatis. Jika dalam 15 menit tamu tidak menyelesaikan pembayaran di kasir, sistem otomatis membatalkan pesanan (`CANCELLED_EXPIRED`) dan meja kembali berstatus `AVAILABLE`.
+### 3.2 Alur QR Meja & Pemesanan Mandiri
+> [!NOTE] 
+> **Pembaruan Arsitektur & Operasional:** Berdasarkan evaluasi alur layanan kafe fast-casual, fitur pemesanan mandiri QR tamu dinonaktifkan sepenuhnya. Seluruh alur pemesanan difokuskan 100% pada pemesanan langsung di konter kasir (*100% Counter Pay-First Service*). Hal ini mengeliminasi risiko ghost order dan menjaga kesederhanaan operasional.
 
 ### 3.3 Penanganan Pesanan Tambahan (*Add-on / Re-order*) pada Meja Terisi
 * **Cacat Logika Awal:** Meja 06 sudah bayar di awal untuk 2 kopi. Satu jam kemudian tamu memesan French Fries. Sistem biasa menolak karena Meja 06 berstatus "Sedang Terisi".

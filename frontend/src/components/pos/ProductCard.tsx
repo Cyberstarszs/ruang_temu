@@ -35,8 +35,8 @@ export function ProductCard({
         }
       }}
       style={{
-        backgroundColor: '#ffffff',
-        border: quantityInCart > 0 ? '1.5px solid #57695b' : '1px solid #e5e5e3',
+        backgroundColor: quantityInCart > 0 ? '#f2f6f3' : '#ffffff',
+        border: quantityInCart > 0 ? '2px solid #57695b' : '1px solid #e5e5e3',
         borderRadius: '12px',
         overflow: 'hidden',
         cursor: isSoldOut ? 'not-allowed' : 'pointer',
@@ -45,7 +45,7 @@ export function ProductCard({
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        boxShadow: quantityInCart > 0 ? '0 2px 8px rgba(87, 105, 91, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
+        boxShadow: quantityInCart > 0 ? '0 4px 14px rgba(87, 105, 91, 0.22)' : '0 1px 3px rgba(0,0,0,0.03)',
       }}
     >
       {/* Media / Image Container */}
@@ -118,16 +118,20 @@ export function ProductCard({
               position: 'absolute',
               top: '8px',
               right: '8px',
-              backgroundColor: '#57695b',
+              backgroundColor: '#3b4e40',
               color: '#ffffff',
-              padding: '2px 8px',
+              padding: '3px 8px',
               borderRadius: '999px',
               fontSize: '11px',
-              fontWeight: 700,
-              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+              fontWeight: 800,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+              border: '1.5px solid #ffffff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
             }}
           >
-            {quantityInCart}x
+            ✓ {quantityInCart}x
           </span>
         )}
       </div>
@@ -135,7 +139,7 @@ export function ProductCard({
       {/* Card Content */}
       <div
         style={{
-          padding: '12px',
+          padding: '10px 12px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -143,20 +147,20 @@ export function ProductCard({
         }}
       >
         <div>
-          <div style={{ fontSize: '11px', color: '#7a7a7a', fontWeight: 500, marginBottom: '2px' }}>
+          <div style={{ fontSize: '10.5px', color: '#7a7a7a', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>
             {product.category}
           </div>
           <b
             style={{
-              fontSize: '14px',
-              fontWeight: 600,
-              color: '#272727',
-              lineHeight: 1.3,
+              fontSize: '13.5px',
+              fontWeight: 700,
+              color: '#1c2826',
+              lineHeight: '17px',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              minHeight: '36px',
+              minHeight: '34px',
             }}
           >
             {product.name}
@@ -173,7 +177,7 @@ export function ProductCard({
             borderTop: '1px solid #f2f1ed',
           }}
         >
-          <strong style={{ fontSize: '15px', fontWeight: 700, color: '#57695b' }}>
+          <strong style={{ fontSize: '14px', fontWeight: 700, color: '#57695b' }}>
             {rupiah(product.price)}
           </strong>
 
@@ -186,10 +190,10 @@ export function ProductCard({
             }}
             aria-label={`Tambah ${product.name}`}
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '9px',
-              backgroundColor: isSoldOut ? '#e5e5e3' : '#57695b',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              backgroundColor: isSoldOut ? '#e5e5e3' : quantityInCart > 0 ? '#3b4e40' : '#57695b',
               color: isSoldOut ? '#999' : '#ffffff',
               display: 'flex',
               alignItems: 'center',
@@ -198,9 +202,10 @@ export function ProductCard({
               cursor: isSoldOut ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s ease',
               touchAction: 'manipulation',
+              boxShadow: quantityInCart > 0 ? '0 2px 6px rgba(59, 78, 64, 0.3)' : 'none',
             }}
           >
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size={15} />
           </button>
         </div>
       </div>

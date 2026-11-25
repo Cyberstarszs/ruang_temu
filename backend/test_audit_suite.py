@@ -125,35 +125,30 @@ t_m04 = next(t for t in t_check if t['id'] == table_m04['id'])
 assert t_m04['status'] == 'OCCUPIED', f"Expected OCCUPIED, got {t_m04['status']}"
 print(' [PASS] FR-04 Pay-First Table Lifecycle: Meja M04 Tetap OCCUPIED Saat Tamu Makan')
 
-# 10. QR Customer Order & Anti-Ghost Verification
-qr_submit = request('POST', '/api/v1/orders/qr-submit', {
-    'tableNumber': 'M04',
+# 10. Additional Order at Table (Add-on Checkout)
+addon_order = request('POST', '/api/v1/orders/checkout-direct', {
+    'shiftId': shift_id,
+    'orderType': 'DINE_IN',
+    'tableId': table_m04['id'],
     'customerName': 'Rian Tamu Meja 4',
     'items': [
-        {'productId': kopi_susu['id'], 'quantity': 1, 'unitPrice': 24000}
-    ]
-})
-assert qr_submit['success'] == True, f"QR submit failed: {qr_submit}"
-qr_order_id = qr_submit['data']['id']
-print(f" [PASS] FR-06 QR Customer Order: Pesanan #{qr_submit['data']['order_number']} Terdaftar Status PENDING/UNPAID")
-
-# Cashier confirms QR payment
-qr_pay = request('POST', f"/api/v1/orders/{qr_order_id}/pay-qr", {
-    'shiftId': shift_id,
+        {'productId': kopi_susu['id'], 'quantity': 1, 'unitPrice': 24000, 'modifiers': []}
+    ],
     'paymentMethod': 'QRIS',
-    'amountPaid': 24000,
     'referenceNumber': 'QRIS-TRX-998822'
 }, token=cashier_token)
-assert qr_pay['success'] == True
-print(' [PASS] FR-06 QR Cashier Verification: Pembayaran QRIS Berhasil & Tiket Cetak Otomatis Diteruskan ke Bar')
+assert addon_order['success'] == True, f"Add-on checkout failed: {addon_order}"
+addon_order_id = addon_order['data']['id']
+print(f" [PASS] FR-06 Direct Checkout Add-on: Pesanan #{addon_order['data']['order_number']} Lunas via QRIS")
 
-# 11. Owner PIN Void Order Test
-void_res = request('POST', f"/api/v1/orders/{qr_order_id}/void", {
+# 11. Owner PIN Void Order with Restock Option
+void_res = request('POST', f"/api/v1/orders/{addon_order_id}/void", {
     'managerPin': '123456',
-    'reason': 'Tamu ada urusan mendadak'
+    'reason': 'Tamu ada urusan mendadak (belum diracik)',
+    'restock': True
 }, token=cashier_token)
-assert void_res['success'] == True
-print(' [PASS] FR-02 Void Order Protocol: Transaksi Dibatalkan & Tiket VOID Terkirim ke Bar/Dapur')
+assert void_res['success'] == True and void_res['data']['restocked'] == True
+print(' [PASS] FR-02 Void Order Protocol: Transaksi Dibatalkan, Stok Bahan Dipulihkan (Restocked), & Tiket VOID Terkirim')
 
 # 12. Clear Table
 clear_res = request('POST', f"/api/v1/tables/{table_m04['id']}/clear", token=cashier_token)

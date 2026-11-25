@@ -1,9 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CartItem, Customer, Order } from '@/types';
+import { CartItem, Customer } from '@/types';
 import { rupiah } from '@/lib/utils';
-import { Icon } from '@/components/common/Icons';
+import {
+  Pause,
+  Trash2,
+  Utensils,
+  ShoppingBag,
+  MapPin,
+  X,
+  User,
+  ChevronRight,
+  Coffee,
+  Minus,
+  Plus,
+  Percent,
+  StickyNote,
+  Split,
+  CreditCard,
+} from 'lucide-react';
 
 interface CartSidebarProps {
   cart: CartItem[];
@@ -15,8 +31,6 @@ interface CartSidebarProps {
   discountAmount: number;
   promoCode: string;
   claimedDownPayment: number;
-  activeQrOrder?: Order | null;
-  onCancelQrOrder?: () => void;
   onUpdateQuantity: (index: number, newQty: number) => void;
   onRemoveItem: (index: number) => void;
   onClearCart: () => void;
@@ -33,6 +47,7 @@ interface CartSidebarProps {
   promoSuccess?: string;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  onCloseCart?: () => void;
 }
 
 export function CartSidebar({
@@ -45,8 +60,6 @@ export function CartSidebar({
   discountAmount,
   promoCode,
   claimedDownPayment,
-  activeQrOrder,
-  onCancelQrOrder,
   onUpdateQuantity,
   onRemoveItem,
   onClearCart,
@@ -63,6 +76,7 @@ export function CartSidebar({
   promoSuccess,
   mobileOpen,
   onCloseMobile,
+  onCloseCart,
 }: CartSidebarProps) {
   const [promoInput, setPromoInput] = useState(promoCode);
   const [validatingPromo, setValidatingPromo] = useState(false);
@@ -90,11 +104,15 @@ export function CartSidebar({
         className={`new-pos-cart ${mobileOpen ? 'open' : ''}`}
         style={{
           backgroundColor: '#ffffff',
-          borderLeft: '1px solid #e5e5e3',
           display: 'flex',
           flexDirection: 'column',
-          height: 'calc(100vh - 64px)',
+          height: '100%',
+          maxHeight: '100%',
           overflow: 'hidden',
+          borderRadius: '16px',
+          border: '1px solid #e5e5e3',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+          position: 'relative',
         }}
       >
         <button
@@ -103,151 +121,160 @@ export function CartSidebar({
           aria-label="Tutup pesanan"
         />
 
-        {/* Cart Header */}
+        {/* 1. COMPACT CART HEADER */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '10px 14px',
             borderBottom: '1px solid #f0efe9',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            background: '#ffffff',
+            flexShrink: 0,
           }}
         >
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#272727' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#1c2826' }}>
               Pesanan Aktif
             </h2>
-            <small style={{ color: '#7a7a7a', fontSize: '12px' }}>
-              {totalItemCount} item terpilih
-            </small>
+            {totalItemCount > 0 && (
+              <span
+                style={{
+                  background: '#57695b',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '1px 7px',
+                  borderRadius: '10px',
+                  lineHeight: '16px',
+                }}
+              >
+                {totalItemCount}
+              </span>
+            )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
               onClick={onHoldOrder}
               disabled={cart.length === 0}
               title="Tahan/parkir pesanan ini sementara"
               style={{
-                background: cart.length === 0 ? 'transparent' : '#f3f6f3',
-                border: '1px solid #d1d1d1',
-                color: cart.length === 0 ? '#bbb' : '#57695b',
-                fontSize: '12px',
+                background: cart.length === 0 ? '#fafaf8' : '#f0f4f1',
+                border: '1px solid #dcdfd5',
+                color: cart.length === 0 ? '#9ca3af' : '#57695b',
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: cart.length === 0 ? 'default' : 'pointer',
-                padding: '4px 10px',
+                padding: '4px 9px',
                 borderRadius: '6px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
               }}
             >
-              <Icon name="pause" size={13} />
+              <Pause size={12} />
               <span>Tahan</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setClearConfirm(true)}
-              disabled={cart.length === 0}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: cart.length === 0 ? '#bbb' : '#a32424',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: cart.length === 0 ? 'default' : 'pointer',
-                padding: '4px 8px',
-                borderRadius: '6px',
-              }}
-            >
-              Kosongkan
-            </button>
-          </div>
-        </div>
+            {/* Separator to prevent accidental misclicks */}
+            <div style={{ width: '1px', height: '16px', backgroundColor: '#e5e7eb' }} />
 
-        {/* Active QR Order Banner */}
-        {activeQrOrder && (
-          <div
-            style={{
-              padding: '10px 16px',
-              backgroundColor: '#eef6ef',
-              borderBottom: '1px solid #d4e7d7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              color: '#2d6a4f',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              <Icon name="qrCode" size={16} />
-              <div style={{ minWidth: 0 }}>
-                <b style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  QR #{activeQrOrder.order_number} {activeQrOrder.table_number ? `(Meja ${activeQrOrder.table_number})` : ''}
-                </b>
-                <span style={{ fontSize: '11px', color: '#57695b' }}>
-                  Selesaikan pembayaran di kasir
-                </span>
-              </div>
-            </div>
-            {onCancelQrOrder && (
+            {cart.length > 0 && (
               <button
                 type="button"
-                onClick={onCancelQrOrder}
-                title="Batal bayar pesanan QR ini"
+                onClick={() => setClearConfirm(true)}
                 style={{
-                  background: 'none',
-                  border: '1px solid #d4e7d7',
-                  borderRadius: '4px',
-                  backgroundColor: '#ffffff',
-                  color: '#a32424',
-                  fontSize: '11px',
-                  fontWeight: 700,
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  border: '1px solid #fecaca',
+                  background: '#fef2f2',
+                  color: '#b91c1c',
                   cursor: 'pointer',
-                  padding: '2px 8px',
-                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
                 }}
+                title="Kosongkan seluruh isi keranjang"
+                aria-label="Kosongkan pesanan"
               >
-                Batal
+                <Trash2 size={13} />
+              </button>
+            )}
+
+            {onCloseCart && (
+              <button
+                type="button"
+                onClick={onCloseCart}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                  background: '#ffffff',
+                  color: '#4b5563',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+                title="Tutup Panel Keranjang"
+                aria-label="Tutup Panel Keranjang"
+              >
+                <X size={14} />
               </button>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Order Type Tabs (Dine-in vs Takeaway) */}
-        <div style={{ padding: '12px 20px 8px' }}>
+        {/* 2. COMPACT ORDER CONTROLS (Tipe Order + Meja / Pelanggan) */}
+        <div
+          style={{
+            padding: '8px 12px',
+            background: '#fafaf8',
+            borderBottom: '1px solid #f0efe9',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            flexShrink: 0,
+          }}
+        >
+          {/* Row 1: Order Type Tabs (Dine-in vs Takeaway) */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '4px',
-              backgroundColor: '#f5f4f0',
-              padding: '4px',
-              borderRadius: '8px',
+              backgroundColor: '#eeeee9',
+              padding: '2px',
+              borderRadius: '7px',
             }}
           >
             <button
               type="button"
               onClick={() => onSetOrderType('DINE_IN')}
               style={{
-                padding: '8px 10px',
-                borderRadius: '6px',
+                padding: '5px 8px',
+                borderRadius: '5px',
                 border: 'none',
                 backgroundColor: orderType === 'DINE_IN' ? '#ffffff' : 'transparent',
-                color: orderType === 'DINE_IN' ? '#57695b' : '#666',
+                color: orderType === 'DINE_IN' ? '#57695b' : '#6b7280',
                 fontWeight: orderType === 'DINE_IN' ? 700 : 500,
-                fontSize: '12px',
+                fontSize: '11.5px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '5px',
                 cursor: 'pointer',
-                boxShadow: orderType === 'DINE_IN' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.15s ease',
+                boxShadow: orderType === 'DINE_IN' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.12s ease',
               }}
             >
-              <Icon name="utensils" size={15} />
+              <Utensils size={13} />
               <span>Dine In</span>
             </button>
 
@@ -255,168 +282,193 @@ export function CartSidebar({
               type="button"
               onClick={() => onSetOrderType('TAKEAWAY')}
               style={{
-                padding: '8px 10px',
-                borderRadius: '6px',
+                padding: '5px 8px',
+                borderRadius: '5px',
                 border: 'none',
                 backgroundColor: orderType === 'TAKEAWAY' ? '#ffffff' : 'transparent',
-                color: orderType === 'TAKEAWAY' ? '#57695b' : '#666',
+                color: orderType === 'TAKEAWAY' ? '#57695b' : '#6b7280',
                 fontWeight: orderType === 'TAKEAWAY' ? 700 : 500,
-                fontSize: '12px',
+                fontSize: '11.5px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '5px',
                 cursor: 'pointer',
-                boxShadow: orderType === 'TAKEAWAY' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.15s ease',
+                boxShadow: orderType === 'TAKEAWAY' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.12s ease',
               }}
             >
-              <Icon name="shoppingBag" size={15} />
+              <ShoppingBag size={13} />
               <span>Takeaway</span>
+            </button>
+          </div>
+
+          {/* Row 2: Table / Takeaway input (58%) & Customer CRM button (42%) */}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ flex: '1 1 55%', position: 'relative' }}>
+              {orderType === 'DINE_IN' ? (
+                <>
+                  <input
+                    id="pos-table-number-input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={selectedTable?.number || ''}
+                    onChange={(e) => {
+                      const digitsOnly = e.target.value.replace(/\D/g, '');
+                      onSetManualTable(digitsOnly);
+                    }}
+                    onKeyDown={(e) => {
+                      if (
+                        ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key) ||
+                        e.ctrlKey ||
+                        e.metaKey
+                      ) {
+                        return;
+                      }
+                      if (!/^\d$/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    placeholder="No. Meja (angka)..."
+                    title="Ketik nomor meja (hanya angka)"
+                    style={{
+                      width: '100%',
+                      height: '32px',
+                      padding: '0 24px 0 26px',
+                      borderRadius: '6px',
+                      border: selectedTable?.number ? '1.5px solid #57695b' : '1px solid #d1cfc7',
+                      fontSize: '12px',
+                      fontWeight: selectedTable?.number ? 700 : 500,
+                      backgroundColor: selectedTable?.number ? '#f3f6f3' : '#ffffff',
+                      color: selectedTable?.number ? '#57695b' : '#1f2937',
+                      outline: 'none',
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: selectedTable?.number ? '#57695b' : '#9ca3af',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <MapPin size={13} />
+                  </span>
+                  {selectedTable?.number && (
+                    <button
+                      type="button"
+                      onClick={() => onSetManualTable('')}
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#9ca3af',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Hapus nomor meja"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <input
+                  type="text"
+                  value={takeawayName}
+                  onChange={(e) => onSetTakeawayName(e.target.value)}
+                  placeholder="Nama Pemesan..."
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '0 8px',
+                    borderRadius: '6px',
+                    border: takeawayName ? '1.5px solid #57695b' : '1px solid #d1cfc7',
+                    fontSize: '12px',
+                    fontWeight: takeawayName ? 600 : 400,
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Customer CRM Pill */}
+            <button
+              type="button"
+              onClick={onOpenCustomerModal}
+              style={{
+                flex: '1 1 45%',
+                height: '32px',
+                padding: '0 8px',
+                borderRadius: '6px',
+                border: customer ? '1.5px solid #57695b' : '1px solid #d1cfc7',
+                backgroundColor: customer ? '#f3f6f3' : '#ffffff',
+                color: customer ? '#57695b' : '#4b5563',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                fontSize: '11.5px',
+                fontWeight: customer ? 700 : 500,
+                overflow: 'hidden',
+              }}
+              title={customer ? `${customer.name} (${customer.tier})` : 'Pilih Pelanggan Member'}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <User size={13} color={customer ? '#57695b' : '#9ca3af'} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {customer ? customer.name : '+ Member CRM'}
+                </span>
+              </span>
+              <ChevronRight size={12} color={customer ? '#57695b' : '#9ca3af'} />
             </button>
           </div>
         </div>
 
-        {/* Table Selector / Takeaway Name */}
-        <div style={{ padding: '0 20px 8px' }}>
-          {orderType === 'DINE_IN' ? (
-            <div style={{ position: 'relative' }}>
-              <input
-                id="pos-table-number-input"
-                type="text"
-                value={selectedTable?.number || ''}
-                onChange={(e) => onSetManualTable(e.target.value)}
-                placeholder="Ketik Nomor Meja (Contoh: 01, M05, Akrilik 2)..."
-                style={{
-                  width: '100%',
-                  padding: '10px 36px 10px 36px',
-                  borderRadius: '8px',
-                  border: selectedTable?.number ? '1.5px solid #57695b' : '1px solid #d1cfc7',
-                  fontSize: '13px',
-                  fontWeight: selectedTable?.number ? 700 : 500,
-                  backgroundColor: selectedTable?.number ? '#f3f6f3' : '#fafaf8',
-                  color: selectedTable?.number ? '#57695b' : '#333',
-                  outline: 'none',
-                }}
-              />
-              <span
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: selectedTable?.number ? '#57695b' : '#888',
-                  pointerEvents: 'none',
-                }}
-              >
-                <Icon name="pin" size={16} />
-              </span>
-              {selectedTable?.number && (
-                <button
-                  type="button"
-                  onClick={() => onSetManualTable('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#888',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="Hapus nomor meja"
-                  aria-label="Hapus nomor meja"
-                >
-                  <Icon name="close" size={14} />
-                </button>
-              )}
-            </div>
-          ) : (
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                value={takeawayName}
-                onChange={(e) => onSetTakeawayName(e.target.value)}
-                placeholder="Nama Pemesan (Contoh: Dimas)..."
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #e0dfd8',
-                  fontSize: '13px',
-                  backgroundColor: '#fafaf8',
-                }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Customer Loyalty (CRM) Chip */}
-        <div style={{ padding: '0 20px 10px' }}>
-          <button
-            type="button"
-            onClick={onOpenCustomerModal}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: customer ? '1px solid #57695b' : '1px solid #e5e5e3',
-              backgroundColor: customer ? '#f7f9f7' : '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Icon name="user" size={16} className={customer ? 'text-[#57695b]' : 'text-[#888]'} />
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: customer ? '#57695b' : '#555' }}>
-                  {customer ? customer.name : 'Tambah Pelanggan (Member CRM)'}
-                </span>
-                {customer && (
-                  <small style={{ display: 'block', fontSize: '10px', color: '#666' }}>
-                    Tier {customer.tier} · {customer.loyalty_points} poin
-                  </small>
-                )}
-              </div>
-            </div>
-            <Icon name="chevron" size={14} className="text-[#888]" />
-          </button>
-        </div>
-
-        {/* Scrollable Cart Items */}
+        {/* 3. HERO SECTION: SCROLLABLE CART ITEMS LIST (EXPANDS DYNAMICALLY) */}
         <div
           style={{
-            flex: 1,
+            flex: '1 1 0%',
             overflowY: 'auto',
-            padding: '0 20px',
-            borderTop: '1px solid #f2f1ed',
-            borderBottom: '1px solid #f2f1ed',
+            minHeight: 0,
+            padding: '8px 12px',
+            scrollbarWidth: 'thin',
           }}
         >
           {cart.length === 0 ? (
             <div
               style={{
+                height: '100%',
+                minHeight: '120px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
                 textAlign: 'center',
-                padding: '40px 10px',
+                padding: '20px 10px',
                 color: '#8b8b8b',
               }}
             >
-              <Icon name="coffee" size={36} className="text-[#bbb] mx-auto mb-2 opacity-50" />
-              <b style={{ fontSize: '13px', color: '#555', display: 'block' }}>Keranjang Kosong</b>
-              <p style={{ fontSize: '11px', margin: '4px 0 0' }}>
-                Pilih menu di sebelah kiri atau tekan <kbd style={{ padding: '1px 4px', background: '#eee', borderRadius: '3px' }}>F2</kbd> untuk mencari.
+              <Coffee size={28} color="#cbd5e1" style={{ marginBottom: '8px' }} />
+              <b style={{ fontSize: '13px', color: '#4b5563', display: 'block' }}>Keranjang Kosong</b>
+              <p style={{ fontSize: '11px', color: '#9ca3af', margin: '3px 0 0' }}>
+                Pilih menu di sebelah kiri atau tekan <kbd style={{ padding: '1px 4px', background: '#e5e7eb', borderRadius: '3px', fontSize: '10px' }}>F2</kbd>
               </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {cart.map((item, index) => (
                 <div
                   key={`${item.product.id}-${index}`}
@@ -424,33 +476,97 @@ export function CartSidebar({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 10px',
+                    padding: '6px 8px',
                     borderRadius: '8px',
                     backgroundColor: '#fafaf8',
                     border: '1px solid #f0efe9',
+                    gap: '8px',
+                    transition: 'background 0.1s ease',
                   }}
                 >
-                  <div style={{ flex: 1, paddingRight: '8px' }}>
-                    <b style={{ fontSize: '13px', color: '#272727', display: 'block' }}>
-                      {item.product.name}
-                    </b>
-                    {item.customization && (
-                      <small style={{ fontSize: '11px', color: '#666', display: 'block', marginTop: '1px' }}>
-                        {item.customization.selectedOptions.join(' · ')}
-                      </small>
+                  {/* Thumbnail Foto Menu */}
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#f3f4f6',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {item.product.image_url ? (
+                      <img
+                        src={item.product.image_url}
+                        alt={item.product.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <Coffee size={16} color="#9ca3af" />
                     )}
-                    {item.customization?.notes && (
-                      <small style={{ fontSize: '11px', color: '#57695b', fontStyle: 'italic', display: 'block' }}>
-                        "{item.customization.notes}"
-                      </small>
-                    )}
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#57695b', marginTop: '2px', display: 'block' }}>
-                      {rupiah(item.itemSubtotal)}
-                    </span>
                   </div>
 
-                  {/* Stepper Buttons */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {/* Deskripsi & Harga Produk */}
+                  <div style={{ flex: '1 1 0%', minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        color: '#1f2937',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        lineHeight: '16px',
+                      }}
+                      title={item.product.name}
+                    >
+                      {item.product.name}
+                    </div>
+
+                    {item.customization?.selectedOptions && item.customization.selectedOptions.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: '10.5px',
+                          color: '#6b7280',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          marginTop: '1px',
+                        }}
+                      >
+                        {item.customization.selectedOptions.join(' · ')}
+                      </div>
+                    )}
+
+                    {item.customization?.notes && (
+                      <div
+                        style={{
+                          fontSize: '10.5px',
+                          color: '#57695b',
+                          fontStyle: 'italic',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        "{item.customization.notes}"
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#57695b', marginTop: '2px' }}>
+                      {rupiah(item.itemSubtotal)}
+                    </div>
+                  </div>
+
+                  {/* Stepper Buttons (Touchscreen-friendly: 32x32px) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                     <button
                       type="button"
                       onClick={() => {
@@ -461,46 +577,48 @@ export function CartSidebar({
                         }
                       }}
                       style={{
-                        width: '30px',
-                        height: '30px',
+                        width: '32px',
+                        height: '32px',
                         borderRadius: '6px',
-                        border: '1px solid #dcdbd5',
-                        backgroundColor: '#fff',
+                        border: '1.5px solid #d1d5db',
+                        backgroundColor: '#ffffff',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#444',
-                        fontSize: '15px',
-                        fontWeight: 700,
+                        color: '#1f2937',
+                        padding: 0,
                         touchAction: 'manipulation',
                       }}
+                      title={item.quantity === 1 ? 'Hapus item' : 'Kurangi jumlah'}
                     >
-                      −
+                      <Minus size={14} strokeWidth={2.5} />
                     </button>
-                    <b style={{ minWidth: '22px', textAlign: 'center', fontSize: '13.5px' }}>
+
+                    <b style={{ minWidth: '24px', textAlign: 'center', fontSize: '13.5px', fontWeight: 800, color: '#111827' }}>
                       {item.quantity}
                     </b>
+
                     <button
                       type="button"
                       onClick={() => onUpdateQuantity(index, item.quantity + 1)}
                       style={{
-                        width: '30px',
-                        height: '30px',
+                        width: '32px',
+                        height: '32px',
                         borderRadius: '6px',
-                        border: '1px solid #dcdbd5',
-                        backgroundColor: '#fff',
+                        border: '1.5px solid #57695b',
+                        backgroundColor: '#57695b',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#444',
-                        fontSize: '15px',
-                        fontWeight: 700,
+                        color: '#ffffff',
+                        padding: 0,
                         touchAction: 'manipulation',
                       }}
+                      title="Tambah jumlah"
                     >
-                      +
+                      <Plus size={14} strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>
@@ -509,53 +627,71 @@ export function CartSidebar({
           )}
         </div>
 
-        {/* Footer Summary & Checkout */}
-        <div style={{ padding: '14px 20px', backgroundColor: '#ffffff' }}>
-          {/* Quick toggle for Promo & Notes */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
-            <button
-              type="button"
-              onClick={() => setShowPromoBox(!showPromoBox)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: promoCode ? '#2d6a4f' : '#666',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <Icon name="percent" size={13} />
-              {promoCode ? `Kupon: ${promoCode}` : '+ Tambah Promo'}
-            </button>
+        {/* 4. COMPACT FOOTER SUMMARY & CHECKOUT */}
+        <div
+          style={{
+            padding: '10px 14px',
+            backgroundColor: '#ffffff',
+            borderTop: '1px solid #f0efe9',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            flexShrink: 0,
+          }}
+        >
+          {/* Quick Actions for Promo & Notes */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowPromoBox(!showPromoBox)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: promoCode ? '#2e7d32' : '#6b7280',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  padding: 0,
+                }}
+              >
+                <Percent size={12} />
+                {promoCode ? `Promo: ${promoCode}` : '+ Promo'}
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setShowNoteBox(!showNoteBox)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: orderNote ? '#57695b' : '#666',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <Icon name="stickyNote" size={13} />
-              {orderNote ? 'Catatan Aktif' : '+ Catatan Dapur/Bar'}
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowNoteBox(!showNoteBox)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: orderNote ? '#57695b' : '#6b7280',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  padding: 0,
+                }}
+              >
+                <StickyNote size={12} />
+                {orderNote ? 'Catatan Aktif' : '+ Catatan'}
+              </button>
+            </div>
+
+            <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+              {totalItemCount} item
+            </span>
           </div>
 
-          {/* Collapsible Promo Box */}
+          {/* Collapsible Promo Input */}
           {showPromoBox && (
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ background: '#f9fafb', padding: '6px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', gap: '4px' }}>
                 <input
                   type="text"
                   value={promoInput}
@@ -563,11 +699,12 @@ export function CartSidebar({
                   placeholder="KODE PROMO..."
                   style={{
                     flex: 1,
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1cfc7',
-                    fontSize: '12px',
+                    padding: '4px 8px',
+                    borderRadius: '5px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '11.5px',
                     textTransform: 'uppercase',
+                    fontFamily: 'monospace',
                   }}
                 />
                 <button
@@ -575,10 +712,10 @@ export function CartSidebar({
                   disabled={validatingPromo || !promoInput.trim()}
                   onClick={handleApplyPromo}
                   style={{
-                    padding: '6px 12px',
+                    padding: '4px 10px',
                     backgroundColor: '#57695b',
                     color: '#fff',
-                    borderRadius: '6px',
+                    borderRadius: '5px',
                     border: 'none',
                     fontSize: '11px',
                     fontWeight: 700,
@@ -588,125 +725,134 @@ export function CartSidebar({
                   {validatingPromo ? '...' : 'Terapkan'}
                 </button>
               </div>
-              {promoError && <small style={{ color: '#a32424', fontSize: '10px', display: 'block', marginTop: '3px' }}>{promoError}</small>}
-              {promoSuccess && <small style={{ color: '#2d6a4f', fontSize: '10px', display: 'block', marginTop: '3px' }}>{promoSuccess}</small>}
+              {promoError && <small style={{ color: '#b91c1c', fontSize: '10px', display: 'block', marginTop: '2px' }}>{promoError}</small>}
+              {promoSuccess && <small style={{ color: '#2e7d32', fontSize: '10px', display: 'block', marginTop: '2px' }}>{promoSuccess}</small>}
             </div>
           )}
 
-          {/* Collapsible Note Box */}
+          {/* Collapsible Note Input */}
           {showNoteBox && (
-            <div style={{ marginBottom: '10px' }}>
+            <div style={{ background: '#f9fafb', padding: '6px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
               <input
                 type="text"
                 value={orderNote}
                 onChange={(e) => onSetOrderNote(e.target.value)}
-                placeholder="Catatan ke koki/barista..."
+                placeholder="Catatan ke koki / barista..."
                 style={{
                   width: '100%',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1cfc7',
-                  fontSize: '12px',
+                  padding: '4px 8px',
+                  borderRadius: '5px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '11.5px',
                 }}
               />
             </div>
           )}
 
           {/* Price Breakdown */}
-          <div style={{ fontSize: '12px', color: '#555', marginBottom: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11.5px', color: '#6b7280', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Subtotal:</span>
-              <b style={{ color: '#272727' }}>{rupiah(subtotal)}</b>
+              <b style={{ color: '#1f2937' }}>{rupiah(subtotal)}</b>
             </div>
 
             {discountAmount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#2d6a4f' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
                 <span>Diskon Kupon:</span>
                 <b>− {rupiah(discountAmount)}</b>
               </div>
             )}
 
             {claimedDownPayment > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#2d6a4f' }}>
-                <span>Uang Muka Reservasi (DP):</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
+                <span>Uang Muka (DP):</span>
                 <b>− {rupiah(claimedDownPayment)}</b>
               </div>
             )}
           </div>
 
-          {/* Total Nett */}
+          {/* Total Bayar Headline */}
           <div
             style={{
               display: 'flex',
-              alignItems: 'baseline',
+              alignItems: 'center',
               justifyContent: 'space-between',
-              paddingTop: '8px',
-              borderTop: '1.5px solid #272727',
-              marginBottom: '12px',
+              paddingTop: '6px',
+              borderTop: '1.5px dashed #e5e7eb',
             }}
           >
             <div>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#272727', display: 'block' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1f2937', display: 'block', letterSpacing: '0.3px' }}>
                 TOTAL BAYAR
               </span>
-              <small style={{ fontSize: '10px', color: '#777' }}>Nett (0% Pajak, 0% Servis)</small>
+              <small style={{ fontSize: '9.5px', color: '#9ca3af' }}>Nett (0% Pajak, 0% Servis)</small>
             </div>
-            <b style={{ fontSize: '22px', fontWeight: 700, color: '#57695b' }}>{rupiah(grandTotal)}</b>
+            <b style={{ fontSize: '19px', fontWeight: 800, color: '#57695b' }}>{rupiah(grandTotal)}</b>
           </div>
 
-          {/* Primary Action Button (Bayar F4) */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {/* Action Buttons (Split + Checkout) */}
+          <div style={{ display: 'flex', gap: '6px' }}>
             <button
               type="button"
               disabled={cart.length === 0}
               onClick={onOpenSplitBill}
-              title="Pisah tagihan sama rata"
+              title="Pisah tagihan sama rata (Split Bill)"
               style={{
-                padding: '12px 14px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '8px',
-                border: '1px solid #d1d1d1',
+                border: '1px solid #d1d5db',
                 backgroundColor: '#ffffff',
-                color: '#444',
+                color: '#4b5563',
                 cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              <Icon name="split" size={18} />
+              <Split size={16} />
             </button>
 
-            <button
-              type="button"
-              disabled={cart.length === 0 || (orderType === 'DINE_IN' && !selectedTable)}
-              onClick={onOpenPayment}
-              style={{
-                flex: 1,
-                padding: '12px 16px',
-                borderRadius: '8px',
-                backgroundColor: cart.length === 0 || (orderType === 'DINE_IN' && !selectedTable) ? '#d1d5db' : '#57695b',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '14px',
-                cursor: cart.length === 0 || (orderType === 'DINE_IN' && !selectedTable) ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: cart.length > 0 ? '0 2px 6px rgba(87, 105, 91, 0.25)' : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <Icon name="creditCard" size={18} />
-              <span>
-                {cart.length === 0
-                  ? 'Pilih Menu Dulu'
-                  : orderType === 'DINE_IN' && !selectedTable
-                  ? 'Pilih Nomor Meja'
-                  : `Bayar ${rupiah(grandTotal)} (F4)`}
-              </span>
-            </button>
+            {(() => {
+              const isTableNeeded = orderType === 'DINE_IN' && !selectedTable?.number?.trim();
+              const isCartEmpty = cart.length === 0;
+              const isDisabled = isCartEmpty || isTableNeeded;
+
+              return (
+                <button
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={onOpenPayment}
+                  style={{
+                    flex: 1,
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: isDisabled ? '#f3f4f6' : '#57695b',
+                    color: isDisabled ? '#4b5563' : '#ffffff',
+                    border: isDisabled ? '1.5px dashed #cbd5e1' : 'none',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: !isDisabled ? '0 2px 6px rgba(87, 105, 91, 0.25)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <CreditCard size={15} />
+                  <span>
+                    {isCartEmpty
+                      ? 'Pilih Menu Terlebih Dahulu'
+                      : isTableNeeded
+                      ? 'Masukkan Nomor Meja (Angka)'
+                      : `Bayar ${rupiah(grandTotal)} (F4)`}
+                  </span>
+                </button>
+              );
+            })()}
           </div>
         </div>
       </aside>
@@ -716,7 +862,7 @@ export function CartSidebar({
         <div className="bo-modal-layer">
           <div className="bo-confirm" role="alertdialog">
             <span>
-              <Icon name="trash" size={28} />
+              <Trash2 size={28} />
             </span>
             <h2>Kosongkan Pesanan?</h2>
             <p>Seluruh item dalam keranjang belanja saat ini akan dihapus.</p>

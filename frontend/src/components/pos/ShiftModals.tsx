@@ -459,6 +459,10 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
 
   const handleClose = async () => {
     setError('');
+    if (physicalCash < 0) {
+      setError('Nominal uang fisik di laci tidak boleh negatif.');
+      return;
+    }
     setLoading(true);
 
     try {

@@ -1,6 +1,14 @@
 import { Router } from 'express';
-import { requireAuth } from '../../middlewares/auth';
-import { getCurrentShift, openShift, closeShift, recordCashMovement, getCashMovements } from './shiftController';
+import { requireAuth, requireRoles } from '../../middlewares/auth';
+import {
+  getCurrentShift,
+  openShift,
+  closeShift,
+  recordCashMovement,
+  getCashMovements,
+  getShiftHistory,
+  forceCloseShift,
+} from './shiftController';
 
 const router = Router();
 
@@ -11,5 +19,7 @@ router.post('/open', openShift);
 router.post('/close', closeShift);
 router.get('/cash-movements', getCashMovements);
 router.post('/cash-movements', recordCashMovement);
+router.get('/history', requireRoles('OWNER'), getShiftHistory);
+router.post('/:id/force-close', requireRoles('OWNER'), forceCloseShift);
 
 export default router;

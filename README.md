@@ -43,11 +43,9 @@ File ini akan otomatis mendeteksi dependensi dan langsung menjalankan Backend + 
 
 ## 🌐 Akses Sistem
 
-- **Aplikasi Web / Kasir POS:** [http://localhost:3000](http://localhost:3000)
-- **Menu Self-Order QR Pelanggan:** [http://localhost:3000?meja=M01](http://localhost:3000?meja=M01)
+- **Aplikasi Web / Kasir POS & Backoffice:** [http://localhost:3000](http://localhost:3000)
 - **Backend API & Health Check:** [http://localhost:5000/health](http://localhost:5000/health)
 
 ### Akun Demo 1-Klik di Halaman Login:
-- **Kasir:** `kasir@ruangtemu.id` (Akses POS, shift kasir, transaksi bayar di kasir, meja)
-- **Manajer:** `manager@ruangtemu.id` (Akses otorisasi void PIN, inventaris, purchasing PO, audit log)
-- **Owner:** `owner@ruangtemu.id` (Akses penuh termasuk laporan laba rugi, heatmap penjualan, pengaturan toko)
+- **Kasir:** Username: `kasir` (Password: `kasir123`) - Akses POS kasir, sif kasir, transaksi bayar di kasir, denah meja, kas kecil.
+- **Owner:** Username: `owner` (Password: `owner123` | PIN Otorisasi: `123456`) - Akses penuh termasuk laporan eksekutif (laba kotor, ringkasan harian, heatmap), matriks BCG menu, inventaris & opname, purchasing PO, otorisasi void transaksi, manajemen pengguna, audit log, dan pengaturan toko.

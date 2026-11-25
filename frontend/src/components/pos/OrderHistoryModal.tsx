@@ -9,19 +9,17 @@ import { Icon } from '@/components/common/Icons';
 interface OrderHistoryModalProps {
   onClose: () => void;
   onReprintReceipt: (order: Order) => void;
-  onPayPendingOrder: (order: Order) => void;
   onRefreshOrders?: () => void;
 }
 
 export function OrderHistoryModal({
   onClose,
   onReprintReceipt,
-  onPayPendingOrder,
   onRefreshOrders,
 }: OrderHistoryModalProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'PAID' | 'CANCELLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'CANCELLED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -30,6 +28,7 @@ export function OrderHistoryModal({
   const [orderToVoid, setOrderToVoid] = useState<Order | null>(null);
   const [voidPin, setVoidPin] = useState('');
   const [voidReason, setVoidReason] = useState('');
+  const [restockStock, setRestockStock] = useState(true);
   const [voiding, setVoiding] = useState(false);
   const [voidError, setVoidError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -56,8 +55,6 @@ export function OrderHistoryModal({
     const matchesStatus =
       statusFilter === 'ALL'
         ? true
-        : statusFilter === 'PENDING'
-        ? o.status === 'PENDING_PAYMENT_AT_CASHIER'
         : statusFilter === 'PAID'
         ? o.status === 'PAID'
         : o.status === 'CANCELLED';
@@ -97,6 +94,7 @@ export function OrderHistoryModal({
       const res = await api.orders.voidOrder(orderToVoid.id, {
         managerPin: voidPin.trim(),
         reason: voidReason.trim(),
+        restock: restockStock,
       });
 
       if (res.success) {
@@ -142,8 +140,8 @@ export function OrderHistoryModal({
         >
           <header className="bo-modal-head">
             <div>
-              <h2>Riwayat Transaksi & Antrean QR</h2>
-              <p>Daftar seluruh transaksi kasir, self-order QR meja, dan status pembayaran.</p>
+              <h2>Riwayat Transaksi</h2>
+              <p>Daftar seluruh transaksi kasir dan status pembayaran.</p>
             </div>
             <button onClick={onClose} aria-label="Tutup">
               <Icon name="close" size={20} />
@@ -192,7 +190,7 @@ export function OrderHistoryModal({
               </div>
 
               <div className="pos-category-tabs" style={{ margin: 0 }}>
-                {(['ALL', 'PENDING', 'PAID', 'CANCELLED'] as const).map((s) => (
+                {(['ALL', 'PAID', 'CANCELLED'] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -202,8 +200,6 @@ export function OrderHistoryModal({
                   >
                     {s === 'ALL'
                       ? 'Semua'
-                      : s === 'PENDING'
-                      ? 'Antrean QR'
                       : s === 'PAID'
                       ? 'Lunas'
                       : 'Void'}
@@ -317,21 +313,6 @@ export function OrderHistoryModal({
 
                             {/* Actions toolbar */}
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                              {order.status === 'PENDING_PAYMENT_AT_CASHIER' && (
-                                <button
-                                  type="button"
-                                  className="bo-primary"
-                                  onClick={() => {
-                                    onPayPendingOrder(order);
-                                    onClose();
-                                  }}
-                                  style={{ padding: '6px 14px', fontSize: '13px' }}
-                                >
-                                  <Icon name="creditCard" size={16} />
-                                  Proses Pembayaran di Kasir
-                                </button>
-                              )}
-
                               {order.status === 'PAID' && (
                                 <>
                                   <button
@@ -482,6 +463,18 @@ export function OrderHistoryModal({
                     letterSpacing: '3px',
                   }}
                 />
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={restockStock}
+                  onChange={(e) => setRestockStock(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#1b4332' }}
+                />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#1c2826' }}>
+                  Kembalikan bahan baku ke stok (Restock)
+                </span>
               </label>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

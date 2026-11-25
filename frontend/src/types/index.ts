@@ -258,3 +258,157 @@ export interface HeldOrder {
   grandTotal: number;
 }
 
+// ==========================================
+// ADMIN & OWNER REPORT / BACKOFFICE TYPES
+// ==========================================
+
+export interface DailySummary {
+  date: string;
+  totalTransactions: number;
+  netSales: number;
+  totalCogs: number;
+  grossProfit: number;
+  grossMarginPercentage: string;
+  averageBasketSize: number;
+  topProducts: Array<{
+    name: string;
+    total_qty: string | number;
+    total_revenue: string | number;
+  }>;
+}
+
+export interface HourlyHeatmapItem {
+  hour: number;
+  transactionCount: number;
+  salesVolume: number;
+}
+
+export interface Ingredient {
+  id: string;
+  code: string;
+  name: string;
+  usage_unit: 'gram' | 'ml' | 'pcs';
+  purchase_unit: string;
+  conversion_rate: number;
+  stock_actual: number;
+  safe_stock: number;
+  unit_cost: number;
+  is_low_stock?: boolean;
+  is_out_of_stock?: boolean;
+  updated_at?: string;
+}
+
+export interface ProductRecipeItem {
+  id: string;
+  product_id: string;
+  ingredient_id: string;
+  ingredient_name: string;
+  ingredient_code: string;
+  usage_unit: string;
+  unit_cost: number;
+  quantity: number;
+  item_hpp: number;
+  is_packaging_only: boolean;
+}
+
+export interface ProductRecipesResponse {
+  recipes: ProductRecipeItem[];
+  totalHpp: number;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  payment_terms: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  ingredient_id: string;
+  ingredient_name: string;
+  ingredient_code?: string;
+  usage_unit?: string;
+  purchase_unit?: string;
+  quantity: number;
+  unit_cost: number;
+  subtotal: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  po_number: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_phone?: string;
+  supplier_address?: string;
+  status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  total_amount: number;
+  payment_status: 'UNPAID' | 'PAID';
+  notes?: string | null;
+  ordered_by_user_id: string;
+  ordered_by_name?: string;
+  received_at?: string | null;
+  created_at: string;
+  items?: PurchaseOrderItem[];
+}
+
+export interface StoreSettings {
+  id: string;
+  store_name: string;
+  tagline?: string;
+  address?: string;
+  phone?: string;
+  receipt_footer?: string;
+  rounding_rule: number;
+  updated_at?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id?: string | null;
+  actor_name?: string | null;
+  actor_role?: string | null;
+  action: string;
+  target_table: string;
+  target_id: string;
+  details: any;
+  created_at: string;
+}
+
+export interface ShiftAuditItem {
+  id: string;
+  cashier_id: string;
+  cashier_name: string;
+  opened_at: string;
+  closed_at?: string | null;
+  opening_cash: number;
+  system_expected_cash?: number | null;
+  blind_counted_cash?: number | null;
+  cash_difference?: number | null;
+  closing_notes?: string | null;
+  approved_by_name?: string | null;
+  status: 'OPEN' | 'CLOSED';
+  total_orders: number;
+  total_sales: number;
+  cash_sales?: number;
+  non_cash_sales?: number;
+  total_cash_in?: number;
+  total_cash_out?: number;
+  movement_count: number;
+}
+
+export interface StaffUser {
+  id: string;
+  name: string;
+  username: string;
+  role: UserRole;
+  has_pin: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+

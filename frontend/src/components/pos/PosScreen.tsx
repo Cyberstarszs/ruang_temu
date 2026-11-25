@@ -20,14 +20,17 @@ import { HeldOrdersModal } from './HeldOrdersModal';
 import { Icon } from '@/components/common/Icons';
 import { rupiah } from '@/lib/utils';
 
-export function PosScreen() {
+interface PosScreenProps {
+  onSwitchToAdmin?: () => void;
+}
+
+export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
   const { shift, hasActiveShift, isLoading: shiftLoading, refreshShift } = useShift();
 
   // State: Data from Backend
   const [products, setProducts] = useState<Product[]>([]);
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [pendingQrCount, setPendingQrCount] = useState(0);
   const [printerOnline, setPrinterOnline] = useState(true);
 
   // State: Filters
@@ -47,7 +50,6 @@ export function PosScreen() {
   const [promoSuccess, setPromoSuccess] = useState('');
   const [claimedDownPayment, setClaimedDownPayment] = useState(0);
   const [reservationId, setReservationId] = useState<string | null>(null);
-  const [activeQrOrder, setActiveQrOrder] = useState<Order | null>(null);
 
   // State: Modals
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
@@ -60,6 +62,7 @@ export function PosScreen() {
   const [menuMatrixOpen, setMenuMatrixOpen] = useState(false);
   const [heldOrdersModalOpen, setHeldOrdersModalOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(true);
   const [splitBillOpen, setSplitBillOpen] = useState(false);
   const [splitCount, setSplitCount] = useState(2);
 
@@ -79,10 +82,9 @@ export function PosScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoadingData(true);
-      const [prodRes, tableRes, ordersRes] = await Promise.all([
+      const [prodRes, tableRes] = await Promise.all([
         api.products.getAll(),
         api.tables.getAll(),
-        api.orders.getOrders({ status: 'PENDING_PAYMENT_AT_CASHIER' }),
       ]);
 
       if (prodRes.success && prodRes.data) {
@@ -90,9 +92,6 @@ export function PosScreen() {
       }
       if (tableRes.success && tableRes.data) {
         setTables(tableRes.data);
-      }
-      if (ordersRes.success && ordersRes.data) {
-        setPendingQrCount(ordersRes.data.length);
       }
     } catch (err) {
       console.error('Error loading master data:', err);
@@ -117,23 +116,16 @@ export function PosScreen() {
       );
     };
 
-    const handleQrOrder = () => {
-      setPendingQrCount((prev) => prev + 1);
-      showToast('Pesanan QR Meja baru masuk ke antrean kasir!');
-    };
-
     const handlePrinterError = () => {
       setPrinterOnline(false);
       showToast('Peringatan: Salah satu printer thermal offline.');
     };
 
     socket.on('table:status_change', handleTableChange);
-    socket.on('order:qr_submitted', handleQrOrder);
     socket.on('printer:error', handlePrinterError);
 
     return () => {
       socket.off('table:status_change', handleTableChange);
-      socket.off('order:qr_submitted', handleQrOrder);
       socket.off('printer:error', handlePrinterError);
     };
   }, []);
@@ -147,6 +139,7 @@ export function PosScreen() {
       } else if (e.key === 'F4') {
         if (cart.length > 0 && !paymentModalOpen) {
           e.preventDefault();
+          setIsCartOpen(true);
           if (orderType === 'DINE_IN' && !selectedTable?.number?.trim()) {
             document.getElementById('pos-table-number-input')?.focus();
             showToast('Ketik nomor meja terlebih dahulu.');
@@ -293,7 +286,6 @@ export function PosScreen() {
     setPromoSuccess('');
     setClaimedDownPayment(0);
     setReservationId(null);
-    setActiveQrOrder(null);
     showToast('Keranjang belanja dikosongkan.');
   };
 
@@ -379,24 +371,28 @@ export function PosScreen() {
     showToast('Pesanan tahanan dihapus.');
   };
 
-  // Input Manual Nomor Meja
+  // Input Manual Nomor Meja (Hanya Angka)
   const handleSetManualTable = (tableNumber: string) => {
-    if (!tableNumber) {
+    const digitsOnly = tableNumber.replace(/\D/g, '');
+    if (!digitsOnly) {
       setSelectedTable(null);
       return;
     }
-    const trimmed = tableNumber.trim();
-    if (!trimmed) {
-      setSelectedTable(null);
-      return;
-    }
-    const matched = tables.find(
-      (t) => t.table_number.toLowerCase() === trimmed.toLowerCase()
-    );
+
+    const intVal = parseInt(digitsOnly, 10);
+    const matched = tables.find((t) => {
+      const tableDigits = t.table_number.replace(/\D/g, '');
+      return (
+        t.table_number.toLowerCase() === digitsOnly.toLowerCase() ||
+        t.table_number.toLowerCase() === `m${digitsOnly.padStart(2, '0')}`.toLowerCase() ||
+        (tableDigits && parseInt(tableDigits, 10) === intVal)
+      );
+    });
+
     if (matched) {
-      setSelectedTable({ id: matched.id, number: matched.table_number });
+      setSelectedTable({ id: matched.id, number: digitsOnly });
     } else {
-      setSelectedTable({ number: tableNumber });
+      setSelectedTable({ number: digitsOnly });
     }
   };
 
@@ -438,55 +434,6 @@ export function PosScreen() {
     if (!hasActiveShift || !shift) {
       setActiveShiftModal('open');
       throw new Error('Sif kasir belum dibuka. Silakan masukkan modal awal kasir.');
-    }
-
-    if (activeQrOrder) {
-      // Selesaikan pembayaran pesanan QR mandiri yang sudah ada (mencegah order ganda & duplikasi stok)
-      const qrPayload = {
-        shiftId: shift.id,
-        paymentMethod: paymentData.paymentMethod,
-        payments: paymentData.payments,
-        cashReceived: paymentData.cashReceived,
-        cashChange: paymentData.cashChange,
-        referenceNumber: paymentData.referenceNumber,
-      };
-
-      const res = await api.orders.payQr(activeQrOrder.id, qrPayload);
-      if (res.success) {
-        setReceiptData({
-          orderNumber: activeQrOrder.order_number,
-          orderType: activeQrOrder.order_type,
-          tableNumber: activeQrOrder.table_number || selectedTable?.number || null,
-          cashierName: shift.cashier_name || 'Kasir',
-          customerName: activeQrOrder.customer_name || customer?.name,
-          createdAt: new Date().toISOString(),
-          items: cart.map((item) => ({
-            productName: item.product.name,
-            quantity: item.quantity,
-            unitPrice: item.customization
-              ? item.product.price + item.customization.unitPriceAdjustment
-              : item.product.price,
-            subtotal: item.itemSubtotal,
-            printTarget: item.product.print_target,
-            notes: item.customization?.notes || item.customization?.selectedOptions?.join(', '),
-          })),
-          subtotal,
-          discountAmount,
-          claimedDownPayment,
-          totalAmount: grandTotal,
-          paymentMethod: paymentData.paymentMethod,
-          cashReceived: paymentData.cashReceived,
-          cashChange: paymentData.cashChange,
-        });
-
-        handleClearCart();
-        setPaymentModalOpen(false);
-        showToast(`Pesanan QR ${activeQrOrder.order_number} lunas! Tiket cetak otomatis terkirim.`);
-        await Promise.all([loadData(), refreshShift()]);
-        return;
-      } else {
-        throw new Error(res.message || 'Gagal menyelesaikan pembayaran pesanan QR.');
-      }
     }
 
     const payload = {
@@ -553,39 +500,6 @@ export function PosScreen() {
     }
   };
 
-  // Pay QR Order from Order History
-  const handlePayPendingOrder = (order: Order) => {
-    setActiveQrOrder(order);
-    // Fill cart from order items
-    if (order.items && order.items.length > 0) {
-      const reconstituted: CartItem[] = order.items.map((oi) => {
-        const prod = products.find((p) => p.id === oi.productId) || {
-          id: oi.productId,
-          sku: 'UNKNOWN',
-          name: oi.productName,
-          category: 'Kopi' as const,
-          price: Number(oi.unitPrice),
-          print_target: oi.printTarget || 'BAR_PRINTER',
-          is_active: true,
-          is_force_sold_out: false,
-        };
-        return {
-          product: prod,
-          quantity: oi.quantity,
-          itemSubtotal: Number(oi.subtotal),
-          customization: oi.notes ? { size: 'Reguler', unitPriceAdjustment: 0, notes: oi.notes, selectedOptions: [] } : undefined,
-        };
-      });
-      setCart(reconstituted);
-      setSelectedTable(order.table_number ? { id: order.table_id || undefined, number: order.table_number } : null);
-      setOrderType(order.order_type);
-      setDiscountAmount(Number(order.discount_amount || 0));
-      setClaimedDownPayment(Number(order.claimed_down_payment || 0));
-      setPaymentModalOpen(true);
-      showToast(`Memuat Pesanan QR ${order.order_number} ke kasir.`);
-    }
-  };
-
   // Reprint Receipt from Order History
   const handleReprintReceipt = (order: Order) => {
     const payment = order.payments?.[0];
@@ -635,13 +549,23 @@ export function PosScreen() {
         onOpenMatrix={() => setMenuMatrixOpen(true)}
         onOpenShiftModal={(modal) => setActiveShiftModal(modal)}
         onOpenHeldOrders={() => setHeldOrdersModalOpen(true)}
+        onSwitchToAdmin={onSwitchToAdmin}
         heldOrdersCount={heldOrders.length}
-        pendingQrCount={pendingQrCount}
         printerOnline={printerOnline}
+        isCartOpen={isCartOpen}
+        onToggleCart={() => setIsCartOpen(!isCartOpen)}
+        cartItemCount={cart.reduce((s, i) => s + i.quantity, 0)}
+        cartGrandTotal={grandTotal}
       />
 
       {/* Main Layout: Products Catalog + Cart */}
-      <main>
+      <main
+        className={isCartOpen ? '' : 'cart-closed'}
+        style={{
+          gridTemplateColumns: isCartOpen ? 'minmax(0, 1fr) 380px' : '1fr',
+          transition: 'grid-template-columns 0.25s ease',
+        }}
+      >
         {/* Catalog Section */}
         <section className="new-pos-products">
           <div className="pos-catalog-tools">
@@ -790,46 +714,89 @@ export function PosScreen() {
         </section>
 
         {/* Right Cart Sidebar */}
-        <CartSidebar
-          cart={cart}
-          orderType={orderType}
-          selectedTable={selectedTable}
-          customer={customer}
-          orderNote={orderNote}
-          takeawayName={takeawayName}
-          discountAmount={discountAmount}
-          promoCode={promoCode}
-          claimedDownPayment={claimedDownPayment}
-          activeQrOrder={activeQrOrder}
-          onCancelQrOrder={() => {
-            setActiveQrOrder(null);
-            handleClearCart();
-          }}
-          onUpdateQuantity={handleUpdateQuantity}
-          onRemoveItem={handleRemoveItem}
-          onClearCart={handleClearCart}
-          onHoldOrder={handleHoldOrder}
-          onSetOrderType={setOrderType}
-          onSetManualTable={handleSetManualTable}
-          onOpenCustomerModal={() => setCustomerModalOpen(true)}
-          onSetOrderNote={setOrderNote}
-          onSetTakeawayName={setTakeawayName}
-          onOpenPayment={() => {
-            if (orderType === 'DINE_IN' && !selectedTable?.number?.trim()) {
-              document.getElementById('pos-table-number-input')?.focus();
-              showToast('Wajib mengisi nomor meja terlebih dahulu.');
-            } else {
-              setPaymentModalOpen(true);
-            }
-          }}
-          onOpenSplitBill={() => setSplitBillOpen(true)}
-          onValidatePromo={handleValidatePromo}
-          promoError={promoError}
-          promoSuccess={promoSuccess}
-          mobileOpen={mobileCartOpen}
-          onCloseMobile={() => setMobileCartOpen(false)}
-        />
+        {isCartOpen && (
+          <CartSidebar
+            cart={cart}
+            orderType={orderType}
+            selectedTable={selectedTable}
+            customer={customer}
+            orderNote={orderNote}
+            takeawayName={takeawayName}
+            discountAmount={discountAmount}
+            promoCode={promoCode}
+            claimedDownPayment={claimedDownPayment}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onClearCart={handleClearCart}
+            onHoldOrder={handleHoldOrder}
+            onSetOrderType={setOrderType}
+            onSetManualTable={handleSetManualTable}
+            onOpenCustomerModal={() => setCustomerModalOpen(true)}
+            onSetOrderNote={setOrderNote}
+            onSetTakeawayName={setTakeawayName}
+            onOpenPayment={() => {
+              if (orderType === 'DINE_IN' && !selectedTable?.number?.trim()) {
+                document.getElementById('pos-table-number-input')?.focus();
+                showToast('Wajib mengisi nomor meja terlebih dahulu.');
+              } else {
+                setPaymentModalOpen(true);
+              }
+            }}
+            onOpenSplitBill={() => setSplitBillOpen(true)}
+            onValidatePromo={handleValidatePromo}
+            promoError={promoError}
+            promoSuccess={promoSuccess}
+            mobileOpen={mobileCartOpen}
+            onCloseMobile={() => setMobileCartOpen(false)}
+            onCloseCart={() => setIsCartOpen(false)}
+          />
+        )}
       </main>
+
+      {/* Floating Open Cart Pill when Cart is Closed (Desktop) */}
+      {!isCartOpen && (
+        <button
+          type="button"
+          onClick={() => setIsCartOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 20px',
+            backgroundColor: '#57695b',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '999px',
+            boxShadow: '0 8px 24px rgba(87, 105, 91, 0.35)',
+            cursor: 'pointer',
+            fontWeight: 700,
+            fontSize: '13.5px',
+            transition: 'all 0.15s ease',
+          }}
+          title="Buka Panel Keranjang Pesanan (F4)"
+        >
+          <Icon name="bag" size={18} />
+          <span>Buka Keranjang</span>
+          {cart.length > 0 && (
+            <span
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#57695b',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 800,
+              }}
+            >
+              {cart.reduce((s, i) => s + i.quantity, 0)} item · {rupiah(grandTotal)}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Floating Bottom Cart Bar for Mobile View */}
       <button className="pos-mobile-cart-bar" onClick={() => setMobileCartOpen(true)}>
@@ -922,7 +889,6 @@ export function PosScreen() {
         <OrderHistoryModal
           onClose={() => setOrderHistoryOpen(false)}
           onReprintReceipt={handleReprintReceipt}
-          onPayPendingOrder={handlePayPendingOrder}
           onRefreshOrders={loadData}
         />
       )}

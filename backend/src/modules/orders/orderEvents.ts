@@ -2,7 +2,6 @@ export const ORDER_EVENTS = {
   ORDER_CREATED: 'order:created',
   ORDER_PAID: 'order:paid',
   ORDER_VOIDED: 'order:voided',
-  QR_ORDER_RECEIVED: 'order:qr_received',
   TABLE_STATUS_CHANGED: 'table:status_change',
 } as const;
 
@@ -43,13 +42,6 @@ export interface OrderVoidedEvent {
     quantity: number;
     printTarget: string;
   }>;
-}
-
-export interface OrderQrReceivedEvent {
-  orderId: string;
-  orderNumber: string;
-  tableNumber: string;
-  totalAmount: number;
 }
 
 export interface TableStatusChangedEvent {

@@ -23,7 +23,6 @@ if not exist frontend\node_modules (
 echo.
 echo Menjalankan Backend (Port 5000) dan Frontend (Port 3000)...
 echo POS & Web Kasir    : http://localhost:3000
-echo Self-Order QR Meja : http://localhost:3000?meja=M01
 echo Backend API        : http://localhost:5000/health
 echo ===================================================
 echo.

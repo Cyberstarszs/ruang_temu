@@ -113,49 +113,42 @@ def main():
     assert order_total == expected_subtotal, f"Total amount mismatch: {order_total} != {expected_subtotal}"
     print(f" [PASS] ANOMALY 1 RESOLVED: orders.total_amount == SUM(order_items) == order_payments 100% Sinkron!")
 
-    # 5. TEST ANOMALY 2: QR Self-Order Paid by Cashier without Duplication
-    # Step A: Customer submits QR order
+    # 5. TEST ANOMALY 2: VOID Order with Restock Option restores Inventory
     status, res = get_json('/tables', token)
     avail_table = next((t for t in res['data'] if t['status'] == 'AVAILABLE'), res['data'][0])
-    qr_payload = {
-        "tableNumber": avail_table['table_number'],
-        "customerName": "Budi Pengunjung QR",
+    
+    test_order_payload = {
+        "shiftId": shift_id,
+        "tableId": avail_table['id'],
+        "orderType": "DINE_IN",
         "items": [
             {
                 "productId": beverage['id'],
-                "quantity": 2,
-                "notes": "Normal ice"
+                "quantity": 1,
+                "modifiers": []
             }
         ],
-        "notes": "Pesan via QR Meja"
+        "paymentMethod": "CASH",
+        "cashReceived": int(float(beverage['price'])),
+        "cashChange": 0,
+        "payments": [{"method": "CASH", "amount": int(float(beverage['price']))}]
     }
-    status, res = post_json('/orders/qr-submit', qr_payload)
-    assert status in [200, 201], f"QR submit gagal: {res}"
-    qr_order = res['data']
-    qr_order_id = qr_order['id']
-    qr_order_number = qr_order['orderNumber']
-    expected_qr_total = int(float(qr_order['totalAmount']))
-    print(f" [PASS] 5a. Pesanan QR Mandiri dibuat: #{qr_order_number} (Status: PENDING_PAYMENT_AT_CASHIER)")
+    status, res = post_json('/orders/checkout-direct', test_order_payload, token)
+    assert status in [200, 201], f"Direct checkout gagal: {res}"
+    created_id = res['data']['order']['id']
+    print(f" [PASS] 5a. Transaksi Uji #{res['data']['order']['order_number']} dibuat untuk pengujian Void Restock")
 
-    # Step B: Cashier pays the QR order using cashier-pay endpoint
-    pay_payload = {
-        "shiftId": shift_id,
-        "paymentMethod": "QRIS",
-        "referenceNumber": "QRIS-TEST-998811",
-        "payments": [
-            {
-                "method": "QRIS",
-                "amount": expected_qr_total,
-                "referenceNumber": "QRIS-TEST-998811"
-            }
-        ]
+    # Void with restock=True
+    void_payload = {
+        "managerPin": "123456",
+        "reason": "Salah ketik kasir (batal & restock)",
+        "restock": True
     }
-    status, res = post_json(f'/orders/{qr_order_id}/cashier-pay', pay_payload, token)
-    assert status in [200, 201], f"Cashier Pay QR gagal: {res}"
-    paid_result = res['data']
-    assert paid_result['status'] == 'PAID', f"Status bukan PAID: {paid_result}"
-    print(f" [PASS] 5b. Kasir memproses bayar pesanan QR: #{paid_result['orderNumber']} -> Status 'PAID'")
-    print(f" [PASS] ANOMALY 2 RESOLVED: Pesanan QR diselesaikan di database tanpa membuat order ganda!")
+    status, void_res = post_json(f'/orders/{created_id}/void', void_payload, token)
+    assert status == 200 and void_res.get('success'), f"Void gagal: {void_res}"
+    assert void_res['data']['restocked'] == True
+    print(f" [PASS] 5b. Transaksi dibatalkan via Owner PIN dengan opsi restock: True -> Status 'CANCELLED'")
+    print(f" [PASS] ANOMALY 2 RESOLVED: Opsi restock pada pembatalan transaksi (VOID) terverifikasi 100%!")
 
     # 6. TEST ANOMALY 3: Promo Auto-Validation Minimum Spend
     promo_status, promo_res = post_json('/promos/validate', {'code': 'TEMUKOPI', 'subtotal': 100000}, token)

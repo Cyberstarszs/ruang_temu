@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap');
 @import 'tailwindcss';
 
 :root {
-  --font-montserrat: 'Montserrat', Arial, sans-serif;
-  --font-fraunces: 'Fraunces', Georgia, serif;
+  --font-montserrat: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-fraunces: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --green: #57695b;
   --on-green: #f9f6ee;
   --page-bg: #ebebeb;
@@ -23,7 +23,7 @@
   --warning-text: #7a4e00;
   --danger-status-bg: #fde8e8;
   --font-sans: var(--font-montserrat);
-  --font-serif: var(--font-fraunces);
+  --font-serif: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 :root {
@@ -137,10 +137,13 @@
     margin: 0;
     background: var(--cream);
     color: var(--charcoal);
-    font-family: 'Montserrat', Arial, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: var(--font-body);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   button,
   input,
@@ -198,7 +201,7 @@ button {
 }
 .app h1,
 .app h2 {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-weight: 400;
 }
 .app em {
@@ -522,7 +525,7 @@ button {
   margin-bottom: 6px;
 }
 .feature-info h3 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 24px;
   font-weight: 400;
 }
@@ -769,7 +772,7 @@ footer {
   color: var(--sage);
 }
 .product-info h3 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 26px;
   font-weight: 400;
   margin: 8px 0;
@@ -853,7 +856,7 @@ footer {
 }
 .modal-content h2,
 .admin-modal h2 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 38px;
 }
 .modal-content > p:not(.eyebrow) {
@@ -1101,7 +1104,7 @@ footer {
   margin: auto;
 }
 .empty-cart h3 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 24px;
   margin: 18px 0 7px;
   color: var(--espresso);
@@ -1146,7 +1149,7 @@ footer {
   margin: 15px 0;
 }
 .total strong {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 21px;
 }
 .checkout-page {
@@ -1169,7 +1172,7 @@ footer {
   border-top: 1px solid var(--line);
 }
 .checkout-main section h3 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 24px;
   font-weight: 400;
   margin-bottom: 18px;
@@ -1507,7 +1510,7 @@ footer {
   color: var(--muted);
 }
 .kpi-card b {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 24px;
   font-weight: 400;
 }
@@ -1551,7 +1554,7 @@ footer {
   margin-bottom: 6px;
 }
 .panel-head h3 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 22px;
   font-weight: 400;
 }
@@ -1621,7 +1624,7 @@ footer {
   border-top: 1px solid var(--line);
 }
 .best-row .rank {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-caption);
   color: var(--sage);
 }
@@ -1712,7 +1715,7 @@ footer {
   text-align: center;
 }
 .donut b {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 23px;
 }
 .donut span {
@@ -1798,7 +1801,7 @@ footer {
   color: var(--muted);
 }
 .inventory-stats b {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 25px;
   margin-top: 5px;
 }
@@ -1902,7 +1905,7 @@ footer {
   display: grid;
   place-items: center;
   background: var(--beige);
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-caption);
 }
 .generic-list b,
@@ -2020,7 +2023,7 @@ footer {
   text-transform: uppercase;
 }
 .pos-product b {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 16px;
 }
 .pos-product em {
@@ -2053,7 +2056,7 @@ footer {
   justify-content: space-between;
 }
 .pos-cart-head h2 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 28px;
   font-weight: 400;
 }
@@ -2130,7 +2133,7 @@ footer {
   text-align: center;
 }
 .payment-modal h2 {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 40px;
   font-weight: 400;
 }
@@ -2265,7 +2268,7 @@ footer {
   border-bottom: 1px solid var(--line);
 }
 .ticket > header p {
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 27px;
 }
 .ticket > header span {
@@ -3049,7 +3052,7 @@ body {
   border-radius: 50%;
   color: var(--brass);
   background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 13px;
   line-height: 1.3;
   text-align: center;
@@ -3077,7 +3080,7 @@ body {
 .story-numbers b {
   display: block;
   color: var(--legacy-dark);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 32px;
   font-weight: 600;
   text-transform: none;
@@ -3134,7 +3137,7 @@ body {
 }
 .pillar > p {
   margin-top: 10px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: clamp(20px, 2vw, 29px);
   line-height: 1.25;
 }
@@ -3206,7 +3209,7 @@ body {
   gap: 8px;
 }
 .menu-book b {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: clamp(18px, 2vw, 26px);
 }
 .menu-book small {
@@ -3270,7 +3273,7 @@ body {
   display: block;
 }
 .editorial-menu-photo b {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 34px;
 }
 .editorial-menu-photo small {
@@ -3413,7 +3416,7 @@ body {
   color: var(--brass);
 }
 .event-list time b {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 64px;
 }
 .event-list time span {
@@ -3422,7 +3425,7 @@ body {
 }
 .event-list h3 {
   margin: 10px 0 5px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 28px;
   font-weight: 600;
 }
@@ -3479,7 +3482,7 @@ body {
   letter-spacing: 0.12em;
 }
 .reservation-card-head b {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 20px;
 }
 .reservation-inline-fields {
@@ -3515,7 +3518,7 @@ body {
 .available-tables button {
   min-height: 54px;
   border: 1px solid var(--line);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 17px;
 }
 .available-tables button.active {
@@ -3563,7 +3566,7 @@ body {
 .seat-saved > b {
   margin: 14px 0;
   color: var(--legacy-primary);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 86px;
 }
 .seat-saved h3 {
@@ -3700,7 +3703,7 @@ body {
 .footer-wordmark {
   margin: 30px 0 0;
   color: var(--cream);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: clamp(5rem, 17.5vw, 20rem);
   font-weight: 600;
   letter-spacing: -0.075em;
@@ -3778,7 +3781,7 @@ body {
 }
 .physical-member-card > div > b {
   margin-top: 4px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 28px;
 }
 .member-points {
@@ -3843,11 +3846,11 @@ body {
 }
 .account-editorial-list article > span {
   color: var(--brass);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 18px;
 }
 .account-editorial-list h3 {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 26px;
   font-weight: 600;
 }
@@ -3878,7 +3881,7 @@ body {
 }
 .voucher-grid h3 {
   margin: auto 0 8px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 34px;
 }
 .voucher-grid p {
@@ -3894,7 +3897,7 @@ body {
 }
 .customer-empty h3 {
   margin-top: 14px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 26px;
 }
 .customer-empty p {
@@ -4028,7 +4031,7 @@ body {
     padding: 5px 0;
     color: var(--cream);
     border-bottom: 1px solid color-mix(in srgb, var(--surface-raised) 14%, transparent);
-    font-family: 'Fraunces', serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
     font-size: clamp(2rem, 8vw, 3.5rem);
     font-weight: 600;
     text-align: left;
@@ -4049,7 +4052,7 @@ body {
   .mobile-nav-brand b {
     margin-top: 4px;
     color: var(--cream);
-    font-family: 'Fraunces', serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   }
   .mobile-nav-hours {
     margin-top: 28px;
@@ -4619,7 +4622,7 @@ body {
   letter-spacing: 0.08em;
 }
 .story-facts h3 {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-h2);
   font-weight: 600;
 }
@@ -4740,7 +4743,7 @@ body {
   --bo-sage: var(--green);
   --bo-soft: var(--sand);
   --bo-danger: var(--danger);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   color: var(--bo-text);
   font-size: var(--font-body);
   line-height: 1.5;
@@ -4799,7 +4802,7 @@ body {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-family: 'Fraunces';
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-caption);
 }
 .bo-brand b,
@@ -5013,7 +5016,7 @@ body {
   margin-bottom: 7px;
 }
 .bo-page-head h1 {
-  font-family: 'Montserrat', Arial, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 27px !important;
   font-weight: 650 !important;
   letter-spacing: -0.025em;
@@ -5131,7 +5134,7 @@ body {
   margin-bottom: 17px;
 }
 .bo-card-head h2 {
-  font-family: 'Montserrat', Arial, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 13px !important;
   font-weight: 650 !important;
 }
@@ -7627,7 +7630,7 @@ body {
 }
 .receipt-preview-modal > header h2 {
   margin: 4px 0;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 30px;
 }
 .receipt-preview-modal > header p {
@@ -7860,7 +7863,7 @@ body {
 }
 .printer-card-head h2,
 .printer-preferences h2 {
-  font-family: 'Fraunces', serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 21px !important;
 }
 .printer-card-head p,
@@ -8446,7 +8449,7 @@ body {
   border-radius: 0.35rem;
   color: var(--bo-muted);
   background: var(--legacy-soft);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-caption);
   white-space: nowrap;
 }
@@ -8816,7 +8819,7 @@ textarea:focus-visible {
 .bo-brand > span {
   width: 42px;
   height: 42px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-h3);
   font-weight: 700;
   text-transform: lowercase;
@@ -8830,7 +8833,7 @@ textarea:focus-visible {
   object-fit: cover;
 }
 .bo-brand b {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 1.0625rem;
   letter-spacing: 0;
   text-transform: lowercase;
@@ -8911,7 +8914,7 @@ textarea:focus-visible {
 }
 .bo-page-head h1,
 .new-pos-heading h1 {
-  font-family: 'Fraunces', serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-h1) !important;
   font-weight: 700 !important;
   color: var(--legacy-dark);
@@ -8949,7 +8952,7 @@ textarea:focus-visible {
 .bo-modal h2,
 .feature-placeholder h2,
 .kds-column-head h2 {
-  font-family: 'Fraunces', serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-h2) !important;
   font-weight: 700 !important;
 }
@@ -9326,7 +9329,7 @@ textarea:focus-visible {
 }
 .kds-column-head h2 {
   color: var(--surface-raised);
-  font-family: 'Montserrat', sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: var(--font-h3) !important;
   display: flex;
   align-items: center;
@@ -9478,7 +9481,7 @@ textarea:focus-visible {
   --bo-danger: var(--danger);
   background: var(--bo-bg);
   color: var(--bo-text);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 500;
 }
@@ -9524,7 +9527,7 @@ textarea:focus-visible {
 .cart-grand b,
 .payment-total b,
 .cash-change b {
-  font-family: 'Fraunces', Georgia, serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-optical-sizing: auto;
   font-weight: 600 !important;
   letter-spacing: -0.01em;
@@ -9679,7 +9682,7 @@ textarea:focus-visible {
 }
 .topbar-page-title b {
   margin-top: 2px;
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 28px;
   font-weight: 600;
 }
@@ -9819,7 +9822,7 @@ textarea:focus-visible {
 }
 .bo-page-head h1 {
   max-width: 760px;
-  font-family: 'Fraunces', Georgia, serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 30px !important;
   font-weight: 600 !important;
   line-height: 1.15;
@@ -9848,7 +9851,7 @@ textarea:focus-visible {
 }
 .bo-card-head h2 {
   color: var(--bo-text);
-  font-family: 'Fraunces', Georgia, serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 20px !important;
   font-weight: 600 !important;
 }
@@ -10088,7 +10091,7 @@ textarea:focus-visible {
 }
 .mini-kpi > b {
   margin-top: 16px;
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 28px;
   font-weight: 600;
 }
@@ -10255,7 +10258,7 @@ textarea:focus-visible {
   display: block;
 }
 .admin-donut b {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 28px;
 }
 .admin-donut small {
@@ -10396,105 +10399,265 @@ textarea:focus-visible {
     var(--pos-bg);
 }
 .new-pos .pos-navbar {
-  height: 72px;
+  height: 64px;
   padding: 0 20px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  position: relative;
   color: var(--surface-raised);
-  background: linear-gradient(100deg, var(--ink), var(--ink));
-  border-bottom: 1px solid color-mix(in srgb, var(--warning-text) 40%, transparent);
+  background: linear-gradient(135deg, #324036 0%, #3e4f43 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  user-select: none;
 }
 .pos-shift {
   width: fit-content;
-  min-width: 250px;
-  height: 52px;
-  padding: 0 10px 0 4px;
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 16px;
+  max-width: calc(50vw - 110px);
+  height: 48px;
+  padding: 0 12px 0 6px;
+  display: flex;
+  align-items: center;
   gap: 10px;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
   color: var(--surface-raised);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 20;
+  position: relative;
 }
 .pos-shift:hover {
-  background: color-mix(in srgb, var(--surface-raised) 8%, transparent);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 .shift-photo {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   object-fit: cover;
-  border: 1.5px solid var(--pos-brass);
+  border: 1.5px solid var(--pos-brass, #d4a373);
   border-radius: 50%;
-  filter: saturate(0.72);
+  filter: saturate(0.85);
+  flex-shrink: 0;
+}
+.pos-shift > span {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.25;
 }
 .pos-shift b {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 .pos-shift small {
-  margin-top: 2px;
-  color: color-mix(in srgb, var(--surface-raised) 70%, transparent);
-  font-size: 13px;
+  margin-top: 1px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11.5px;
+  white-space: nowrap;
 }
 .pos-shift > svg {
   transform: rotate(90deg);
+  opacity: 0.8;
+  margin-left: 2px;
 }
 .pos-brand-center {
-  height: 62px;
-  display: grid;
-  place-content: center;
-  justify-items: center;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
 }
-.pos-brand-center .bo-brand {
-  height: 36px;
-}
-.pos-brand-center .bo-brand-full {
-  width: 156px !important;
-  height: 36px !important;
+.pos-brand-center img.brand-wordmark,
+.pos-brand-center .brand-wordmark {
+  height: 32px;
+  max-height: 32px;
+  width: auto;
   object-fit: contain;
-  transform: none;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+  flex-shrink: 0;
 }
 .pos-navbar-actions {
   position: relative;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 7px;
+  z-index: 20;
+  max-width: calc(50vw - 110px);
 }
-.pos-admin-return,
-.pos-icon,
-.pos-printer-control {
-  height: 44px;
-  color: var(--surface-raised);
-  border: 1px solid color-mix(in srgb, var(--surface-raised) 34%, transparent);
-  border-radius: 14px;
-}
-.pos-admin-return {
-  padding: 0 12px;
-}
-.pos-icon {
-  width: 44px;
-}
-.pos-printer-control {
-  min-width: 64px;
-  padding: 0 10px;
+.pos-nav-btn {
   display: flex;
   align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 11px;
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #dcdfd5;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  touch-action: manipulation;
+  user-select: none;
+}
+.pos-nav-btn:hover {
+  background: #f8faf8;
+  border-color: #bcc4be;
+  color: #1f2937;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+.pos-nav-btn:active {
+  transform: scale(0.98);
+}
+.pos-nav-btn-active {
+  background: #edf3ee !important;
+  border-color: #57695b !important;
+  color: #334437 !important;
+}
+.pos-nav-icon-btn {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
   justify-content: center;
-  gap: 7px;
 }
-.pos-printer-control > span {
+.pos-nav-badge {
+  background: #57695b;
+  color: #ffffff;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+.pos-nav-cart-btn {
+  border-color: #57695b;
+}
+.pos-nav-cart-open {
+  background: #edf3ee;
+  border-color: #57695b;
+  color: #334437;
+}
+.pos-nav-badge-accent {
+  background: #57695b;
+  color: #ffffff;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+}
+.pos-printer-dots {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 3.5px;
+  margin-left: 2px;
 }
-.pos-printer-control i {
-  width: 6px;
-  height: 6px;
+.pos-printer-dots i {
+  width: 6.5px;
+  height: 6.5px;
   border-radius: 50%;
-  background: var(--green);
+  display: inline-block;
+  transition: background-color 0.2s ease;
 }
-.pos-header-popover,
-.shift-popover {
+.pos-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 100;
+  animation: posDropFade 0.15s ease-out;
+}
+@keyframes posDropFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pos-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #374151;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.pos-dropdown-item:hover {
+  background: #f1f5f2;
+  color: #1f2937;
+}
+.pos-dropdown-item > div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.pos-dropdown-item strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1f2937;
+}
+.pos-dropdown-item small {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+.pos-dropdown-danger {
+  color: #991b1b;
+}
+.pos-dropdown-danger:hover {
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+.pos-dropdown-danger small {
+  color: #b91c1c;
+}
+.pos-dropdown-divider {
+  margin: 4px 6px;
+  border: none;
+  border-top: 1px solid #e5e7eb;
+}
+@media (max-width: 1220px) {
+  .pos-nav-btn span.pos-nav-text {
+    display: none;
+  }
+  .pos-nav-btn {
+    padding: 0 10px;
+  }
+}
+.pos-header-popover {
   top: 56px;
   color: var(--pos-ink);
   background: var(--pos-card);
@@ -10503,51 +10666,89 @@ textarea:focus-visible {
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--green) 6%, transparent),
     0 16px 40px color-mix(in srgb, var(--green) 14%, transparent);
-}
-.pos-header-popover {
   width: 320px;
   padding: 12px;
 }
 .shift-popover {
-  position: fixed;
-  left: 20px;
-  right: auto;
-  top: 64px;
-  width: 320px;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 330px;
   padding: 14px;
+  background: #ffffff;
+  color: var(--pos-ink);
+  border: 1px solid rgba(87, 105, 91, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16), 0 3px 8px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  animation: posDropFade 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .shift-popover > header {
-  padding-bottom: 14px;
-  display: grid;
-  grid-template-columns: 56px 1fr;
+  padding-bottom: 12px;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   border-bottom: 1px solid var(--pos-line);
 }
 .shift-popover > header img {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
-  border: 1.5px solid var(--pos-brass);
+  border: 1.5px solid var(--pos-brass, #d4a373);
   border-radius: 50%;
+  flex-shrink: 0;
 }
-.shift-popover > header small,
-.shift-popover > header b,
-.shift-popover > header em {
-  display: block;
+.shift-popover-user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
-.shift-popover > header small {
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 20px;
+.shift-popover-user-info b {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.shift-popover > header b {
-  margin-top: 5px;
-  font-size: 13px;
-}
-.shift-popover > header em {
-  color: var(--pos-muted);
-  font-size: 13px;
+.shift-popover-user-info em {
+  font-size: 11.5px;
+  color: #6b7280;
   font-style: normal;
+  margin-top: 1px;
+}
+.shift-popover-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.shift-popover-close:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+.pos-shift-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: rotate(90deg);
+  opacity: 0.85;
+  margin-left: 2px;
+}
+.pos-shift-chevron.is-open {
+  transform: rotate(-90deg);
+  opacity: 1;
 }
 .shift-summary {
   padding: 12px 0;
@@ -10597,7 +10798,7 @@ textarea:focus-visible {
   background: transparent;
 }
 .new-pos > main {
-  height: calc(100vh - 72px);
+  height: calc(100vh - 64px);
   grid-template-columns: minmax(0, 1fr) 400px;
 }
 .new-pos-products {
@@ -10943,7 +11144,7 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 .new-cart-items span em {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 13px;
 }
 .new-cart-summary {
@@ -11006,7 +11207,7 @@ textarea:focus-visible {
   color: var(--pos-brass);
 }
 .empty-pos-cart b {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 20px;
 }
 .new-pos .bo-modal {
@@ -11283,7 +11484,7 @@ textarea:focus-visible {
   border-radius: 16px;
 }
 .close-shift-total b {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 22px;
 }
 .table-picker-tools {
@@ -11356,7 +11557,7 @@ textarea:focus-visible {
   background: var(--pos-card);
 }
 .table-picker-grid b {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 22px;
 }
 .table-picker-grid small,
@@ -11997,7 +12198,7 @@ textarea:focus-visible {
   gap: 16px;
 }
 .v2-form-section > header h3 {
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 19px;
 }
 .v2-form-section > header p {
@@ -13057,7 +13258,7 @@ textarea:focus-visible {
 .bo-shell .topbar-page-title b {
   margin: 0;
   color: var(--admin-text);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -13096,7 +13297,7 @@ textarea:focus-visible {
 }
 .bo-shell .bo-page-head h1 {
   color: var(--admin-text);
-  font-family: 'Montserrat', Arial, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: clamp(25px, 2.1vw, 32px) !important;
   font-weight: 750 !important;
   letter-spacing: -0.035em;
@@ -13159,7 +13360,7 @@ textarea:focus-visible {
 .bo-shell .printer-card-head h2,
 .bo-shell .printer-preferences h2 {
   color: var(--admin-text);
-  font-family: 'Montserrat', Arial, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 17px !important;
   font-weight: 720 !important;
   letter-spacing: -0.02em;
@@ -13235,7 +13436,7 @@ textarea:focus-visible {
 .bo-shell .bo-kpis article b {
   margin: 12px 0 8px;
   color: var(--admin-text);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: clamp(21px, 2vw, 28px);
   font-weight: 750;
   letter-spacing: -0.035em;
@@ -13555,7 +13756,7 @@ textarea:focus-visible {
   box-shadow: var(--admin-shadow-lg);
 }
 .bo-shell .bo-confirm h2 {
-  font-family: 'Montserrat', Arial, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 19px !important;
 }
 .bo-shell .filter-panel {
@@ -13583,7 +13784,7 @@ textarea:focus-visible {
   border: 1px solid color-mix(in srgb, var(--surface-raised) 10%, transparent);
   border-radius: 12px;
   box-shadow: 0 14px 34px color-mix(in srgb, var(--green) 22%, transparent);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 13px;
 }
 
@@ -14048,7 +14249,7 @@ textarea:focus-visible {
 .admin-v2 h3,
 .admin-v2 .av-kpi > b,
 .admin-v2 .av-bi-metrics b {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 .admin-v2 .v2-workspace {
   background: var(--admin-page);
@@ -14412,7 +14613,7 @@ textarea:focus-visible {
 }
 .av-onboarding li > b {
   color: var(--admin-warm);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 .av-onboarding strong,
 .av-onboarding small {
@@ -14511,7 +14712,7 @@ textarea:focus-visible {
   pointer-events: none;
   color: var(--admin-surface);
   background: var(--admin-sage-900);
-  font-family: 'Montserrat', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.45;
@@ -14553,7 +14754,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-family: 'Montserrat', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 700;
 }
@@ -14802,7 +15003,7 @@ textarea:focus-visible {
 .av-donut > div b {
   max-width: 92px;
   overflow: hidden;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 18px;
   text-overflow: ellipsis;
 }
@@ -14970,7 +15171,7 @@ textarea:focus-visible {
 }
 .av-finance-numbers b {
   margin-top: 6px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 22px;
 }
 .av-finance > footer {
@@ -14981,7 +15182,7 @@ textarea:focus-visible {
   background: var(--admin-sage-700);
 }
 .av-finance > footer b {
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 18px;
 }
 .av-stock-row {
@@ -15081,7 +15282,7 @@ textarea:focus-visible {
 .av-voucher-stat b,
 .av-voucher-big b {
   margin-top: 8px;
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 38px;
 }
 .av-voucher-stat span,
@@ -15335,7 +15536,7 @@ textarea:focus-visible {
 }
 .av-insights p > b {
   color: var(--admin-warm);
-  font-family: 'Fraunces', serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 .av-simple-list {
   padding: 4px 18px;
@@ -15941,6 +16142,29 @@ textarea:focus-visible {
 }
 
 @media print {
+  /* Isolate thermal paper receipt for clean POS printing */
+  body:has(#printable-receipt) * {
+    visibility: hidden !important;
+  }
+  body:has(#printable-receipt) #printable-receipt,
+  body:has(#printable-receipt) #printable-receipt * {
+    visibility: visible !important;
+  }
+  body:has(#printable-receipt) #printable-receipt {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 999999 !important;
+  }
+
   .admin-v2 .v2-sidebar,
   .admin-v2 .v2-topbar,
   .admin-v2 .v2-mobile-nav,
@@ -16027,7 +16251,7 @@ textarea:focus-visible {
 .admin-v2 input,
 .admin-v2 select,
 .admin-v2 textarea {
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 .admin-v2 button:disabled {
   cursor: not-allowed;
@@ -16041,7 +16265,7 @@ textarea:focus-visible {
 }
 .admin-v2 h1,
 .admin-v2 .v2-product-hero h2 {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 .v2-sidebar {
   position: relative;
@@ -16973,7 +17197,7 @@ textarea:focus-visible {
   background: var(--v2-surface);
 }
 .v2-modal > header h2 {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 22px;
   font-weight: 550;
 }
@@ -17190,7 +17414,7 @@ textarea:focus-visible {
 .v2-access-denied h1 {
   margin-top: 14px;
   color: var(--v2-ink);
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 }
 .v2-access-denied p {
   margin: 7px 0 20px;
@@ -18007,16 +18231,20 @@ textarea:focus-visible {
   overflow: hidden;
   color: var(--text-primary);
   background: var(--page-bg);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-variant-numeric: tabular-nums;
 }
 .new-pos > main {
-  height: calc(100dvh - 72px);
+  height: calc(100dvh - 64px);
   padding: 16px 20px 20px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: 20px;
   overflow: hidden;
+  transition: grid-template-columns 0.25s ease;
+}
+.new-pos > main.cart-closed {
+  grid-template-columns: 1fr !important;
 }
 .new-pos-products {
   min-width: 0;
@@ -18104,17 +18332,17 @@ textarea:focus-visible {
 }
 .new-pos .new-product-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 14px;
 }
 .new-pos .new-product-grid > article {
   min-width: 0;
-  min-height: 320px;
+  min-height: auto;
   position: relative;
   overflow: hidden;
   color: var(--text-primary);
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--card-bg);
   box-shadow: 0 4px 14px var(--admin-shadow);
   cursor: pointer;
@@ -18339,7 +18567,7 @@ textarea:focus-visible {
 .new-pos .new-cart-head h2 {
   margin: 0;
   color: var(--color-primary-dark);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 20px !important;
   font-weight: 600;
 }
@@ -18417,7 +18645,7 @@ textarea:focus-visible {
   display: block;
   margin-top: 4px;
   color: var(--color-primary-dark);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 14px;
   font-style: normal;
   font-weight: 700;
@@ -18455,7 +18683,7 @@ textarea:focus-visible {
 .new-pos .empty-pos-cart b {
   margin-top: 10px;
   color: var(--text-primary);
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 17px;
 }
 .new-pos .empty-pos-cart small {
@@ -20490,10 +20718,15 @@ textarea:focus-visible {
 
 /* Cashier and promo-card refinements. */
 .new-pos .new-pos-cart {
-  height: 100%;
-  max-height: calc(100dvh - 108px);
-  min-height: 0;
-  gap: 6px;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 .new-pos .new-cart-head {
   min-height: 46px;
@@ -21257,4 +21490,23 @@ textarea:focus-visible {
 
 .bo-confirm button.bo-primary:hover {
   background: #47574b !important;
+}
+
+/* Admin / Backoffice Responsive Shell Rules */
+@media (min-width: 768px) {
+  .admin-mobile-header {
+    display: none !important;
+  }
+  .admin-desktop-sidebar {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-desktop-sidebar {
+    display: none !important;
+  }
+  .admin-mobile-header {
+    display: flex !important;
+  }
 }

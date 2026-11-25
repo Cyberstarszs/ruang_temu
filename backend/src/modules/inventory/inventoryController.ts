@@ -161,3 +161,89 @@ export async function submitStocktake(req: Request, res: Response, next: NextFun
     client.release();
   }
 }
+
+export async function createIngredient(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { code, name, usage_unit, purchase_unit, conversion_rate, stock_actual, safe_stock, unit_cost } = req.body;
+    if (!code || !name || !usage_unit || !purchase_unit) {
+      res.status(400).json({ success: false, message: 'Kode, nama bahan, satuan pakai, dan satuan beli wajib diisi.' });
+      return;
+    }
+
+    const result = await pool.query(`
+      INSERT INTO ingredients (code, name, usage_unit, purchase_unit, conversion_rate, stock_actual, safe_stock, unit_cost)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      code.trim().toUpperCase(),
+      name.trim(),
+      usage_unit,
+      purchase_unit.trim(),
+      conversion_rate ? Number(conversion_rate) : 1000,
+      stock_actual !== undefined ? Number(stock_actual) : 0,
+      safe_stock !== undefined ? Number(safe_stock) : 0,
+      unit_cost !== undefined ? Number(unit_cost) : 0,
+    ]);
+
+    res.status(201).json({
+      success: true,
+      message: `Bahan baku ${name} berhasil ditambahkan.`,
+      data: result.rows[0],
+    });
+  } catch (err: any) {
+    if (err.code === '23505') {
+      res.status(409).json({ success: false, message: 'Kode bahan baku sudah terdaftar.' });
+      return;
+    }
+    next(err);
+  }
+}
+
+export async function updateIngredient(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { code, name, usage_unit, purchase_unit, conversion_rate, safe_stock, unit_cost, stock_actual } = req.body;
+
+    const result = await pool.query(`
+      UPDATE ingredients
+      SET code = COALESCE($1, code),
+          name = COALESCE($2, name),
+          usage_unit = COALESCE($3, usage_unit),
+          purchase_unit = COALESCE($4, purchase_unit),
+          conversion_rate = COALESCE($5, conversion_rate),
+          safe_stock = COALESCE($6, safe_stock),
+          unit_cost = COALESCE($7, unit_cost),
+          stock_actual = COALESCE($8, stock_actual),
+          updated_at = NOW()
+      WHERE id = $9
+      RETURNING *
+    `, [
+      code?.trim()?.toUpperCase(),
+      name?.trim(),
+      usage_unit,
+      purchase_unit?.trim(),
+      conversion_rate !== undefined ? Number(conversion_rate) : null,
+      safe_stock !== undefined ? Number(safe_stock) : null,
+      unit_cost !== undefined ? Number(unit_cost) : null,
+      stock_actual !== undefined ? Number(stock_actual) : null,
+      id,
+    ]);
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Bahan baku tidak ditemukan.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: `Bahan baku ${result.rows[0].name} berhasil diperbarui.`,
+      data: result.rows[0],
+    });
+  } catch (err: any) {
+    if (err.code === '23505') {
+      res.status(409).json({ success: false, message: 'Kode bahan baku sudah digunakan oleh bahan lain.' });
+      return;
+    }
+    next(err);
+  }
+}

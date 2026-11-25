@@ -22,6 +22,7 @@ export interface DirectCheckoutInput {
     quantity: number;
     notes?: string;
     modifiers?: string[];
+    unitPriceAdjustment?: number;
   }>;
   payments?: Array<{
     method: 'CASH' | 'QRIS' | 'DEBIT_CARD' | 'BANK_TRANSFER';
@@ -73,13 +74,24 @@ export class OrderService {
 
       await client.query('BEGIN');
 
-      // 1. Verify active shift
+      // 1. Verify active shift (with auto-fallback to cashier's active shift)
+      let effectiveShiftId = shiftId;
+      if (!effectiveShiftId && user?.id) {
+        const activeShift = await client.query(
+          `SELECT id FROM cashier_shifts WHERE cashier_id = $1 AND status = 'OPEN' ORDER BY opened_at DESC LIMIT 1`,
+          [user.id]
+        );
+        if (activeShift.rows.length > 0) {
+          effectiveShiftId = activeShift.rows[0].id;
+        }
+      }
+
       const shiftRes = await client.query(
         `SELECT id FROM cashier_shifts WHERE id = $1 AND status = 'OPEN'`,
-        [shiftId]
+        [effectiveShiftId]
       );
       if (shiftRes.rows.length === 0) {
-        throw { statusCode: 400, message: 'Sif kasir tidak aktif atau sudah ditutup.' };
+        throw { statusCode: 400, message: 'Sif kasir tidak aktif atau sudah ditutup. Silakan buka sif terlebih dahulu.' };
       }
 
       // 2. Prepare items & compute HPP
@@ -226,9 +238,18 @@ export class OrderService {
       // 5. Resolve Table ID if fallback string matches table_number
       let resolvedTableId = tableId || null;
       if (!resolvedTableId && tableNumberFallback) {
+        const rawTbl = tableNumberFallback.trim();
+        const digits = rawTbl.replace(/\D/g, '');
         const findTbl = await client.query(
-          `SELECT id FROM dining_tables WHERE UPPER(table_number) = UPPER($1) LIMIT 1`,
-          [tableNumberFallback.trim()]
+          `SELECT id FROM dining_tables 
+           WHERE UPPER(table_number) = UPPER($1)
+              OR (NULLIF($2, '') IS NOT NULL AND (
+                   UPPER(table_number) = UPPER('M' || $2)
+                OR UPPER(table_number) = UPPER('M' || LPAD($2, 2, '0'))
+                OR REGEXP_REPLACE(table_number, '\\D', '', 'g') = $2
+              ))
+           LIMIT 1`,
+          [rawTbl, digits]
         );
         if (findTbl.rows.length > 0) {
           resolvedTableId = findTbl.rows[0].id;
@@ -246,7 +267,7 @@ export class OrderService {
         RETURNING *`,
         [
           orderNumber,
-          shiftId,
+          effectiveShiftId,
           user?.id || null,
           resolvedTableId,
           customerId || null,
@@ -400,259 +421,11 @@ export class OrderService {
     }
   }
 
-  // 2. SUBMIT QR CUSTOMER ORDER
-  async submitQrOrder(body: { tableNumber: string; customerName?: string; items: any[]; notes?: string }) {
+  // 2. VOID ORDER (Requires Owner PIN Authorization, with optional restock)
+  async voidOrder(id: string, body: { managerPin: string; reason: string; restock?: boolean }) {
     const client = await pool.connect();
     try {
-      const { tableNumber, customerName, items, notes } = body;
-
-      if (!tableNumber || !items || items.length === 0) {
-        throw { statusCode: 400, message: 'Nomor meja dan pesanan menu wajib diisi.' };
-      }
-
-      await client.query('BEGIN');
-
-      const tableRes = await client.query(
-        `SELECT id, table_number FROM dining_tables WHERE table_number = $1`,
-        [tableNumber.trim().toUpperCase()]
-      );
-
-      if (tableRes.rows.length === 0) {
-        throw { statusCode: 404, message: `Meja ${tableNumber} tidak ditemukan.` };
-      }
-      const table = tableRes.rows[0];
-
-      const shiftRes = await client.query(
-        `SELECT id FROM cashier_shifts WHERE status = 'OPEN' ORDER BY opened_at DESC LIMIT 1`
-      );
-      if (shiftRes.rows.length === 0) {
-        throw { statusCode: 400, message: 'Kasir belum membuka sif hari ini. Silakan pesan langsung ke kasir.' };
-      }
-      const shiftId = shiftRes.rows[0].id;
-
-      let subtotal = 0;
-      const preparedItems: any[] = [];
-
-      for (const item of items) {
-        const prodRes = await client.query(
-          `SELECT id, name, price, print_target, is_force_sold_out 
-           FROM products WHERE id = $1 AND is_active = TRUE`,
-          [item.productId]
-        );
-
-        if (prodRes.rows.length === 0) {
-          throw { statusCode: 404, message: `Produk ID ${item.productId} tidak tersedia.` };
-        }
-
-        const product = prodRes.rows[0];
-        if (product.is_force_sold_out) {
-          throw { statusCode: 400, message: `Maaf, "${product.name}" sedang habis.` };
-        }
-
-        const itemSubtotal = Number(product.price) * item.quantity;
-        subtotal += itemSubtotal;
-
-        preparedItems.push({
-          productId: product.id,
-          productName: product.name,
-          quantity: item.quantity,
-          unitPrice: Number(product.price),
-          subtotal: itemSubtotal,
-          printTarget: product.print_target,
-          notes: item.notes || null,
-        });
-      }
-
-      const orderNumber = generateOrderNumber();
-      const orderRes = await client.query(
-        `INSERT INTO orders (
-          order_number, shift_id, table_id, order_type, subtotal, total_amount,
-          status, notes
-        ) VALUES ($1, $2, $3, 'DINE_IN', $4, $4, 'PENDING_PAYMENT_AT_CASHIER', $5)
-        RETURNING *`,
-        [orderNumber, shiftId, table.id, subtotal, notes || null]
-      );
-
-      const order = orderRes.rows[0];
-
-      for (const pi of preparedItems) {
-        await client.query(
-          `INSERT INTO order_items (
-            order_id, product_id, product_name_snapshot, quantity, unit_price_snapshot, unit_hpp_snapshot,
-            subtotal, print_target, item_notes
-          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)`,
-          [order.id, pi.productId, pi.productName, pi.quantity, pi.unitPrice, pi.subtotal, pi.printTarget, pi.notes]
-        );
-      }
-
-      await client.query(
-        `UPDATE dining_tables SET status = 'OCCUPIED', occupied_at = NOW(), updated_at = NOW() WHERE id = $1`,
-        [table.id]
-      );
-
-      await client.query('COMMIT');
-
-      // Dispatch event
-      eventBus.emit(ORDER_EVENTS.QR_ORDER_RECEIVED, {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        tableNumber: table.table_number,
-        totalAmount: subtotal,
-      });
-
-      return {
-        id: order.id,
-        orderId: order.id,
-        orderNumber: order.order_number,
-        order_number: order.order_number,
-        tableNumber: table.table_number,
-        totalAmount: subtotal,
-        status: 'PENDING_PAYMENT_AT_CASHIER',
-      };
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  // 3. CASHIER PAY QR ORDER
-  async payQrOrder(id: string, body: any, user?: AuthUser) {
-    const client = await pool.connect();
-    try {
-      const cashierId = user?.id;
-      const { payments, paymentMethod, amountPaid, cashReceived, cashChange, referenceNumber } = body;
-
-      let paymentsList = payments;
-      if ((!paymentsList || paymentsList.length === 0) && paymentMethod) {
-        paymentsList = [{
-          method: paymentMethod,
-          amount: amountPaid || cashReceived || 0,
-          cashReceived: cashReceived || amountPaid || null,
-          cashChange: cashChange || 0,
-          referenceNumber: referenceNumber || null,
-        }];
-      }
-
-      if (!paymentsList || paymentsList.length === 0) {
-        throw { statusCode: 400, message: 'Informasi pembayaran wajib diisi.' };
-      }
-
-      await client.query('BEGIN');
-
-      const orderRes = await client.query(
-        `SELECT o.*, t.table_number FROM orders o LEFT JOIN dining_tables t ON o.table_id = t.id WHERE o.id = $1`,
-        [id]
-      );
-
-      if (orderRes.rows.length === 0) {
-        throw { statusCode: 404, message: 'Pesanan tidak ditemukan.' };
-      }
-
-      const order = orderRes.rows[0];
-      if (order.status !== 'PENDING_PAYMENT_AT_CASHIER') {
-        throw { statusCode: 400, message: `Status pesanan saat ini adalah ${order.status}, bukan menunggu pembayaran.` };
-      }
-
-      if (paymentsList && paymentsList.length === 1 && (!paymentsList[0].amount || Number(paymentsList[0].amount) === 0)) {
-        paymentsList[0].amount = Number(order.total_amount);
-      }
-
-      const totalPaid = paymentsList.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
-      if (totalPaid < Number(order.total_amount)) {
-        throw { statusCode: 400, message: 'Nominal pembayaran kurang dari total tagihan.' };
-      }
-
-      await client.query(
-        `UPDATE orders SET status = 'PAID', cashier_id = $1, shift_id = COALESCE($3, shift_id), paid_at = NOW(), updated_at = NOW() WHERE id = $2`,
-        [cashierId, order.id, body.shiftId || null]
-      );
-
-      for (const pay of paymentsList) {
-        await client.query(
-          `INSERT INTO order_payments (order_id, payment_method, amount_paid, cash_received, cash_change, reference_number)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [order.id, pay.method, pay.amount, pay.cashReceived || null, pay.cashChange || null, pay.referenceNumber || null]
-        );
-      }
-
-      // Deduct stock for all items
-      const itemsRes = await client.query(
-        `SELECT oi.*, p.id as product_id, p.print_target 
-         FROM order_items oi 
-         JOIN products p ON oi.product_id = p.id 
-         WHERE oi.order_id = $1`,
-        [order.id]
-      );
-
-      for (const item of itemsRes.rows) {
-        const recRes = await client.query(
-          `SELECT ingredient_id, quantity, is_packaging_only FROM product_recipes WHERE product_id = $1`,
-          [item.product_id]
-        );
-
-        for (const rec of recRes.rows) {
-          if (rec.is_packaging_only && order.order_type !== 'TAKEAWAY') continue;
-          const qtyToDeduct = Number(rec.quantity) * item.quantity;
-          await client.query(
-            `UPDATE ingredients SET stock_actual = stock_actual - $1, updated_at = NOW() WHERE id = $2`,
-            [qtyToDeduct, rec.ingredient_id]
-          );
-          await client.query(
-            `INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
-             VALUES ($1, 'SALE', $2, (SELECT stock_actual FROM ingredients WHERE id = $1), $3)`,
-            [rec.ingredient_id, -qtyToDeduct, order.order_number]
-          );
-        }
-      }
-
-      await client.query('COMMIT');
-
-      // Dispatch event to EventBus
-      const preparedItems = itemsRes.rows.map((i) => ({
-        productId: i.product_id,
-        productName: i.product_name_snapshot,
-        quantity: i.quantity,
-        unitPrice: Number(i.unit_price_snapshot),
-        unitHpp: Number(i.unit_hpp_snapshot),
-        subtotal: Number(i.subtotal),
-        printTarget: i.print_target,
-        notes: i.item_notes,
-        modifiers: [],
-      }));
-
-      eventBus.emit(ORDER_EVENTS.ORDER_PAID, {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        orderType: order.order_type,
-        displayTableNumber: order.table_number || 'Bawa Pulang',
-        totalAmount: order.total_amount,
-        tableId: order.table_id,
-        items: preparedItems,
-        payments: paymentsList,
-        notes: order.notes,
-      });
-
-      return {
-        id: order.id,
-        orderNumber: order.order_number,
-        status: 'PAID',
-        totalAmount: order.total_amount,
-      };
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  // 4. VOID ORDER (Requires Owner PIN Authorization)
-  async voidOrder(id: string, body: { managerPin: string; reason: string }) {
-    const client = await pool.connect();
-    try {
-      const { managerPin, reason } = body;
+      const { managerPin, reason, restock = false } = body;
 
       if (!managerPin || !reason) {
         throw { statusCode: 400, message: 'PIN Owner dan alasan pembatalan wajib diisi.' };
@@ -700,6 +473,49 @@ export class OrderService {
         [order.id]
       );
 
+      // Restock ingredients if requested
+      if (restock) {
+        for (const item of itemsRes.rows) {
+          const recRes = await client.query(
+            `SELECT ingredient_id, quantity, is_packaging_only FROM product_recipes WHERE product_id = $1`,
+            [item.product_id]
+          );
+
+          for (const rec of recRes.rows) {
+            if (rec.is_packaging_only && order.order_type !== 'TAKEAWAY') continue;
+            const qtyToReturn = Number(rec.quantity) * item.quantity;
+            await client.query(
+              `UPDATE ingredients SET stock_actual = stock_actual + $1, updated_at = NOW() WHERE id = $2`,
+              [qtyToReturn, rec.ingredient_id]
+            );
+            await client.query(
+              `INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
+               VALUES ($1, 'VOID_RESTOCK', $2, (SELECT stock_actual FROM ingredients WHERE id = $1), $3)`,
+              [rec.ingredient_id, qtyToReturn, order.order_number]
+            );
+          }
+        }
+      }
+
+      // Free table if no other active paid orders on that table
+      if (order.table_id) {
+        const otherOrders = await client.query(
+          `SELECT id FROM orders WHERE table_id = $1 AND status = 'PAID' AND id != $2`,
+          [order.table_id, order.id]
+        );
+        if (otherOrders.rows.length === 0) {
+          await client.query(
+            `UPDATE dining_tables SET status = 'AVAILABLE', occupied_at = NULL, updated_at = NOW() WHERE id = $1`,
+            [order.table_id]
+          );
+          eventBus.emit(ORDER_EVENTS.TABLE_STATUS_CHANGED, {
+            tableId: order.table_id,
+            tableNumber: order.table_number || '',
+            status: 'AVAILABLE',
+          });
+        }
+      }
+
       await client.query(
         `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
          VALUES ($1, 'VOID_ORDER', 'orders', $2, $3)`,
@@ -709,6 +525,7 @@ export class OrderService {
           JSON.stringify({
             orderNumber: order.order_number,
             reason,
+            restock: Boolean(restock),
             authorizedBy: manager.name,
             totalAmount: order.total_amount,
           }),
@@ -723,7 +540,7 @@ export class OrderService {
         orderNumber: order.order_number,
         orderType: order.order_type,
         displayTableNumber: order.table_number || 'Bawa Pulang',
-        reason,
+        reason: `${reason}${restock ? ' (Bahan Dikembalikan ke Stok)' : ' (Bahan Dianggap Limbah)'}`,
         authorizedBy: manager.name,
         totalAmount: order.total_amount,
         items: itemsRes.rows.map((i) => ({
@@ -737,6 +554,7 @@ export class OrderService {
         orderId: order.id,
         orderNumber: order.order_number,
         status: 'CANCELLED',
+        restocked: Boolean(restock),
       };
     } catch (err) {
       await client.query('ROLLBACK');
@@ -746,9 +564,9 @@ export class OrderService {
     }
   }
 
-  // 5. GET ORDERS LIST
-  async getOrders(filters: { date?: string; status?: string; limit?: number; offset?: number }) {
-    const { date, status, limit = 50, offset = 0 } = filters;
+  // 3. GET ORDERS LIST
+  async getOrders(filters: { date?: string; from?: string; to?: string; status?: string; limit?: number; offset?: number }) {
+    const { date, from, to, status, limit = 50, offset = 0 } = filters;
     let query = `
       SELECT o.*, t.table_number, u.name as cashier_name, c.name as customer_name,
         COALESCE(
@@ -784,8 +602,19 @@ export class OrderService {
     const params: any[] = [];
     const conditions: string[] = [];
 
-    if (date) {
-      conditions.push(`DATE(o.created_at) = $${params.length + 1}`);
+    if (from && to) {
+      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') >= $${params.length + 1}`);
+      params.push(from);
+      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') <= $${params.length + 1}`);
+      params.push(to);
+    } else if (from) {
+      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') >= $${params.length + 1}`);
+      params.push(from);
+    } else if (to) {
+      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') <= $${params.length + 1}`);
+      params.push(to);
+    } else if (date) {
+      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') = $${params.length + 1}`);
       params.push(date);
     }
 

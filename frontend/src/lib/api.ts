@@ -64,6 +64,90 @@ export const api = {
       ),
   },
 
+  // Products
+  products: {
+    getAll: () => request<{ success: boolean; data: any[] }>('/products'),
+    toggleSoldOut: (id: string, isForceSoldOut: boolean) =>
+      request<{ success: boolean; data: any; message: string }>(`/products/${id}/toggle-soldout`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isForceSoldOut }),
+      }),
+    uploadImage: (image: string, filename?: string) =>
+      request<{ success: boolean; data: { url: string; filename: string; size: number }; message: string }>('/products/upload-image', {
+        method: 'POST',
+        body: JSON.stringify({ image, filename }),
+      }),
+    create: (payload: { sku: string; name: string; category: string; price: number; print_target?: string; is_favorite?: boolean; image_url?: string | null }) =>
+      request<{ success: boolean; data: any; message: string }>('/products', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    update: (id: string, payload: any) =>
+      request<{ success: boolean; data: any; message: string }>(`/products/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean; data: any; message: string }>(`/products/${id}`, {
+        method: 'DELETE',
+      }),
+    getRecipes: (id: string) =>
+      request<{ success: boolean; data: { recipes: any[]; totalHpp: number } }>(`/products/${id}/recipes`),
+    updateRecipes: (id: string, recipes: Array<{ ingredient_id: string; quantity: number; is_packaging_only?: boolean }>) =>
+      request<{ success: boolean; message: string }>(`/products/${id}/recipes`, {
+        method: 'PUT',
+        body: JSON.stringify({ recipes }),
+      }),
+  },
+
+  // Inventory
+  inventory: {
+    getAll: () => request<{ success: boolean; data: any[] }>('/inventory'),
+    create: (payload: any) =>
+      request<{ success: boolean; data: any; message: string }>('/inventory', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    update: (id: string, payload: any) =>
+      request<{ success: boolean; data: any; message: string }>(`/inventory/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    recordWastage: (payload: { ingredientId: string; quantity: number; reason: string }) =>
+      request<{ success: boolean; data: any; message: string }>('/inventory/wastage', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    submitStocktake: (items: Array<{ ingredientId: string; actualCount: number; notes?: string }>) =>
+      request<{ success: boolean; data: any; message: string }>('/inventory/stocktake', {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+      }),
+  },
+
+  // Purchasing & Suppliers
+  purchasing: {
+    getSuppliers: () => request<{ success: boolean; data: any[] }>('/purchasing/suppliers'),
+    createSupplier: (payload: { name: string; phone: string; email?: string; address?: string; payment_terms?: string }) =>
+      request<{ success: boolean; data: any; message: string }>('/purchasing/suppliers', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getOrders: (status?: string) =>
+      request<{ success: boolean; data: any[] }>(`/purchasing/orders${status ? `?status=${status}` : ''}`),
+    getOrderById: (id: string) =>
+      request<{ success: boolean; data: any }>(`/purchasing/orders/${id}`),
+    createOrder: (payload: { supplierId: string; notes?: string; items: Array<{ ingredientId: string; quantity: number; unitCost: number }> }) =>
+      request<{ success: boolean; data: any; message: string }>('/purchasing/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    receiveOrder: (id: string) =>
+      request<{ success: boolean; data: any; message: string }>(`/purchasing/orders/${id}/receive`, {
+        method: 'POST',
+      }),
+  },
+
   // Shifts
   shifts: {
     getCurrent: () =>
@@ -104,21 +188,92 @@ export const api = {
       description?: string;
       amount: number;
     }) =>
-      request<{ success: boolean; data: any; message: string }>('/shifts/movements', {
+      request<{ success: boolean; data: any; message: string }>('/shifts/cash-movements', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
     getMovements: (shiftId: string) =>
-      request<{ success: boolean; data: any[] }>(`/shifts/movements?shiftId=${shiftId}`),
+      request<{ success: boolean; data: any[] }>(`/shifts/cash-movements?shiftId=${shiftId}`),
+    getHistory: (params?: { limit?: number; from?: string; to?: string } | number) => {
+      if (typeof params === 'number') {
+        return request<{ success: boolean; data: any[] }>(`/shifts/history?limit=${params}`);
+      }
+      const q = new URLSearchParams();
+      if (params?.limit) q.append('limit', params.limit.toString());
+      if (params?.from) q.append('from', params.from);
+      if (params?.to) q.append('to', params.to);
+      const queryStr = q.toString() ? `?${q.toString()}` : '';
+      return request<{ success: boolean; data: any[] }>(`/shifts/history${queryStr}`);
+    },
+    forceClose: (shiftId: string, payload?: { actualCash?: number; notes?: string }) =>
+      request<{ success: boolean; data: any; message: string }>(`/shifts/${shiftId}/force-close`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      }),
   },
 
-  // Products
-  products: {
-    getAll: () => request<{ success: boolean; data: any[] }>('/products'),
-    toggleSoldOut: (id: string, isForceSoldOut: boolean) =>
-      request<{ success: boolean; data: any; message: string }>(`/products/${id}/toggle-sold-out`, {
+  // Promos
+  promos: {
+    getAll: () => request<{ success: boolean; data: any[] }>('/promos'),
+    getAdminList: () => request<{ success: boolean; data: any[] }>('/promos/admin'),
+    validate: (code: string, subtotal: number) =>
+      request<{ success: boolean; data: { id: string; code: string; name: string; discountAmount: number }; message: string }>(
+        '/promos/validate',
+        {
+          method: 'POST',
+          body: JSON.stringify({ code, subtotal }),
+        }
+      ),
+    create: (payload: any) =>
+      request<{ success: boolean; data: any; message: string }>('/promos', {
         method: 'POST',
-        body: JSON.stringify({ isForceSoldOut }),
+        body: JSON.stringify(payload),
+      }),
+    toggle: (id: string, is_active: boolean) =>
+      request<{ success: boolean; data: any; message: string }>(`/promos/${id}/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active }),
+      }),
+  },
+
+  // Store Settings
+  settings: {
+    get: () => request<{ success: boolean; data: any }>('/settings'),
+    update: (payload: any) =>
+      request<{ success: boolean; data: any; message: string }>('/settings', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+  },
+
+  // Audit Logs
+  audit: {
+    getLogs: (params?: { action?: string; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.action) q.append('action', params.action);
+      if (params?.limit) q.append('limit', params.limit.toString());
+      const queryStr = q.toString() ? `?${q.toString()}` : '';
+      return request<{ success: boolean; data: any[] }>(`/audit-logs${queryStr}`);
+    },
+  },
+
+  // Users & Staff
+  users: {
+    getAll: () => request<{ success: boolean; data: any[] }>('/auth/users'),
+    create: (payload: { name: string; username: string; password: string; role: string; pin_code?: string }) =>
+      request<{ success: boolean; data: any; message: string }>('/auth/users', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    update: (id: string, payload: { name?: string; username?: string; role?: string; pin_code?: string | null; password?: string }) =>
+      request<{ success: boolean; data: any; message: string }>(`/auth/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+    toggleActive: (id: string, is_active: boolean) =>
+      request<{ success: boolean; data: any; message: string }>(`/auth/users/${id}/toggle-active`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active }),
       }),
   },
 
@@ -147,19 +302,6 @@ export const api = {
       }),
   },
 
-  // Promos
-  promos: {
-    getAll: () => request<{ success: boolean; data: any[] }>('/promos'),
-    validate: (code: string, subtotal: number) =>
-      request<{ success: boolean; data: { id: string; code: string; name: string; discountAmount: number }; message: string }>(
-        '/promos/validate',
-        {
-          method: 'POST',
-          body: JSON.stringify({ code, subtotal }),
-        }
-      ),
-  },
-
   // Reservations
   reservations: {
     getAll: () => request<{ success: boolean; data: any[] }>('/reservations'),
@@ -169,6 +311,32 @@ export const api = {
   reports: {
     getMenuMatrix: () =>
       request<{ success: boolean; data: any }>('/reports/menu-matrix'),
+    getDailySummary: (dateOrParams?: string | { date?: string; from?: string; to?: string }) => {
+      let q = '';
+      if (typeof dateOrParams === 'string') {
+        q = dateOrParams ? `?date=${encodeURIComponent(dateOrParams)}` : '';
+      } else if (dateOrParams) {
+        const params = new URLSearchParams();
+        if (dateOrParams.date) params.append('date', dateOrParams.date);
+        if (dateOrParams.from) params.append('from', dateOrParams.from);
+        if (dateOrParams.to) params.append('to', dateOrParams.to);
+        q = params.toString() ? `?${params.toString()}` : '';
+      }
+      return request<{ success: boolean; data: any }>(`/reports/daily-summary${q}`);
+    },
+    getHourlyHeatmap: (dateOrParams?: string | { date?: string; from?: string; to?: string }) => {
+      let q = '';
+      if (typeof dateOrParams === 'string') {
+        q = dateOrParams ? `?date=${encodeURIComponent(dateOrParams)}` : '';
+      } else if (dateOrParams) {
+        const params = new URLSearchParams();
+        if (dateOrParams.date) params.append('date', dateOrParams.date);
+        if (dateOrParams.from) params.append('from', dateOrParams.from);
+        if (dateOrParams.to) params.append('to', dateOrParams.to);
+        q = params.toString() ? `?${params.toString()}` : '';
+      }
+      return request<{ success: boolean; data: any }>(`/reports/hourly-heatmap${q}`);
+    },
   },
 
   // Orders
@@ -178,20 +346,17 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
-    getOrders: (params?: { date?: string; status?: string; limit?: number }) => {
+    getOrders: (params?: { date?: string; from?: string; to?: string; status?: string; limit?: number }) => {
       const q = new URLSearchParams();
       if (params?.date) q.append('date', params.date);
+      if (params?.from) q.append('from', params.from);
+      if (params?.to) q.append('to', params.to);
       if (params?.status) q.append('status', params.status);
       if (params?.limit) q.append('limit', params.limit.toString());
       const queryStr = q.toString() ? `?${q.toString()}` : '';
       return request<{ success: boolean; data: any[] }>(`/orders${queryStr}`);
     },
-    payQr: (id: string, payload: any) =>
-      request<{ success: boolean; data: any; message: string }>(`/orders/${id}/cashier-pay`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }),
-    voidOrder: (id: string, payload: { managerPin: string; reason: string }) =>
+    voidOrder: (id: string, payload: { managerPin: string; reason: string; restock?: boolean }) =>
       request<{ success: boolean; data: any; message: string }>(`/orders/${id}/void`, {
         method: 'POST',
         body: JSON.stringify(payload),

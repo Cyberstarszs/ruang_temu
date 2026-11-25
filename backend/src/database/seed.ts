@@ -16,7 +16,7 @@ export async function runSeed() {
     await client.query(`
       INSERT INTO users (name, username, password_hash, role, pin_code)
       VALUES 
-        ('Budi Santoso (Owner)', 'owner', $1, 'OWNER', '123456'),
+        ('Budi Santoso', 'owner', $1, 'OWNER', '123456'),
         ('Rina Kasir', 'kasir', $2, 'CASHIER', NULL)
       ON CONFLICT (username) DO NOTHING;
     `, [ownerPass, cashierPass]);

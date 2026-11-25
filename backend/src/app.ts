@@ -1,6 +1,8 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'path';
+import fs from 'fs';
 import { errorHandler } from './middlewares/errorHandler';
 import { generalLimiter } from './middlewares/rateLimiter';
 
@@ -51,8 +53,16 @@ export function createApp(): Application {
   // DoS Protection
   app.use(generalLimiter);
 
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Static files for product image uploads
+  const uploadsDir = path.resolve(__dirname, '..', 'uploads');
+  const productsUploadsDir = path.join(uploadsDir, 'products');
+  if (!fs.existsSync(productsUploadsDir)) {
+    fs.mkdirSync(productsUploadsDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadsDir));
 
   // Health Check
   app.get('/health', (req: Request, res: Response) => {

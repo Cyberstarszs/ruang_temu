@@ -22,17 +22,7 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
       LIMIT 10
     `);
 
-    // 3. Pending QR customer orders waiting for cashier payment verification
-    const pendingQRRes = await pool.query(`
-      SELECT o.id, o.order_number, COALESCE(c.name, 'Tamu Meja ' || dt.table_number) as customer_name, o.total_amount, o.created_at, dt.table_number
-      FROM orders o
-      LEFT JOIN dining_tables dt ON o.table_id = dt.id
-      LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.status = 'PENDING_PAYMENT_AT_CASHIER'
-      ORDER BY o.created_at ASC
-    `);
-
-    // 4. Today reservations
+    // 3. Today reservations
     const reservationsRes = await pool.query(`
       SELECT r.id, r.customer_name, r.phone_number, r.guest_count, r.reservation_time, r.status, dt.table_number
       FROM reservations r
@@ -44,9 +34,8 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
     const summary = {
       lowStockCount: lowStockRes.rows.length,
       failedPrintsCount: failedPrintsRes.rows.length,
-      pendingQROrdersCount: pendingQRRes.rows.length,
       todayReservationsCount: reservationsRes.rows.length,
-      totalAlerts: lowStockRes.rows.length + failedPrintsRes.rows.length + pendingQRRes.rows.length,
+      totalAlerts: lowStockRes.rows.length + failedPrintsRes.rows.length,
     };
 
     res.json({
@@ -55,7 +44,6 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
         summary,
         lowStockItems: lowStockRes.rows,
         failedPrints: failedPrintsRes.rows,
-        pendingQROrders: pendingQRRes.rows,
         todayReservations: reservationsRes.rows,
       },
     });

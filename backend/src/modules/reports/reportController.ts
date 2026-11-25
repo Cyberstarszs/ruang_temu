@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../../config/database';
 
+function getTodayJakartaDate(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+}
+
 export async function getDailySummary(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { date } = req.query; // YYYY-MM-DD (optional, defaults to today)
-    const targetDate = date ? String(date) : new Date().toISOString().slice(0, 10);
+    const { date, from, to } = req.query; // Supports single 'date' or range 'from' & 'to' (defaults to today in Asia/Jakarta)
+    const fromDate = from ? String(from) : (date ? String(date) : getTodayJakartaDate());
+    const toDate = to ? String(to) : fromDate;
 
     const summaryRes = await pool.query(
       `SELECT 
@@ -13,8 +18,10 @@ export async function getDailySummary(req: Request, res: Response, next: NextFun
          COALESCE(SUM(total_hpp), 0) as total_cogs,
          COALESCE(SUM(discount_amount), 0) as total_discounts
        FROM orders 
-       WHERE status = 'PAID' AND DATE(paid_at) = $1`,
-      [targetDate]
+       WHERE status = 'PAID' 
+         AND DATE(paid_at AT TIME ZONE 'Asia/Jakarta') >= $1 
+         AND DATE(paid_at AT TIME ZONE 'Asia/Jakarta') <= $2`,
+      [fromDate, toDate]
     );
 
     const topProductsRes = await pool.query(
@@ -24,11 +31,13 @@ export async function getDailySummary(req: Request, res: Response, next: NextFun
          SUM(oi.subtotal) as total_revenue
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.id
-       WHERE o.status = 'PAID' AND DATE(o.paid_at) = $1
+       WHERE o.status = 'PAID' 
+         AND DATE(o.paid_at AT TIME ZONE 'Asia/Jakarta') >= $1 
+         AND DATE(o.paid_at AT TIME ZONE 'Asia/Jakarta') <= $2
        GROUP BY oi.product_name_snapshot
        ORDER BY total_qty DESC
        LIMIT 5`,
-      [targetDate]
+      [fromDate, toDate]
     );
 
     const s = summaryRes.rows[0];
@@ -41,7 +50,9 @@ export async function getDailySummary(req: Request, res: Response, next: NextFun
     res.json({
       success: true,
       data: {
-        date: targetDate,
+        date: fromDate === toDate ? fromDate : `${fromDate} s.d. ${toDate}`,
+        fromDate,
+        toDate,
         totalTransactions,
         netSales,
         totalCogs,
@@ -58,19 +69,22 @@ export async function getDailySummary(req: Request, res: Response, next: NextFun
 
 export async function getHourlyHeatmap(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { date } = req.query;
-    const targetDate = date ? String(date) : new Date().toISOString().slice(0, 10);
+    const { date, from, to } = req.query;
+    const fromDate = from ? String(from) : (date ? String(date) : getTodayJakartaDate());
+    const toDate = to ? String(to) : fromDate;
 
     const result = await pool.query(
       `SELECT 
-         EXTRACT(HOUR FROM paid_at) as hour,
+         EXTRACT(HOUR FROM paid_at AT TIME ZONE 'Asia/Jakarta') as hour,
          COUNT(*) as transaction_count,
          COALESCE(SUM(total_amount), 0) as sales_volume
        FROM orders
-       WHERE status = 'PAID' AND DATE(paid_at) = $1
-       GROUP BY EXTRACT(HOUR FROM paid_at)
+       WHERE status = 'PAID' 
+         AND DATE(paid_at AT TIME ZONE 'Asia/Jakarta') >= $1 
+         AND DATE(paid_at AT TIME ZONE 'Asia/Jakarta') <= $2
+       GROUP BY EXTRACT(HOUR FROM paid_at AT TIME ZONE 'Asia/Jakarta')
        ORDER BY hour ASC`,
-      [targetDate]
+      [fromDate, toDate]
     );
 
     res.json({
