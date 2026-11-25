@@ -74,7 +74,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
     : 'hari ini';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '80px' }}>
       {/* Minimal Filter Bar */}
       <div
         style={{
@@ -82,6 +82,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '12px',
+          flexWrap: 'wrap',
         }}
       >
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>
@@ -93,6 +94,8 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
             value={dateRange}
             onChange={(r) => setDateRange(r)}
             placeholder="Rentang Tanggal Dasbor..."
+            align="right"
+            showApplyButton={false}
           />
 
           <button
@@ -102,7 +105,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '6px 14px',
+              padding: '0 16px',
               background: '#57695b',
               color: '#ffffff',
               border: 'none',
@@ -110,11 +113,14 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
               fontWeight: 600,
               fontSize: '12.5px',
               cursor: 'pointer',
-              height: '36px',
-              boxShadow: '0 1px 2px rgba(87, 105, 91, 0.2)',
+              height: '38px',
+              boxShadow: '0 1px 3px rgba(87, 105, 91, 0.25)',
               transition: 'background 0.15s ease',
+              whiteSpace: 'nowrap',
             }}
             title="Muat ulang data performa"
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
           >
             <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
             Perbarui
@@ -202,14 +208,14 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b', textTransform: 'uppercase' }}>
-              Rata-rata Keranjang (Basket)
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#64746b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Nilai Rata-rata Keranjang
             </span>
             <div style={{ padding: '8px', background: 'rgba(21, 101, 192, 0.1)', borderRadius: '10px' }}>
               <ShoppingBag size={18} color="#1565c0" />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#1c2826' }}>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826', whiteSpace: 'nowrap' }}>
             Rp {Number(summary?.averageBasketSize || 0).toLocaleString('id-ID')}
           </div>
         </div>
@@ -300,11 +306,11 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
               style={{
                 display: 'flex',
                 alignItems: 'flex-end',
-                gap: '8px',
-                height: '200px',
+                gap: '3px',
+                height: '190px',
                 paddingTop: '20px',
                 borderBottom: '2px solid #e2e4dc',
-                overflowX: 'auto',
+                width: '100%',
               }}
             >
               {Array.from({ length: 24 }).map((_, h) => {
@@ -318,31 +324,40 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
                     key={h}
                     style={{
                       flex: '1 1 0',
-                      minWidth: '22px',
+                      minWidth: 0,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '4px',
                       height: '100%',
                       justifyContent: 'flex-end',
+                      cursor: 'pointer',
                     }}
-                    title={`Pukul ${h}:00 - Rp ${sales.toLocaleString('id-ID')} (${count} order)`}
+                    title={`Pukul ${h < 10 ? '0' + h : h}:00 - Rp ${sales.toLocaleString('id-ID')} (${count} pesanan)`}
                   >
-                    {count > 0 && (
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#57695b' }}>
+                    {count > 0 ? (
+                      <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#57695b' }}>
                         {count}
                       </span>
+                    ) : (
+                      <span style={{ fontSize: '9px', opacity: 0 }}>0</span>
                     )}
                     <div
                       style={{
                         width: '100%',
-                        height: `${Math.max(count > 0 ? 12 : 2, heightPct)}%`,
+                        height: `${Math.max(count > 0 ? 12 : 3, heightPct)}%`,
                         background: count > 0 ? '#57695b' : '#e7e8e3',
-                        borderRadius: '4px 4px 0 0',
-                        transition: 'height 0.3s ease',
+                        borderRadius: '3px 3px 0 0',
+                        transition: 'height 0.3s ease, background 0.15s ease',
                       }}
                     />
-                    <span style={{ fontSize: '10px', color: '#64746b' }}>
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        color: count > 0 ? '#2d3830' : '#8b968f',
+                        fontWeight: count > 0 ? 700 : 400,
+                      }}
+                    >
                       {h}
                     </span>
                   </div>
@@ -350,10 +365,35 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
               })}
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#8b968f' }}>
-            <span>Pukul 00:00 (Tengah Malam)</span>
-            <span>Pukul 12:00 (Siang)</span>
-            <span>Pukul 23:00 (Malam)</span>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#8b968f',
+              paddingTop: '2px',
+            }}
+          >
+            <span>00:00 (Malam)</span>
+            <span>06:00 (Pagi)</span>
+            <span>12:00 (Siang)</span>
+            <span>18:00 (Sore)</span>
+            <span>23:00 (Malam)</span>
+          </div>
+          <div
+            style={{
+              fontSize: '11px',
+              color: '#687768',
+              background: '#f8faf6',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>💡 Arahkan kursor ke tiap batang jam (0–23) untuk melihat rincian omzet &amp; jumlah pesanan.</span>
           </div>
         </div>
 

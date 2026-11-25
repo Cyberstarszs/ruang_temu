@@ -14,6 +14,8 @@ export interface DateRangePickerProps {
   onApply?: (range: DateRange) => void;
   placeholder?: string;
   className?: string;
+  align?: 'left' | 'right';
+  showApplyButton?: boolean;
 }
 
 const monthNames = [
@@ -106,6 +108,8 @@ export function DateRangePicker({
   onApply,
   placeholder = 'Pilih rentang tanggal...',
   className = '',
+  align = 'left',
+  showApplyButton = true,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -562,28 +566,30 @@ export function DateRangePicker({
       </div>
 
       {/* 2. Terapkan Filter Button (Theme: Signature Forest Green #57695b) */}
-      <button
-        type="button"
-        onClick={() => handleApply()}
-        style={{
-          height: '38px',
-          padding: '0 16px',
-          background: '#57695b',
-          color: '#ffffff',
-          border: 'none',
-          borderRadius: '8px',
-          fontSize: '12.5px',
-          fontWeight: 600,
-          cursor: 'pointer',
-          boxShadow: '0 1px 3px rgba(87, 105, 91, 0.25)',
-          transition: 'background 0.15s ease',
-          whiteSpace: 'nowrap',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
-      >
-        Terapkan Filter
-      </button>
+      {showApplyButton && (
+        <button
+          type="button"
+          onClick={() => handleApply()}
+          style={{
+            height: '38px',
+            padding: '0 16px',
+            background: '#57695b',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(87, 105, 91, 0.25)',
+            transition: 'background 0.15s ease',
+            whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
+        >
+          Terapkan Filter
+        </button>
+      )}
 
       {/* 3. Popover: Dual Month Side-by-Side Calendar (Harmonized Ruang Temu Theme) */}
       {isOpen && (
@@ -591,7 +597,9 @@ export function DateRangePicker({
           style={{
             position: 'absolute',
             top: 'calc(100% + 6px)',
-            left: 0,
+            ...(align === 'right' ? { right: 0 } : { left: 0 }),
+            maxWidth: 'calc(100vw - 32px)',
+            boxSizing: 'border-box',
             zIndex: 99999,
             background: '#ffffff',
             borderRadius: '16px',
@@ -604,9 +612,69 @@ export function DateRangePicker({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Dual Calendar Container */}
-          <div style={{ display: 'flex', gap: '32px' }}>
+          <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap' }}>
             {renderMonthSection(leftGrid, true)}
             {renderMonthSection(rightGrid, false)}
+          </div>
+
+          {/* Quick Info & Action Bar inside popover */}
+          <div
+            style={{
+              marginTop: '16px',
+              paddingTop: '14px',
+              borderTop: '1px solid #f0f2eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontSize: '12px', color: '#687768', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#57695b' }} />
+              {tempFrom && tempTo
+                ? `${formatShortDate(tempFrom)} — ${formatShortDate(tempTo)}`
+                : tempFrom
+                ? `Pilih tanggal akhir (mulai: ${formatShortDate(tempFrom)})`
+                : 'Pilih tanggal mulai'}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '7px',
+                  border: '1px solid #d5dad2',
+                  background: '#f8faf6',
+                  color: '#46554a',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApply()}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  background: '#57695b',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(87, 105, 91, 0.25)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
+              >
+                Terapkan
+              </button>
+            </div>
           </div>
         </div>
       )}
