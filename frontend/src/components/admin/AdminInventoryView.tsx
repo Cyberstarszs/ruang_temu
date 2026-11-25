@@ -14,7 +14,23 @@ import {
   RotateCcw,
   X,
   CheckCircle2,
+  Info,
+  ChevronDown,
 } from 'lucide-react';
+
+const cleanNumStr = (val: any, fallback = '0') => {
+  if (val === null || val === undefined || val === '') return fallback;
+  const num = Number(val);
+  if (isNaN(num)) return fallback;
+  return String(Number(num.toFixed(4)));
+};
+
+const parseCleanNumber = (val: string) => {
+  if (!val) return 0;
+  const normalized = val.replace(',', '.');
+  const n = parseFloat(normalized);
+  return isNaN(n) ? 0 : n;
+};
 
 export function AdminInventoryView() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -31,6 +47,8 @@ export function AdminInventoryView() {
   // Wastage Modal State
   const [isWastageModalOpen, setIsWastageModalOpen] = useState(false);
   const [wasteIngredientId, setWasteIngredientId] = useState('');
+  const [wasteSearch, setWasteSearch] = useState('');
+  const [isWasteDropdownOpen, setIsWasteDropdownOpen] = useState(false);
   const [wasteQuantity, setWasteQuantity] = useState('');
   const [wasteReason, setWasteReason] = useState('Kedaluwarsa / Rusak');
   const [wasteError, setWasteError] = useState('');
@@ -120,16 +138,24 @@ export function AdminInventoryView() {
 
   // Wastage Handlers
   const openWastageModal = (preselectedId?: string) => {
-    setWasteIngredientId(preselectedId || (ingredients[0]?.id || ''));
+    if (preselectedId) {
+      const selected = ingredients.find((i) => i.id === preselectedId);
+      setWasteIngredientId(preselectedId);
+      setWasteSearch(selected ? selected.name : '');
+    } else {
+      setWasteIngredientId('');
+      setWasteSearch('');
+    }
     setWasteQuantity('');
     setWasteReason('Kedaluwarsa / Rusak');
     setWasteError('');
+    setIsWasteDropdownOpen(false);
     setIsWastageModalOpen(true);
   };
 
   const handleSubmitWastage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!wasteIngredientId || !wasteQuantity || Number(wasteQuantity) <= 0) {
+    if (!wasteIngredientId || !wasteQuantity || parseCleanNumber(wasteQuantity) <= 0) {
       setWasteError('Pilih bahan dan masukkan jumlah limbah valid (> 0).');
       return;
     }
@@ -137,7 +163,7 @@ export function AdminInventoryView() {
     try {
       const res = await api.inventory.recordWastage({
         ingredientId: wasteIngredientId,
-        quantity: Number(wasteQuantity),
+        quantity: parseCleanNumber(wasteQuantity),
         reason: wasteReason,
       });
 
@@ -172,10 +198,10 @@ export function AdminInventoryView() {
     setIngName(ing.name);
     setIngUsageUnit(ing.usage_unit);
     setIngPurchaseUnit(ing.purchase_unit);
-    setIngConversionRate(ing.conversion_rate.toString());
-    setIngStockActual(ing.stock_actual.toString());
-    setIngSafeStock(ing.safe_stock.toString());
-    setIngUnitCost(ing.unit_cost.toString());
+    setIngConversionRate(cleanNumStr(ing.conversion_rate, '1000'));
+    setIngStockActual(cleanNumStr(ing.stock_actual, '0'));
+    setIngSafeStock(cleanNumStr(ing.safe_stock, '500'));
+    setIngUnitCost(cleanNumStr(ing.unit_cost, '150'));
     setIngError('');
     setIsIngModalOpen(true);
   };
@@ -193,10 +219,10 @@ export function AdminInventoryView() {
         name: ingName.trim(),
         usage_unit: ingUsageUnit,
         purchase_unit: ingPurchaseUnit.trim(),
-        conversion_rate: Number(ingConversionRate),
-        stock_actual: Number(ingStockActual),
-        safe_stock: Number(ingSafeStock),
-        unit_cost: Number(ingUnitCost),
+        conversion_rate: parseCleanNumber(ingConversionRate),
+        stock_actual: parseCleanNumber(ingStockActual),
+        safe_stock: parseCleanNumber(ingSafeStock),
+        unit_cost: parseCleanNumber(ingUnitCost),
       };
 
       if (editingIng) {
@@ -232,7 +258,7 @@ export function AdminInventoryView() {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
       {/* Top Header Controls */}
       {/* Minimal Action & Filter Bar */}
       <div
@@ -364,10 +390,14 @@ export function AdminInventoryView() {
               fontWeight: 600,
               fontSize: '12.5px',
               cursor: 'pointer',
+              transition: 'background 0.15s ease',
             }}
+            title="Catat limbah / kerusakan bahan umum (pilih bahan secara bebas)"
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#ffe5e3')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff1f0')}
           >
             <Trash2 size={14} />
-            Limbah
+            Catat Limbah
           </button>
 
           <button
@@ -466,9 +496,10 @@ export function AdminInventoryView() {
 
                       {/* 3. Satuan */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ color: '#4b5563', fontSize: '11.5px' }}>{ing.usage_unit}</span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#4b5563', fontSize: '11.5px', fontWeight: 500 }}>{ing.usage_unit}</span>
                           <button
+                            type="button"
                             onClick={(e) =>
                               openIngPopover(e, `Satuan Konversi: ${ing.name}`, [
                                 { label: 'Satuan Pakai (POS)', value: ing.usage_unit },
@@ -477,21 +508,31 @@ export function AdminInventoryView() {
                                 { label: 'Biaya per ' + ing.usage_unit, value: `Rp ${Number(ing.unit_cost).toLocaleString('id-ID')}` },
                               ])
                             }
-                            title="Rincian konversi satuan beli & pakai"
+                            title={`Klik untuk rincian konversi satuan (1 ${ing.purchase_unit} = ${Number(ing.conversion_rate).toLocaleString('id-ID')} ${ing.usage_unit})`}
                             style={{
-                              padding: '1px 4px',
-                              fontSize: '10.5px',
-                              fontWeight: 700,
-                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
                               background: '#f2f4ef',
                               border: '1px solid #dcdfd5',
                               color: '#57695b',
                               cursor: 'pointer',
-                              lineHeight: '13px',
-                              height: '17px',
+                              padding: 0,
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#57695b';
+                              e.currentTarget.style.color = '#ffffff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#f2f4ef';
+                              e.currentTarget.style.color = '#57695b';
                             }}
                           >
-                            ...
+                            <Info size={11} />
                           </button>
                         </div>
                       </td>
@@ -556,38 +597,52 @@ export function AdminInventoryView() {
                       </td>
 
                       {/* 8. Aksi */}
-                      <td style={{ padding: '8px 14px', verticalAlign: 'middle', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <td style={{ padding: '8px 18px', verticalAlign: 'middle', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <button
+                            type="button"
                             onClick={() => openWastageModal(ing.id)}
                             style={{
-                              padding: '3px 8px',
+                              padding: '4px 10px',
                               background: '#fff1f0',
                               color: '#cf1322',
                               border: '1px solid #ffa39e',
-                              borderRadius: '5px',
+                              borderRadius: '6px',
                               fontSize: '11px',
                               fontWeight: 600,
                               cursor: 'pointer',
+                              transition: 'all 0.15s ease',
                             }}
-                            title="Catat pemborosan atau bahan tumpah/rusak"
+                            title={`Catat limbah langsung untuk bahan ${ing.name}`}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#ffe5e3')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff1f0')}
                           >
                             Limbah
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => openEditModal(ing)}
                             style={{
-                              padding: '4px 6px',
+                              padding: '4px 8px',
                               background: '#f7f7f5',
                               color: '#64746b',
                               border: '1px solid #e2e4dc',
-                              borderRadius: '5px',
+                              borderRadius: '6px',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
+                              transition: 'all 0.15s ease',
                             }}
-                            title="Edit Bahan Baku"
+                            title={`Edit Bahan: ${ing.name}`}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#e2e4dc';
+                              e.currentTarget.style.color = '#1c2826';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#f7f7f5';
+                              e.currentTarget.style.color = '#64746b';
+                            }}
                           >
                             <Pencil size={12} />
                           </button>
@@ -792,186 +847,397 @@ export function AdminInventoryView() {
       )}
 
       {/* RECORD WASTAGE MODAL */}
-      {isWastageModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '16px',
-          }}
-        >
+      {isWastageModalOpen && (() => {
+        const selectedWasteIng = ingredients.find((i) => i.id === wasteIngredientId);
+
+        return (
           <div
             style={{
-              background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '460px',
-              width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              overflow: 'hidden',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(3px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '16px',
             }}
           >
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '18px 24px',
-                borderBottom: '1px solid #e7e8e3',
+                background: '#ffffff',
+                borderRadius: '20px',
+                maxWidth: '480px',
+                width: '100%',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                overflow: 'hidden',
               }}
             >
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                Pencatatan Limbah (Wastage)
-              </h3>
-              <button
-                onClick={() => setIsWastageModalOpen(false)}
-                style={{
-                  background: '#f7f7f5',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  color: '#64746b',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitWastage} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {wasteError && (
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#b91c1c',
-                    fontSize: '13px',
-                  }}
-                >
-                  {wasteError}
-                </div>
-              )}
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                  Pilih Bahan Baku
-                </label>
-                <select
-                  value={wasteIngredientId}
-                  onChange={(e) => setWasteIngredientId(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '13px',
-                    background: '#ffffff',
-                  }}
-                >
-                  {ingredients.map((ing) => (
-                    <option key={ing.id} value={ing.id}>
-                      {ing.name} ({ing.code}) — Saldo: {Number(ing.stock_actual).toLocaleString('id-ID')} {ing.usage_unit}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                  Jumlah Bahan Terbuang / Rusak
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  required
-                  placeholder="cth: 250"
-                  value={wasteQuantity}
-                  onChange={(e) => setWasteQuantity(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '13px',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                  Alasan Kerusakan / Limbah
-                </label>
-                <select
-                  value={wasteReason}
-                  onChange={(e) => setWasteReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '13px',
-                    background: '#ffffff',
-                  }}
-                >
-                  <option value="Kedaluwarsa / Rusak">Kedaluwarsa / Rusak</option>
-                  <option value="Tumpah saat Barista Brewing">Tumpah saat Barista Brewing</option>
-                  <option value="Salah Takaran / Reject Rasa">Salah Takaran / Reject Rasa</option>
-                  <option value="Kemasan Rusak / Bocor">Kemasan Rusak / Bocor</option>
-                  <option value="Trial / Kalibrasi Mesin Kopi">Trial / Kalibrasi Mesin Kopi</option>
-                </select>
-              </div>
-
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '12px',
-                  marginTop: '12px',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '18px 24px',
+                  borderBottom: '1px solid #e7e8e3',
                 }}
               >
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                    Pencatatan Limbah (Wastage)
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#687768' }}>
+                    {selectedWasteIng ? `Mencatat pemborosan untuk: ${selectedWasteIng.name}` : 'Catat bahan baku rusak, tumpah, atau kedaluwarsa'}
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsWastageModalOpen(false)}
                   style={{
-                    padding: '10px 18px',
-                    background: '#f0f0eb',
-                    border: '1px solid #dcdfd5',
-                    borderRadius: '10px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#4b5563',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '10px 20px',
-                    background: '#dc2626',
-                    color: '#ffffff',
+                    background: '#f7f7f5',
                     border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    borderRadius: '8px',
+                    padding: '6px',
                     cursor: 'pointer',
+                    color: '#64746b',
                   }}
                 >
-                  Catat & Kurangi Stok
+                  <X size={18} />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSubmitWastage} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {wasteError && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      color: '#b91c1c',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {wasteError}
+                  </div>
+                )}
+
+                {/* Searchable Combobox for Bahan Baku */}
+                <div style={{ position: 'relative' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                    Pilih Bahan Baku <span style={{ color: '#b91c1c' }}>*</span>
+                  </label>
+
+                  {/* Search Input Box */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#ffffff',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      padding: '0 12px',
+                      height: '42px',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                    onClick={() => setIsWasteDropdownOpen(true)}
+                  >
+                    <Search size={15} color="#71717a" style={{ flexShrink: 0 }} />
+                    <input
+                      type="text"
+                      placeholder="Ketik untuk mencari nama / kode bahan..."
+                      value={wasteSearch}
+                      onFocus={() => setIsWasteDropdownOpen(true)}
+                      onChange={(e) => {
+                        setWasteSearch(e.target.value);
+                        if (wasteIngredientId) setWasteIngredientId('');
+                        setIsWasteDropdownOpen(true);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        fontSize: '13px',
+                        width: '100%',
+                        color: '#1c2826',
+                        fontWeight: wasteIngredientId ? 600 : 400,
+                      }}
+                    />
+                    {wasteIngredientId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setWasteIngredientId('');
+                          setWasteSearch('');
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#9ca3af',
+                          cursor: 'pointer',
+                          padding: '2px',
+                        }}
+                        title="Hapus pilihan"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <ChevronDown size={15} color="#71717a" style={{ flexShrink: 0 }} />
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {isWasteDropdownOpen && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 99991 }}
+                        onClick={() => setIsWasteDropdownOpen(false)}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          left: 0,
+                          right: 0,
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          background: '#ffffff',
+                          borderRadius: '10px',
+                          border: '1px solid #d1d5db',
+                          boxShadow: '0 12px 28px rgba(0,0,0,0.18)',
+                          zIndex: 99992,
+                        }}
+                      >
+                        {ingredients.filter((ing) => {
+                          if (!wasteSearch.trim()) return true;
+                          const q = wasteSearch.toLowerCase();
+                          return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
+                        }).length === 0 ? (
+                          <div style={{ padding: '14px', fontSize: '12.5px', color: '#9ca3af', textAlign: 'center', fontStyle: 'italic' }}>
+                            Bahan baku &quot;{wasteSearch}&quot; tidak ditemukan.
+                          </div>
+                        ) : (
+                          ingredients
+                            .filter((ing) => {
+                              if (!wasteSearch.trim()) return true;
+                              const q = wasteSearch.toLowerCase();
+                              return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
+                            })
+                            .map((ing) => {
+                              const isSelected = ing.id === wasteIngredientId;
+                              const isOut = Number(ing.stock_actual) <= 0;
+                              const isLow = Number(ing.stock_actual) <= Number(ing.safe_stock);
+
+                              return (
+                                <div
+                                  key={ing.id}
+                                  onClick={() => {
+                                    setWasteIngredientId(ing.id);
+                                    setWasteSearch(ing.name);
+                                    setIsWasteDropdownOpen(false);
+                                    setWasteError('');
+                                  }}
+                                  style={{
+                                    padding: '10px 14px',
+                                    cursor: 'pointer',
+                                    background: isSelected ? '#f0f3ee' : '#ffffff',
+                                    borderBottom: '1px solid #f2f4ef',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '12px',
+                                    transition: 'background 0.12s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected) e.currentTarget.style.background = '#f9fafb';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected) e.currentTarget.style.background = '#ffffff';
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#1c2826' }}>
+                                        {ing.name}
+                                      </span>
+                                      <span style={{ fontSize: '10.5px', color: '#6b7280', background: '#f3f4f6', padding: '1px 5px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                                        {ing.code}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      fontSize: '11.5px',
+                                      fontWeight: 700,
+                                      padding: '3px 8px',
+                                      borderRadius: '6px',
+                                      whiteSpace: 'nowrap',
+                                      background: isOut ? '#fef2f2' : isLow ? '#fffbeb' : '#f0fdf4',
+                                      color: isOut ? '#b91c1c' : isLow ? '#b45309' : '#15803d',
+                                      border: isOut ? '1px solid #fecaca' : isLow ? '1px solid #fde68a' : '1px solid #bbf7d0',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    Saldo: {Number(ing.stock_actual).toLocaleString('id-ID')} {ing.usage_unit}
+                                  </div>
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Selected Ingredient Summary Card */}
+                  {selectedWasteIng && (
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        padding: '10px 14px',
+                        background: '#f8faf6',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e4dc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#687768', display: 'block' }}>Saldo Tersedia:</span>
+                        <strong style={{ fontSize: '13px', color: Number(selectedWasteIng.stock_actual) <= 0 ? '#b91c1c' : '#1c2826' }}>
+                          {Number(selectedWasteIng.stock_actual).toLocaleString('id-ID')} {selectedWasteIng.usage_unit}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '11px', color: '#687768', display: 'block' }}>Estimasi HPP:</span>
+                        <strong style={{ fontSize: '13px', color: '#57695b' }}>
+                          Rp {Number(selectedWasteIng.unit_cost).toLocaleString('id-ID')} / {selectedWasteIng.usage_unit}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                    Jumlah Bahan Terbuang / Rusak <span style={{ color: '#b91c1c' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      placeholder="Contoh: 250"
+                      value={wasteQuantity}
+                      onChange={(e) => setWasteQuantity(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        paddingRight: selectedWasteIng ? '70px' : '12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '13px',
+                        outline: 'none',
+                      }}
+                    />
+                    {selectedWasteIng && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#687768',
+                          background: '#f2f4ef',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        {selectedWasteIng.usage_unit}
+                      </span>
+                    )}
+                  </div>
+                  {selectedWasteIng && Number(wasteQuantity) > Number(selectedWasteIng.stock_actual) && (
+                    <span style={{ display: 'block', fontSize: '11.5px', color: '#b45309', marginTop: '4px' }}>
+                      ⚠️ Jumlah limbah ({wasteQuantity} {selectedWasteIng.usage_unit}) melebihi saldo aktual ({Number(selectedWasteIng.stock_actual).toLocaleString('id-ID')} {selectedWasteIng.usage_unit}).
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                    Alasan Kerusakan / Limbah
+                  </label>
+                  <select
+                    value={wasteReason}
+                    onChange={(e) => setWasteReason(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '13px',
+                      background: '#ffffff',
+                    }}
+                  >
+                    <option value="Kedaluwarsa / Rusak">Kedaluwarsa / Rusak</option>
+                    <option value="Tumpah saat Barista Brewing">Tumpah saat Barista Brewing</option>
+                    <option value="Salah Takaran / Reject Rasa">Salah Takaran / Reject Rasa</option>
+                    <option value="Kemasan Rusak / Bocor">Kemasan Rusak / Bocor</option>
+                    <option value="Trial / Kalibrasi Mesin Kopi">Trial / Kalibrasi Mesin Kopi</option>
+                  </select>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '12px',
+                    marginTop: '12px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsWastageModalOpen(false)}
+                    style={{
+                      padding: '10px 18px',
+                      background: '#f0f0eb',
+                      border: '1px solid #dcdfd5',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#4b5563',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '10px 20px',
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Catat & Kurangi Stok
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ADD / EDIT INGREDIENT MODAL */}
       {isIngModalOpen && (
@@ -1044,7 +1310,7 @@ export function AdminInventoryView() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Kode Bahan
+                    Kode Bahan <span style={{ color: '#b91c1c' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -1064,12 +1330,12 @@ export function AdminInventoryView() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Nama Bahan
+                    Nama Bahan <span style={{ color: '#b91c1c' }}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="cth: Kopi Arabika House Blend"
+                    placeholder="Contoh: Kopi Arabika House Blend"
                     value={ingName}
                     onChange={(e) => setIngName(e.target.value)}
                     style={{
@@ -1086,7 +1352,7 @@ export function AdminInventoryView() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Satuan Pemakaian
+                    Satuan Pemakaian (POS)
                   </label>
                   <select
                     value={ingUsageUnit}
@@ -1108,12 +1374,12 @@ export function AdminInventoryView() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Satuan Pembelian
+                    Satuan Pembelian (PO)
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="cth: kg / botol / dus"
+                    placeholder="Contoh: kg, botol, dus, pack"
                     value={ingPurchaseUnit}
                     onChange={(e) => setIngPurchaseUnit(e.target.value)}
                     style={{
@@ -1127,14 +1393,43 @@ export function AdminInventoryView() {
                 </div>
               </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                  Rasio Konversi (1 {ingPurchaseUnit || 'satuan beli'} = ... {ingUsageUnit})
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    placeholder="1000"
+                    value={ingConversionRate}
+                    onChange={(e) => setIngConversionRate(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <span style={{ fontSize: '12px', color: '#687768', whiteSpace: 'nowrap' }}>
+                    {ingUsageUnit} per {ingPurchaseUnit || 'satuan'}
+                  </span>
+                </div>
+                <span style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>
+                  Contoh: 1 kg = 1000 gram, atau 1 liter = 1000 ml
+                </span>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Biaya / Satuan (Rp)
+                    Biaya per {ingUsageUnit} (Rp)
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="any"
                     required
                     placeholder="150"
                     value={ingUnitCost}
@@ -1147,14 +1442,18 @@ export function AdminInventoryView() {
                       fontSize: '13px',
                     }}
                   />
+                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
+                    HPP satuan pakai
+                  </span>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Batas Stok Aman
+                    Batas Stok Aman ({ingUsageUnit})
                   </label>
                   <input
                     type="number"
+                    step="any"
                     required
                     placeholder="500"
                     value={ingSafeStock}
@@ -1167,14 +1466,18 @@ export function AdminInventoryView() {
                       fontSize: '13px',
                     }}
                   />
+                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
+                    Batas status kritis
+                  </span>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Stok Aktual
+                    Stok Aktual ({ingUsageUnit})
                   </label>
                   <input
                     type="number"
+                    step="any"
                     required
                     placeholder="1000"
                     value={ingStockActual}
@@ -1187,6 +1490,9 @@ export function AdminInventoryView() {
                       fontSize: '13px',
                     }}
                   />
+                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
+                    Saldo fisik riil saat ini
+                  </span>
                 </div>
               </div>
 
