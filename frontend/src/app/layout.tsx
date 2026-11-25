@@ -1,10 +1,17 @@
 import type { Metadata } from 'next';
+import { Plus_Jakarta_Sans } from 'next/font/google';
+import { AppProviders } from './providers';
 import './globals.css';
-import { AuthProvider } from '@/context/AuthContext';
-import { ShiftProvider } from '@/context/ShiftContext';
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-jakarta',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'RUANG TEMU · Integrated Cafe & POS Management System',
+  title: 'RUANG TEMU · Smart POS & Integrated Cafe Management',
   description: 'Point of Sale, Kitchen/Bar Checker, Inventory & Cafe Management System for RUANG TEMU.',
   icons: {
     icon: '/favicon.png',
@@ -17,21 +24,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
+    <html lang="id" className={plusJakarta.variable}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap"
-          rel="stylesheet"
-        />
       </head>
-      <body>
-        <AuthProvider>
-          <ShiftProvider>
-            {children}
-          </ShiftProvider>
-        </AuthProvider>
+      <body className="bg-[#f8f8f6] font-sans antialiased text-[#1c2826]">
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

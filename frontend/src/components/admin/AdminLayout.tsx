@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard,
@@ -34,6 +36,7 @@ import { AdminSettingsView } from './AdminSettingsView';
 
 interface AdminLayoutProps {
   onSwitchToPos?: () => void;
+  children?: React.ReactNode;
 }
 
 export type AdminTab =
@@ -87,6 +90,7 @@ const SLUG_TAB_MAP: Record<string, AdminTab> = {
   orders: 'orders',
   sif: 'shifts',
   shifts: 'shifts',
+  shift: 'shifts',
   menu: 'products',
   products: 'products',
   stok: 'inventory',
@@ -97,30 +101,20 @@ const SLUG_TAB_MAP: Record<string, AdminTab> = {
   promos: 'promos',
   karyawan: 'users',
   users: 'users',
+  staf: 'users',
   audit: 'audit',
   pengaturan: 'settings',
   settings: 'settings',
 };
 
-export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
+export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
 
-  const getInitialTab = (): AdminTab => {
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname.replace(/^\//, '').toLowerCase();
-      if (path && SLUG_TAB_MAP[path]) {
-        return SLUG_TAB_MAP[path];
-      }
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab')?.toLowerCase();
-      if (tabParam && SLUG_TAB_MAP[tabParam]) {
-        return SLUG_TAB_MAP[tabParam];
-      }
-    }
-    return 'dashboard';
-  };
+  const currentSlug = pathname ? pathname.replace(/^\//, '').toLowerCase().split('/')[0] : '';
+  const activeTab: AdminTab = SLUG_TAB_MAP[currentSlug] || 'dashboard';
 
-  const [activeTab, setActiveTab] = useState<AdminTab>(getInitialTab);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -139,57 +133,10 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
     });
   };
 
-  // Sync tab change with browser clean URL (e.g. /transaksi, /menu, /stok)
   const handleSelectTab = (tab: AdminTab) => {
-    setActiveTab(tab);
-    if (typeof window !== 'undefined') {
-      const slug = TAB_SLUG_MAP[tab] || tab;
-      window.history.pushState({ tab }, '', `/${slug}`);
-    }
+    const slug = TAB_SLUG_MAP[tab] || tab;
+    router.push(`/${slug}`);
   };
-
-  // Sync on mount: read tab from clean URL pathname or legacy query param
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname.replace(/^\//, '').toLowerCase();
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab')?.toLowerCase();
-
-      if (path && SLUG_TAB_MAP[path]) {
-        setActiveTab(SLUG_TAB_MAP[path]);
-      } else if (tabParam && SLUG_TAB_MAP[tabParam]) {
-        const resolved = SLUG_TAB_MAP[tabParam];
-        setActiveTab(resolved);
-        const slug = TAB_SLUG_MAP[resolved] || tabParam;
-        window.history.replaceState({ tab: resolved }, '', `/${slug}`);
-      } else {
-        const slug = TAB_SLUG_MAP[activeTab] || 'dasbor';
-        window.history.replaceState({ tab: activeTab }, '', `/${slug}`);
-      }
-    }
-  }, []);
-
-  // Listen to browser Back / Forward buttons
-  useEffect(() => {
-    const onPopState = () => {
-      if (typeof window !== 'undefined') {
-        const path = window.location.pathname.replace(/^\//, '').toLowerCase();
-        if (path && SLUG_TAB_MAP[path]) {
-          setActiveTab(SLUG_TAB_MAP[path]);
-          return;
-        }
-        const params = new URLSearchParams(window.location.search);
-        const tabParam = params.get('tab')?.toLowerCase();
-        if (tabParam && SLUG_TAB_MAP[tabParam]) {
-          setActiveTab(SLUG_TAB_MAP[tabParam]);
-        } else {
-          setActiveTab('dashboard');
-        }
-      }
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
 
   const getActiveTabTitle = () => {
     const item = NAV_ITEMS.find((n) => n.id === activeTab);
@@ -365,10 +312,11 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const slug = TAB_SLUG_MAP[item.id] || item.id;
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => handleSelectTab(item.id)}
+                href={`/${slug}`}
                 title={isSidebarCollapsed ? item.label : undefined}
                 style={{
                   display: 'flex',
@@ -386,6 +334,8 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
                   textAlign: 'left',
                   transition: 'all 0.12s ease',
                   width: '100%',
+                  textDecoration: 'none',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -402,7 +352,7 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
               >
                 <Icon size={17} color={isActive ? '#ffffff' : '#71717a'} />
                 {!isSidebarCollapsed && <span>{item.label}</span>}
-              </button>
+              </Link>
             );
           })}
         </nav>
@@ -607,25 +557,28 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {onSwitchToPos && (
-              <button
-                onClick={onSwitchToPos}
-                style={{
-                  padding: '5px 10px',
-                  background: '#f2f4ef',
-                  color: '#57695b',
-                  border: '1px solid #dcdfd5',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <ShoppingCart size={13} /> Kasir
-              </button>
-            )}
+            <Link
+              href="/pos"
+              onClick={() => {
+                localStorage.setItem('ruang_temu_view_mode', 'POS');
+                if (onSwitchToPos) onSwitchToPos();
+              }}
+              style={{
+                padding: '5px 10px',
+                background: '#f2f4ef',
+                color: '#57695b',
+                border: '1px solid #dcdfd5',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                textDecoration: 'none',
+              }}
+            >
+              <ShoppingCart size={13} /> Kasir
+            </Link>
             <button
               onClick={logout}
               style={{
@@ -636,6 +589,7 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
                 borderRadius: '6px',
                 fontSize: '12px',
                 fontWeight: 600,
+                cursor: 'pointer',
               }}
             >
               Keluar
@@ -659,13 +613,12 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const slug = TAB_SLUG_MAP[item.id] || item.id;
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => {
-                    handleSelectTab(item.id);
-                    setIsMobileMenuOpen(false);
-                  }}
+                  href={`/${slug}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -678,11 +631,12 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
                     fontWeight: isActive ? 600 : 500,
                     fontSize: '13px',
                     textAlign: 'left',
+                    textDecoration: 'none',
                   }}
                 >
                   <Icon size={15} color={isActive ? '#ffffff' : '#64746b'} />
                   {item.label}
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -698,7 +652,7 @@ export function AdminLayout({ onSwitchToPos }: AdminLayoutProps) {
             margin: '0 auto',
           }}
         >
-          {renderActiveView()}
+          {children || renderActiveView()}
         </main>
       </div>
     </div>

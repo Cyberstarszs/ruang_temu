@@ -5,6 +5,7 @@ import { Product, DiningTable, Customer, CartItem, CartCustomization, Order, Hel
 import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useShift } from '@/context/ShiftContext';
+import { useCart } from '@/context/CartContext';
 import { PosHeader } from './PosHeader';
 import { ProductCard } from './ProductCard';
 import { ProductCustomizationModal } from './ProductCustomizationModal';
@@ -37,19 +38,46 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
   const [activeCategory, setActiveCategory] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // State: Cart
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [orderType, setOrderType] = useState<'DINE_IN' | 'TAKEAWAY'>('DINE_IN');
-  const [selectedTable, setSelectedTable] = useState<{ id?: string; number: string } | null>(null);
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [orderNote, setOrderNote] = useState('');
-  const [takeawayName, setTakeawayName] = useState('');
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [promoCode, setPromoCode] = useState('');
-  const [promoError, setPromoError] = useState('');
-  const [promoSuccess, setPromoSuccess] = useState('');
-  const [claimedDownPayment, setClaimedDownPayment] = useState(0);
-  const [reservationId, setReservationId] = useState<string | null>(null);
+  // State: Cart from CartContext (Persistent across App Router navigation)
+  const {
+    cart,
+    setCart,
+    orderType,
+    setOrderType,
+    selectedTable,
+    setSelectedTable,
+    customer,
+    setCustomer,
+    orderNote,
+    setOrderNote,
+    takeawayName,
+    setTakeawayName,
+    discountAmount,
+    setDiscountAmount,
+    promoCode,
+    setPromoCode,
+    promoError,
+    setPromoError,
+    promoSuccess,
+    setPromoSuccess,
+    claimedDownPayment,
+    setClaimedDownPayment,
+    reservationId,
+    setReservationId,
+    heldOrders,
+    updateHeldOrders,
+    subtotal,
+    grandTotal,
+    handleQuickAdd: cartQuickAdd,
+    handleCustomizationConfirm: cartCustomizationConfirm,
+    handleUpdateQuantity: cartUpdateQuantity,
+    handleRemoveItem: cartRemoveItem,
+    handleClearCart: cartClearCart,
+    handleHoldOrder: cartHoldOrder,
+    handleRecallHeldOrder: cartRecallHeldOrder,
+    handleDeleteHeldOrder: cartDeleteHeldOrder,
+    handleSetManualTable: cartSetManualTable,
+  } = useCart();
 
   // State: Modals
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
@@ -66,8 +94,6 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
   const [splitBillOpen, setSplitBillOpen] = useState(false);
   const [splitCount, setSplitCount] = useState(2);
 
-  // State: Held Orders (Tahan Pesanan)
-  const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState('');
@@ -165,10 +191,6 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart.length, paymentModalOpen, orderType, selectedTable]);
 
-  // Cart calculations
-  const subtotal = cart.reduce((sum, item) => sum + item.itemSubtotal, 0);
-  const grandTotal = Math.max(0, subtotal - discountAmount - claimedDownPayment);
-
   // Auto-revalidate promo if cart items change or subtotal changes
   useEffect(() => {
     if (!promoCode || subtotal === 0) return;
@@ -202,37 +224,13 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     };
   }, [subtotal, promoCode]);
 
-  // Cart handlers
+  // Cart handlers delegating to CartContext
   const handleQuickAdd = (product: Product) => {
-    // If product is beverage, open customization dialog to choose temperature & sugar
     if (product.category === 'Kopi' || product.category === 'Non-Kopi') {
       setCustomizingProduct(product);
       return;
     }
-
-    // Add standard item
-    setCart((prev) => {
-      const existingIdx = prev.findIndex((i) => i.product.id === product.id && !i.customization);
-      if (existingIdx > -1) {
-        const next = [...prev];
-        const item = next[existingIdx];
-        const newQty = item.quantity + 1;
-        next[existingIdx] = {
-          ...item,
-          quantity: newQty,
-          itemSubtotal: product.price * newQty,
-        };
-        return next;
-      }
-      return [
-        ...prev,
-        {
-          product,
-          quantity: 1,
-          itemSubtotal: product.price,
-        },
-      ];
-    });
+    cartQuickAdd(product);
     showToast(`${product.name} ditambahkan ke pesanan.`);
   };
 
@@ -241,159 +239,47 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     quantity: number,
     customization: CartCustomization
   ) => {
-    const finalUnitPrice = product.price + customization.unitPriceAdjustment;
-    setCart((prev) => [
-      ...prev,
-      {
-        product,
-        quantity,
-        customization,
-        itemSubtotal: finalUnitPrice * quantity,
-      },
-    ]);
+    cartCustomizationConfirm(product, quantity, customization);
     showToast(`${product.name} (+pilihan) ditambahkan.`);
   };
 
   const handleUpdateQuantity = (index: number, newQty: number) => {
-    setCart((prev) => {
-      const next = [...prev];
-      const item = next[index];
-      const unitPrice = item.customization
-        ? item.product.price + item.customization.unitPriceAdjustment
-        : item.product.price;
-      next[index] = {
-        ...item,
-        quantity: newQty,
-        itemSubtotal: unitPrice * newQty,
-      };
-      return next;
-    });
+    cartUpdateQuantity(index, newQty);
   };
 
   const handleRemoveItem = (index: number) => {
-    setCart((prev) => prev.filter((_, i) => i !== index));
+    cartRemoveItem(index);
   };
 
   const handleClearCart = () => {
-    setCart([]);
-    setSelectedTable(null);
-    setCustomer(null);
-    setOrderNote('');
-    setTakeawayName('');
-    setDiscountAmount(0);
-    setPromoCode('');
-    setPromoError('');
-    setPromoSuccess('');
-    setClaimedDownPayment(0);
-    setReservationId(null);
+    cartClearCart();
     showToast('Keranjang belanja dikosongkan.');
-  };
-
-  // Load held orders from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('ruang_temu_held_orders_v2');
-      if (saved) {
-        setHeldOrders(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.error('Error loading held orders:', e);
-    }
-  }, []);
-
-  const updateHeldOrders = (newOrders: HeldOrder[]) => {
-    setHeldOrders(newOrders);
-    try {
-      localStorage.setItem('ruang_temu_held_orders_v2', JSON.stringify(newOrders));
-    } catch (e) {
-      console.error('Error saving held orders:', e);
-    }
   };
 
   // Tahan Pesanan (Park Order)
   const handleHoldOrder = () => {
-    if (cart.length === 0) {
-      showToast('Keranjang masih kosong, tidak ada pesanan untuk ditahan.');
-      return;
-    }
-
-    const newHeld: HeldOrder = {
-      id: `HOLD-${Date.now().toString().slice(-6)}`,
-      heldAt: new Date().toISOString(),
-      orderType,
-      selectedTable,
-      customer,
-      takeawayName,
-      orderNote,
-      items: [...cart],
-      subtotal,
-      discountAmount,
-      promoCode,
-      claimedDownPayment,
-      grandTotal,
-    };
-
-    const updated = [newHeld, ...heldOrders];
-    updateHeldOrders(updated);
-    handleClearCart();
-    showToast(`Pesanan berhasil ditahan (${newHeld.id}).`);
+    const res = cartHoldOrder();
+    showToast(res.message);
   };
 
   // Muat Pesanan Tahanan (Recall Held Order)
   const handleRecallHeldOrder = (heldOrder: HeldOrder) => {
-    if (cart.length > 0) {
-      const confirmReplace = window.confirm(
-        'Keranjang saat ini masih terisi item. Apakah Anda ingin menimpa keranjang dengan pesanan tahanan ini?'
-      );
-      if (!confirmReplace) return;
+    const ok = cartRecallHeldOrder(heldOrder, true);
+    if (ok) {
+      setHeldOrdersModalOpen(false);
+      showToast(`Pesanan #${heldOrder.id} dimuat kembali ke kasir.`);
     }
-
-    setCart(heldOrder.items);
-    setOrderType(heldOrder.orderType);
-    setSelectedTable(heldOrder.selectedTable);
-    setCustomer(heldOrder.customer);
-    setTakeawayName(heldOrder.takeawayName || '');
-    setOrderNote(heldOrder.orderNote || '');
-    setDiscountAmount(heldOrder.discountAmount || 0);
-    setPromoCode(heldOrder.promoCode || '');
-    setClaimedDownPayment(heldOrder.claimedDownPayment || 0);
-
-    const updated = heldOrders.filter((o) => o.id !== heldOrder.id);
-    updateHeldOrders(updated);
-    setHeldOrdersModalOpen(false);
-    showToast(`Pesanan #${heldOrder.id} dimuat kembali ke kasir.`);
   };
 
   // Hapus Pesanan Tahanan
   const handleDeleteHeldOrder = (id: string) => {
-    const updated = heldOrders.filter((o) => o.id !== id);
-    updateHeldOrders(updated);
+    cartDeleteHeldOrder(id);
     showToast('Pesanan tahanan dihapus.');
   };
 
   // Input Manual Nomor Meja (Hanya Angka)
   const handleSetManualTable = (tableNumber: string) => {
-    const digitsOnly = tableNumber.replace(/\D/g, '');
-    if (!digitsOnly) {
-      setSelectedTable(null);
-      return;
-    }
-
-    const intVal = parseInt(digitsOnly, 10);
-    const matched = tables.find((t) => {
-      const tableDigits = t.table_number.replace(/\D/g, '');
-      return (
-        t.table_number.toLowerCase() === digitsOnly.toLowerCase() ||
-        t.table_number.toLowerCase() === `m${digitsOnly.padStart(2, '0')}`.toLowerCase() ||
-        (tableDigits && parseInt(tableDigits, 10) === intVal)
-      );
-    });
-
-    if (matched) {
-      setSelectedTable({ id: matched.id, number: digitsOnly });
-    } else {
-      setSelectedTable({ number: digitsOnly });
-    }
+    cartSetManualTable(tableNumber, tables);
   };
 
   // Clear table handler
