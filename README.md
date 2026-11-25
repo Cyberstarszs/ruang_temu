@@ -49,3 +49,10 @@ File ini akan otomatis mendeteksi dependensi dan langsung menjalankan Backend + 
 ### Akun Demo 1-Klik di Halaman Login:
 - **Kasir:** Username: `kasir` (Password: `kasir123`) - Akses POS kasir, sif kasir, transaksi bayar di kasir, denah meja, kas kecil.
 - **Owner:** Username: `owner` (Password: `owner123` | PIN Otorisasi: `123456`) - Akses penuh termasuk laporan eksekutif (laba kotor, ringkasan harian, heatmap), matriks BCG menu, inventaris & opname, purchasing PO, otorisasi void transaksi, manajemen pengguna, audit log, dan pengaturan toko.
+
+---
+
+## 📚 Dokumentasi Teknis & Arsitektur
+
+- **[Arsitektur & Struktur Folder Frontend](docs/FRONTEND_ARCHITECTURE.md):** Penjelasan struktur modular berlapis, desain perutean single-shell, klien API terpusat, dan evaluasi teknis.
+- **[Software Requirements Specification (SRS)](SRS_RUANG_TEMU.md):** Dokumen spesifikasi kebutuhan sistem dan analisis kelayakan teknis Ruang Temu.
