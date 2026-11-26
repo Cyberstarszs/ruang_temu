@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { rupiah } from '../utils/formatters';
+import { rupiah, formatThousands, parseThousands } from '../utils/formatters';
 import { X, ShieldAlert, ArrowDownRight, ArrowUpRight, DollarSign } from 'lucide-react';
 import type { CashierShift } from '../types';
 
@@ -33,7 +33,7 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  const numAmount = Number(amount) || 0;
+  const numAmount = parseThousands(amount);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,12 +89,11 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-zinc-400 text-sm font-semibold">Rp</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    placeholder="Contoh: 200000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatThousands(amount)}
+                    onChange={(e) => setAmount(formatThousands(parseThousands(e.target.value)))}
                     className="w-full bg-[#121316] border border-[#2e313b] rounded-xl pl-10 pr-4 py-2.5 text-white font-mono text-base focus:outline-none focus:border-[#c59a68]"
                     required
                     autoFocus
@@ -105,7 +104,7 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                     <button
                       key={val}
                       type="button"
-                      onClick={() => setAmount(String(val))}
+                      onClick={() => setAmount(formatThousands(val))}
                       className="px-2.5 py-1 text-xs rounded-lg bg-[#252830] hover:bg-[#323642] text-zinc-300 border border-[#353945]"
                     >
                       {rupiah(val)}
@@ -153,11 +152,11 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-zinc-400 text-sm font-semibold">Rp</span>
                   <input
-                    type="number"
-                    min="0"
-                    placeholder="Hitung fisik uang tunai..."
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatThousands(amount)}
+                    onChange={(e) => setAmount(formatThousands(parseThousands(e.target.value)))}
                     className="w-full bg-[#121316] border border-[#2e313b] rounded-xl pl-10 pr-4 py-2.5 text-white font-mono text-base focus:outline-none focus:border-rose-400"
                     required
                     autoFocus
@@ -264,12 +263,11 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-zinc-400 text-sm font-semibold">Rp</span>
                   <input
-                    type="number"
-                    min="1000"
-                    step="1000"
-                    placeholder="Contoh: 35000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatThousands(amount)}
+                    onChange={(e) => setAmount(formatThousands(parseThousands(e.target.value)))}
                     className="w-full bg-[#121316] border border-[#2e313b] rounded-xl pl-10 pr-4 py-2.5 text-white font-mono text-base focus:outline-none focus:border-blue-400"
                     required
                     autoFocus

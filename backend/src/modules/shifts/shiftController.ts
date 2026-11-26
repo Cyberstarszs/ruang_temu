@@ -48,14 +48,23 @@ export async function getCurrentShift(req: Request, res: Response, next: NextFun
       [shift.id]
     );
 
+    const openingCash = Number(shift.opening_cash || 0);
+    const cashSalesTotal = Number(salesRes.rows[0]?.cash_sales_total || 0);
+    const totalCashIn = Number(pettyRes.rows[0]?.total_cash_in || 0);
+    const totalCashOut = Number(pettyRes.rows[0]?.total_cash_out || 0);
+    const expectedCash = openingCash + cashSalesTotal + totalCashIn - totalCashOut;
+
     res.json({
       success: true,
       data: {
         shift,
         summary: {
-          openingCash: Number(shift.opening_cash),
-          orderCount: Number(salesRes.rows[0].order_count),
-          // Note: system_expected_cash is calculated on backend for blind-close verification
+          openingCash,
+          cashSalesTotal,
+          totalCashIn,
+          totalCashOut,
+          expectedCash,
+          orderCount: Number(salesRes.rows[0]?.order_count || 0),
         },
       },
     });

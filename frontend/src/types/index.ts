@@ -16,6 +16,10 @@ export interface AuthState {
 
 export interface ShiftSummary {
   openingCash: number;
+  cashSalesTotal?: number;
+  totalCashIn?: number;
+  totalCashOut?: number;
+  expectedCash?: number;
   orderCount: number;
 }
 

@@ -6,6 +6,27 @@ export function rupiah(amount: number | string | null | undefined): string {
   return `Rp ${num.toLocaleString('id-ID')}`;
 }
 
+/**
+ * Memformat angka/string angka menjadi format ribuan dengan pemisah titik (.)
+ * Contoh: 50000 -> "50.000", 25000 -> "25.000", 0 / "" -> ""
+ */
+export function formatThousands(val: number | string | null | undefined): string {
+  if (val === null || val === undefined || val === '' || val === 0) return '';
+  const numStr = String(val).replace(/\D/g, '');
+  if (!numStr) return '';
+  return Number(numStr).toLocaleString('id-ID');
+}
+
+/**
+ * Mengubah string format ribuan bertitik kembali menjadi number murni
+ * Contoh: "50.000" -> 50000, "Rp 25.000" -> 25000
+ */
+export function parseThousands(val: string | number | null | undefined): number {
+  if (val === null || val === undefined) return 0;
+  const cleanStr = String(val).replace(/\D/g, '');
+  return cleanStr ? parseInt(cleanStr, 10) : 0;
+}
+
 export function formatTime(dateString: string | null | undefined): string {
   if (!dateString) return '—';
   try {

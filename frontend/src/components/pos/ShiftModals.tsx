@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useShift } from '@/context/ShiftContext';
 import { useAuth } from '@/context/AuthContext';
-import { rupiah, formatDateTime } from '@/lib/utils';
+import { rupiah, formatDateTime, formatThousands, parseThousands } from '@/lib/utils';
 import { Icon } from '@/components/common/Icons';
 import { api } from '@/lib/api';
 import {
@@ -104,25 +104,43 @@ export function OpenShiftModal({
 
           <label style={{ display: 'block', marginBottom: '14px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#4a4a4a', display: 'block', marginBottom: '6px' }}>
-              Modal Uang Awal di Laci Kasir (Rp)
+              Modal Uang Awal di Laci Kasir
             </span>
-            <input
-              type="number"
-              value={openingCash || ''}
-              onChange={(e) => setOpeningCash(Number(e.target.value))}
-              autoFocus
-              required
-              min={0}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                border: '1.5px solid #57695b',
-                borderRadius: '8px',
-                fontSize: '20px',
-                fontWeight: 700,
-                color: '#272727',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: '#57695b',
+                  pointerEvents: 'none',
+                }}
+              >
+                Rp
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatThousands(openingCash)}
+                onChange={(e) => setOpeningCash(parseThousands(e.target.value))}
+                autoFocus
+                required
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px 12px 48px',
+                  border: '1.5px solid #57695b',
+                  borderRadius: '8px',
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: '#272727',
+                  outline: 'none',
+                }}
+              />
+            </div>
           </label>
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
@@ -763,17 +781,18 @@ export function CashMovementModal({ onClose }: { onClose: () => void }) {
                   fontSize: '15px',
                   fontWeight: 700,
                   color: '#94a3b8',
+                  pointerEvents: 'none',
                 }}
               >
                 Rp
               </span>
               <input
-                type="number"
-                value={amount || ''}
-                onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
+                type="text"
+                inputMode="numeric"
+                value={formatThousands(amount)}
+                onChange={(e) => setAmount(parseThousands(e.target.value))}
                 placeholder="0"
                 required
-                min={1}
                 style={{
                   width: '100%',
                   padding: '10px 14px 10px 42px',
@@ -1087,8 +1106,12 @@ export function CashMovementModal({ onClose }: { onClose: () => void }) {
 
 // 4. CLOSE SHIFT MODAL (TIDAK PERLU PIN OWNER & OTOMATIS LOGOUT)
 export function CloseShiftModal({ onClose }: { onClose: () => void }) {
-  const { closeShift } = useShift();
+  const { shift, summary, refreshShift, closeShift } = useShift();
   const { logout } = useAuth();
+
+  useEffect(() => {
+    refreshShift();
+  }, [refreshShift]);
 
   // Denominasi Lembaran
   const [denominations, setDenominations] = useState<{ [key: string]: number }>({
@@ -1108,13 +1131,26 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Compute calculated cash
+  // Perhitungan Keuangan Kas Sif dari Sistem
+  const openingCash = Number(summary?.openingCash ?? shift?.opening_cash ?? 0);
+  const cashSales = Number(summary?.cashSalesTotal ?? 0);
+  const cashIn = Number(summary?.totalCashIn ?? 0);
+  const cashOut = Number(summary?.totalCashOut ?? 0);
+  const expectedCash = Number(
+    summary?.expectedCash !== undefined
+      ? summary.expectedCash
+      : openingCash + cashSales + cashIn - cashOut
+  );
+
+  // Compute calculated physical cash
   const calculatedFromDenominations = Object.entries(denominations).reduce((sum, [key, count]) => {
     if (key === 'coins') return sum + (count || 0);
     return sum + Number(key) * (count || 0);
   }, 0);
 
   const physicalCash = useDetailedDenomination ? calculatedFromDenominations : manualPhysicalCash;
+  const cashDifference = physicalCash - expectedCash;
+  const isShortage = cashDifference < 0;
 
   const handleDenomChange = (denom: string, val: number) => {
     setDenominations((prev) => ({
@@ -1123,12 +1159,64 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
     }));
   };
 
+  // Aksi Cepat: Isi Uang Pas Sesuai Ekspektasi Sistem
+  const handleFillExactCash = () => {
+    const target = Math.max(0, expectedCash);
+    setManualPhysicalCash(target);
+
+    // Hitung pecahan lembaran otomatis yang paling pas untuk denominasi
+    let remaining = target;
+    const newDenoms: { [key: string]: number } = {
+      '100000': 0,
+      '50000': 0,
+      '20000': 0,
+      '10000': 0,
+      '5000': 0,
+      '2000': 0,
+      '1000': 0,
+      'coins': 0,
+    };
+    const bills = [100000, 50000, 20000, 10000, 5000, 2000, 1000];
+    for (const bill of bills) {
+      const count = Math.floor(remaining / bill);
+      newDenoms[String(bill)] = count;
+      remaining %= bill;
+    }
+    newDenoms['coins'] = remaining;
+    setDenominations(newDenoms);
+    setError('');
+  };
+
+  // Aksi Reset: Kosongkan Hitungan Kas
+  const handleResetCash = () => {
+    setManualPhysicalCash(0);
+    setDenominations({
+      '100000': 0,
+      '50000': 0,
+      '20000': 0,
+      '10000': 0,
+      '5000': 0,
+      '2000': 0,
+      '1000': 0,
+      'coins': 0,
+    });
+  };
+
   const handleClose = async () => {
     setError('');
     if (physicalCash < 0) {
       setError('Nominal uang fisik di laci tidak boleh negatif.');
       return;
     }
+
+    // Peringatan audit jika uang kurang dan catatan kosong
+    if (isShortage && !notes.trim()) {
+      setError(
+        `Kas fisik laci terdeteksi KURANG sebesar ${rupiah(Math.abs(cashDifference))}. Wajib tuliskan alasan/keterangan selisih kas pada kolom Catatan di bawah sebelum menutup sif.`
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -1157,13 +1245,13 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
         className="bo-modal"
         role="dialog"
         aria-modal="true"
-        style={{ maxWidth: '580px', width: '92%' }}
+        style={{ maxWidth: '600px', width: '92%' }}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="bo-modal-head">
           <div>
             <h2>Tutup Sif Kasir</h2>
-            <p>Hitung total uang fisik di laci. Sif akan ditutup dan akun otomatis keluar.</p>
+            <p>Rekonsiliasi kas laci dan hitung uang fisik. Sif akan ditutup dan akun otomatis keluar.</p>
           </div>
           <button onClick={onClose} aria-label="Tutup">
             <Icon name="close" size={20} />
@@ -1181,21 +1269,177 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                 fontSize: '13px',
                 marginBottom: '14px',
                 lineHeight: 1.4,
+                border: '1px solid #f87171',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
-              {error}
+              <Icon name="alertTriangle" size={16} />
+              <span>{error}</span>
             </div>
           )}
 
+          {/* 1. KARTU INFORMASI FORMULA EKSPEKTASI KAS SIF */}
+          <div
+            style={{
+              background: '#f8faf9',
+              borderRadius: '10px',
+              border: '1.5px solid #dce4dd',
+              padding: '12px 14px',
+              marginBottom: '14px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '10px',
+                borderBottom: '1px solid #eef2ef',
+                paddingBottom: '8px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#2d3748',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Icon name="calculator" size={14} />
+                Formula Kas Sif (Ekspektasi Sistem)
+              </span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: '#57695b',
+                  background: '#eaf0ea',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                }}
+              >
+                {summary?.orderCount || 0} Struk Selesai
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
+              {/* Modal Awal */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#4a5568' }}>Modal Awal Kasir:</span>
+                <b style={{ color: '#1a202c' }}>{rupiah(openingCash)}</b>
+              </div>
+
+              {/* (+) Penjualan Tunai */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#15803d' }}>(+) Penjualan Tunai:</span>
+                <b style={{ color: '#15803d' }}>+{rupiah(cashSales)}</b>
+              </div>
+
+              {/* (+) Kas Masuk */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#166534' }}>(+) Kas Masuk Operasional:</span>
+                <b style={{ color: '#166534' }}>+{rupiah(cashIn)}</b>
+              </div>
+
+              {/* (-) Kas Keluar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#b91c1c' }}>(-) Kas Keluar Operasional:</span>
+                <b style={{ color: '#b91c1c' }}>-{rupiah(cashOut)}</b>
+              </div>
+
+              <div style={{ height: '1px', background: '#dce4dd', margin: '4px 0' }} />
+
+              {/* Total Ekspektasi Kas */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '13.5px',
+                  paddingTop: '2px',
+                }}
+              >
+                <span style={{ fontWeight: 700, color: '#1c2826' }}>Total Ekspektasi Kas Laci:</span>
+                <b style={{ fontWeight: 800, color: '#2d6a4f', fontSize: '16px' }}>{rupiah(expectedCash)}</b>
+              </div>
+            </div>
+
+            {/* AKSI TOMBOL ISI UANG PAS & RESET */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                marginTop: '12px',
+                paddingTop: '10px',
+                borderTop: '1px dashed #dce4dd',
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleFillExactCash}
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  height: '34px',
+                  padding: '0 12px',
+                  borderRadius: '7px',
+                  border: '1.5px solid #57695b',
+                  background: '#edf3ee',
+                  color: '#2d6a4f',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                }}
+                title="Isi jumlah kas fisik sesuai persis dengan ekspektasi sistem"
+              >
+                <Icon name="checkCircle" size={14} />
+                <span>Isi Uang Pas ({rupiah(expectedCash)})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetCash}
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  borderRadius: '7px',
+                  border: '1px solid #d1d5db',
+                  background: '#ffffff',
+                  color: '#6b7280',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+                title="Kosongkan hitungan kas fisik"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* 2. METODE HITUNG FISIK (PECAHAN LEMBAR vs TOTAL LANGSUNG) */}
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '12px',
+              marginBottom: '10px',
             }}
           >
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#4a4a4a' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
               Metode Hitung Kas Fisik:
             </span>
             <button
@@ -1241,19 +1485,25 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                 >
                   <span style={{ fontSize: '11px', color: '#444' }}>{label}</span>
                   <input
-                    type="number"
-                    min={0}
-                    value={denominations[key] || ''}
-                    onChange={(e) => handleDenomChange(key, Number(e.target.value))}
+                    type="text"
+                    inputMode="numeric"
+                    value={key === 'coins' ? formatThousands(denominations[key]) : (denominations[key] || '')}
+                    onChange={(e) =>
+                      handleDenomChange(
+                        key,
+                        key === 'coins' ? parseThousands(e.target.value) : Number(e.target.value.replace(/\D/g, ''))
+                      )
+                    }
                     placeholder="0"
                     style={{
-                      width: '75px',
+                      width: key === 'coins' ? '95px' : '75px',
                       textAlign: 'right',
                       padding: '4px 6px',
                       border: '1px solid #ccc',
                       borderRadius: '4px',
                       fontWeight: 700,
                       fontSize: '13px',
+                      outline: 'none',
                     }}
                   />
                 </label>
@@ -1261,28 +1511,45 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <label style={{ display: 'block', marginBottom: '14px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                Total Uang Tunai Fisik di Laci (Rp)
+              <span style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '4px', color: '#374151' }}>
+                Total Uang Tunai Fisik di Laci
               </span>
-              <input
-                type="number"
-                value={manualPhysicalCash || ''}
-                onChange={(e) => setManualPhysicalCash(Number(e.target.value))}
-                placeholder="Rp 0"
-                min={0}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1.5px solid #57695b',
-                  borderRadius: '8px',
-                  fontSize: '18px',
-                  fontWeight: 700,
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isShortage ? '#dc2626' : '#57695b',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  Rp
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatThousands(manualPhysicalCash)}
+                  onChange={(e) => setManualPhysicalCash(parseThousands(e.target.value))}
+                  placeholder="0"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px 10px 48px',
+                    border: isShortage ? '1.5px solid #dc2626' : '1.5px solid #57695b',
+                    borderRadius: '8px',
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    outline: 'none',
+                  }}
+                />
+              </div>
             </label>
           )}
 
-          {/* Display Total Physical Cash */}
+          {/* 3. TOTAL UANG FISIK LACI */}
           <div
             style={{
               display: 'flex',
@@ -1292,29 +1559,120 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
               backgroundColor: '#f3f6f3',
               borderRadius: '8px',
               border: '1px solid #d4e0d5',
-              marginBottom: '14px',
+              marginBottom: '12px',
             }}
           >
             <span style={{ fontSize: '13px', color: '#57695b', fontWeight: 600 }}>Total Uang Fisik Laci:</span>
             <b style={{ fontSize: '18px', color: '#57695b' }}>{rupiah(physicalCash)}</b>
           </div>
 
-          {/* Notes */}
+          {/* 4. PERINGATAN / INDIKATOR SELISIH KAS */}
+          {isShortage ? (
+            <div
+              style={{
+                padding: '12px 14px',
+                backgroundColor: '#fef2f2',
+                borderRadius: '8px',
+                border: '1.5px solid #f87171',
+                color: '#991b1b',
+                marginBottom: '14px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start',
+              }}
+            >
+              <div style={{ flexShrink: 0, marginTop: '2px', color: '#dc2626' }}>
+                <Icon name="alertTriangle" size={18} />
+              </div>
+              <div style={{ flex: 1, fontSize: '12.5px', lineHeight: '1.45' }}>
+                <b style={{ display: 'block', fontSize: '13px', color: '#b91c1c', marginBottom: '2px' }}>
+                  ⚠️ Peringatan: Kas Fisik Laci Kurang ({rupiah(cashDifference)})
+                </b>
+                <span>
+                  Uang fisik yang dihitung (<strong>{rupiah(physicalCash)}</strong>) lebih sedikit sebesar{' '}
+                  <strong style={{ color: '#dc2626' }}>{rupiah(Math.abs(cashDifference))}</strong> dibanding ekspektasi
+                  sistem (<strong>{rupiah(expectedCash)}</strong>).
+                </span>
+                <div style={{ marginTop: '6px', fontSize: '11.5px', color: '#7f1d1d', fontStyle: 'italic' }}>
+                  * Mohon periksa kembali laci kasir atau wajib berikan alasan selisih kas pada kolom Catatan di bawah.
+                </div>
+              </div>
+            </div>
+          ) : cashDifference === 0 ? (
+            <div
+              style={{
+                padding: '9px 12px',
+                backgroundColor: '#f0fdf4',
+                borderRadius: '8px',
+                border: '1px solid #86efac',
+                color: '#166534',
+                marginBottom: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+              }}
+            >
+              <Icon name="checkCircle" size={15} />
+              <span>
+                <strong>Kas Fisik Seimbang (Rp 0):</strong> Jumlah uang fisik laci sesuai persis dengan ekspektasi sistem.
+              </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: '9px 12px',
+                backgroundColor: '#eff6ff',
+                borderRadius: '8px',
+                border: '1px solid #bfdbfe',
+                color: '#1e40af',
+                marginBottom: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+              }}
+            >
+              <Icon name="info" size={15} />
+              <span>
+                <strong>Kas Fisik Lebih (+{rupiah(cashDifference)}):</strong> Uang fisik laci melebihi ekspektasi sistem ({rupiah(expectedCash)}).
+              </span>
+            </div>
+          )}
+
+          {/* 5. CATATAN TUTUP SIF */}
           <label style={{ display: 'block', marginBottom: '14px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#444', display: 'block', marginBottom: '4px' }}>
-              Catatan Tutup Sif (Opsional)
+            <span
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: isShortage ? '#b91c1c' : '#444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '4px',
+              }}
+            >
+              <span>{isShortage ? 'Catatan Tutup Sif (Wajib Diisi Karena Selisih Kurang)' : 'Catatan Tutup Sif (Opsional)'}</span>
+              {isShortage && <span style={{ color: '#dc2626', fontSize: '11px' }}>* Wajib isi alasan</span>}
             </span>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Contoh: pergantian sif aman, laci kas rapi"
+              placeholder={
+                isShortage
+                  ? 'Contoh: Kurang Rp 10.000 karena salah kembalian saat jam ramai...'
+                  : 'Contoh: pergantian sif aman, laci kas rapi'
+              }
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: '1px solid #d1d1d1',
+                border: isShortage ? '1.5px solid #f87171' : '1px solid #d1d1d1',
                 borderRadius: '6px',
                 fontSize: '13px',
+                backgroundColor: isShortage ? '#fffbfb' : '#ffffff',
+                outline: 'none',
               }}
             />
           </label>

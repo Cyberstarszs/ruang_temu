@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { rupiah } from '@/lib/utils';
+import { rupiah, formatThousands, parseThousands } from '@/lib/utils';
 import { Icon } from '@/components/common/Icons';
 
 interface PaymentModalProps {
@@ -213,13 +213,39 @@ export function PaymentModal({
             <div className="cash-payment-panel">
               <label className="bo-field">
                 <span style={{ fontWeight: 600 }}>Nominal Uang Tunai Diterima</span>
-                <input
-                  type="number"
-                  value={cashReceived || ''}
-                  onChange={(e) => setCashReceived(Number(e.target.value))}
-                  autoFocus
-                  style={{ fontSize: '18px', fontWeight: 700, padding: '10px 14px' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: '#57695b',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatThousands(cashReceived)}
+                    onChange={(e) => setCashReceived(parseThousands(e.target.value))}
+                    autoFocus
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      padding: '10px 14px 10px 48px',
+                      width: '100%',
+                      border: '1.5px solid #57695b',
+                      borderRadius: '8px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
               </label>
 
               {/* Quick Cash Chips */}
@@ -372,31 +398,83 @@ export function PaymentModal({
                   <span style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Porsi Tunai (CASH)
                   </span>
-                  <input
-                    type="number"
-                    value={splitCash || ''}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setSplitCash(val);
-                      setSplitQris(Math.max(0, grandTotal - val));
-                    }}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d1d1', borderRadius: '6px' }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        color: '#57695b',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      Rp
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formatThousands(splitCash)}
+                      onChange={(e) => {
+                        const val = parseThousands(e.target.value);
+                        setSplitCash(val);
+                        setSplitQris(Math.max(0, grandTotal - val));
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 34px',
+                        border: '1px solid #d1d1d1',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
                 </label>
                 <label>
                   <span style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                     Porsi QRIS / Non-Tunai
                   </span>
-                  <input
-                    type="number"
-                    value={splitQris || ''}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setSplitQris(val);
-                      setSplitCash(Math.max(0, grandTotal - val));
-                    }}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d1d1', borderRadius: '6px' }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        color: '#57695b',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      Rp
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={formatThousands(splitQris)}
+                      onChange={(e) => {
+                        const val = parseThousands(e.target.value);
+                        setSplitQris(val);
+                        setSplitCash(Math.max(0, grandTotal - val));
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 34px',
+                        border: '1px solid #d1d1d1',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
                 </label>
               </div>
               <div
