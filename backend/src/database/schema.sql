@@ -348,6 +348,19 @@ CREATE TABLE IF NOT EXISTS store_settings (
 );
 
 -- Schema Additions & Upgrades
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS instagram VARCHAR(100) DEFAULT '@ruangtemu.cafe';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS wifi_ssid VARCHAR(100) DEFAULT 'Ruang Temu Cafe';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS wifi_password VARCHAR(100) DEFAULT '';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS paper_size VARCHAR(10) NOT NULL DEFAULT '58mm';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5, 2) NOT NULL DEFAULT 0;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS service_charge_rate NUMERIC(5, 2) NOT NULL DEFAULT 0;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auto_print_receipt BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auto_print_bar BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auto_print_kitchen BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS cashier_printer_name VARCHAR(100) DEFAULT 'Printer Kasir';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS bar_printer_name VARCHAR(100) DEFAULT 'Printer Bar Checker';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS kitchen_printer_name VARCHAR(100) DEFAULT 'Printer Dapur Checker';
+
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_id UUID NULL REFERENCES promos(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5, 2) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
