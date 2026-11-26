@@ -54,7 +54,7 @@ export function AdminShiftsView() {
   // Force Close Shift Modal (Owner Only)
   const [forceCloseTarget, setForceCloseTarget] = useState<ShiftAuditItem | null>(null);
   const [forceCloseActualCash, setForceCloseActualCash] = useState<string>('');
-  const [forceCloseNotes, setForceCloseNotes] = useState<string>('Kasir lupa tutup sif');
+  const [forceCloseNotes, setForceCloseNotes] = useState<string>('Kasir lupa tutup shift');
   const [isSubmittingForceClose, setIsSubmittingForceClose] = useState<boolean>(false);
   const [forceCloseError, setForceCloseError] = useState<string | null>(null);
 
@@ -129,7 +129,7 @@ export function AdminShiftsView() {
       Number(shift.total_cash_in || 0) -
       Number(shift.total_cash_out || 0);
     setForceCloseActualCash(String(runningExp));
-    setForceCloseNotes('Kasir lupa tutup sif');
+    setForceCloseNotes('Kasir lupa tutup shift');
     setForceCloseError(null);
   };
 
@@ -146,10 +146,10 @@ export function AdminShiftsView() {
         setForceCloseTarget(null);
         await loadShifts();
       } else {
-        setForceCloseError(res.message || 'Gagal menutup sif paksa.');
+        setForceCloseError(res.message || 'Gagal menutup shift paksa.');
       }
     } catch (err: any) {
-      setForceCloseError(err?.message || 'Terjadi kesalahan sistem saat menutup sif.');
+      setForceCloseError(err?.message || 'Terjadi kesalahan sistem saat menutup shift.');
     } finally {
       setIsSubmittingForceClose(false);
     }
@@ -262,7 +262,7 @@ export function AdminShiftsView() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
-            Riwayat Sif Kasir
+            Riwayat Shift Kasir
           </span>
           <span
             style={{
@@ -274,7 +274,7 @@ export function AdminShiftsView() {
               fontWeight: 700,
             }}
           >
-            {filteredShifts.length} Sif
+            {filteredShifts.length} Shift
           </span>
         </div>
 
@@ -336,7 +336,7 @@ export function AdminShiftsView() {
           <DateRangePicker
             value={dateRange}
             onChange={(r) => setDateRange(r)}
-            placeholder="Pilih Tanggal Sif..."
+            placeholder="Pilih Tanggal Shift..."
             align="right"
             showApplyButton={false}
           />
@@ -360,7 +360,7 @@ export function AdminShiftsView() {
               transition: 'background 0.12s ease',
               whiteSpace: 'nowrap',
             }}
-            title="Segarkan data sif"
+            title="Segarkan data shift"
             onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
             onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
           >
@@ -378,7 +378,7 @@ export function AdminShiftsView() {
           gap: '14px',
         }}
       >
-        {/* Card 1: Total Sif */}
+        {/* Card 1: Total Shift */}
         <div
           style={{
             background: '#ffffff',
@@ -391,10 +391,10 @@ export function AdminShiftsView() {
           }}
         >
           <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-            Total Sif Kasir
+            Total Shift Kasir
           </span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
-            {shifts.length} Sif
+            {shifts.length} Shift
           </div>
           <div style={{ fontSize: '12px', color: '#71717a' }}>
             {closedShifts.length} Selesai • {openShifts.length} Aktif Berjalan
@@ -417,7 +417,7 @@ export function AdminShiftsView() {
             Kas Seimbang
           </span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#2e7d32' }}>
-            {balancedShifts.length} Sif
+            {balancedShifts.length} Shift
           </div>
           <div style={{ fontSize: '12px', color: '#71717a' }}>
             Rekonsiliasi akurat (Rp 0 selisih)
@@ -456,11 +456,11 @@ export function AdminShiftsView() {
             {totalNetDiff < 0 ? `-Rp ${Math.abs(totalNetDiff).toLocaleString('id-ID')}` : `Rp ${totalNetDiff.toLocaleString('id-ID')}`}
           </div>
           <div style={{ fontSize: '12px', color: diffShifts.length > 0 ? '#c62828' : '#71717a' }}>
-            {diffShifts.length > 0 ? `${diffShifts.length} sif memiliki selisih` : 'Semua rekonsiliasi pas'}
+            {diffShifts.length > 0 ? `${diffShifts.length} shift memiliki selisih` : 'Semua rekonsiliasi pas'}
           </div>
         </div>
 
-        {/* Card 4: Total Kas Masuk Sif */}
+        {/* Card 4: Total Kas Masuk Shift */}
         <div
           style={{
             background: '#ffffff',
@@ -473,7 +473,7 @@ export function AdminShiftsView() {
           }}
         >
           <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-            Kas Tunai Sif
+            Kas Tunai Shift
           </span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             Rp {totalCashSales.toLocaleString('id-ID')}
@@ -575,7 +575,7 @@ export function AdminShiftsView() {
             <Search size={13} color="#71717a" />
             <input
               type="text"
-              placeholder="Cari kasir / catatan sif..."
+              placeholder="Cari kasir / catatan shift..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -624,7 +624,7 @@ export function AdminShiftsView() {
         </div>
       </div>
 
-      {/* 4. TABEL RIWAYAT SIF (Bersih, Presisi & Informatif) */}
+      {/* 4. TABEL RIWAYAT SHIFT (Bersih, Presisi & Informatif) */}
       <div
         style={{
           background: '#ffffff',
@@ -649,7 +649,7 @@ export function AdminShiftsView() {
                   Kasir
                 </th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
-                  Waktu Sif
+                  Waktu Shift
                 </th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
                   Modal Awal
@@ -678,13 +678,13 @@ export function AdminShiftsView() {
               {isLoading ? (
                 <tr>
                   <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#71717a' }}>
-                    Memuat riwayat sif kasir...
+                    Memuat riwayat shift kasir...
                   </td>
                 </tr>
               ) : filteredShifts.length === 0 ? (
                 <tr>
                   <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#9ca3af' }}>
-                    Tidak ada riwayat sif pada periode atau filter yang dipilih.
+                    Tidak ada riwayat shift pada periode atau filter yang dipilih.
                   </td>
                 </tr>
               ) : (
@@ -763,10 +763,10 @@ export function AdminShiftsView() {
                               onClick={(e) =>
                                 openShiftPopover(
                                   e,
-                                  `Audit Waktu Sif`,
+                                  `Audit Waktu Shift`,
                                   [
-                                    { label: 'Waktu Buka Sif', value: openDate.toLocaleString('id-ID') },
-                                    { label: 'Waktu Tutup Sif', value: closeDate ? closeDate.toLocaleString('id-ID') : 'Masih Berjalan (Sif Aktif)' },
+                                    { label: 'Waktu Buka Shift', value: openDate.toLocaleString('id-ID') },
+                                    { label: 'Waktu Tutup Shift', value: closeDate ? closeDate.toLocaleString('id-ID') : 'Masih Berjalan (Shift Aktif)' },
                                     { label: 'Total Durasi Kerja', value: durationLabel, isHighlight: true },
                                     { label: 'Catatan Penutupan', value: s.closing_notes || 'Tidak ada catatan' },
                                   ],
@@ -833,7 +833,7 @@ export function AdminShiftsView() {
                                 { label: '(+) Kas Masuk Operasional', value: `+Rp ${cashInNum.toLocaleString('id-ID')}`, color: '#15803d' },
                                 { label: '(-) Kas Keluar Operasional', value: `-Rp ${cashOutNum.toLocaleString('id-ID')}`, color: '#b91c1c' },
                                 { label: '(=) Total Ekspektasi Kas', value: `Rp ${displayExpected.toLocaleString('id-ID')}`, isHighlight: true },
-                                { label: 'Status Sif', value: isOpen ? 'Sedang Berjalan (Real-time)' : 'Selesai Direkonsiliasi' },
+                                { label: 'Status Shift', value: isOpen ? 'Sedang Berjalan (Real-time)' : 'Selesai Direkonsiliasi' },
                               ],
                               `Kasir: ${s.cashier_name}`
                             )
@@ -956,7 +956,7 @@ export function AdminShiftsView() {
                         </button>
                       </td>
 
-                      {/* 8. Status Sif */}
+                      {/* 8. Status Shift */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span
                           style={{
@@ -1000,7 +1000,7 @@ export function AdminShiftsView() {
                           {isOpen && (
                             <button
                               onClick={() => handleOpenForceClose(s)}
-                              title="Tutup sif ini secara paksa oleh Owner"
+                              title="Tutup shift ini secara paksa oleh Owner"
                               style={{
                                 padding: '4px 8px',
                                 background: '#fff1f2',
@@ -1138,7 +1138,7 @@ export function AdminShiftsView() {
                   ) : movements.length === 0 ? (
                     <tr>
                       <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#8b968f' }}>
-                        Tidak ada transaksi kas masuk / kas keluar (petty cash) pada sif ini.
+                        Tidak ada transaksi kas masuk / kas keluar (petty cash) pada shift ini.
                       </td>
                     </tr>
                   ) : (
@@ -1385,7 +1385,7 @@ export function AdminShiftsView() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b' }}>
                 <ShieldAlert size={18} />
                 <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                  Tutup Sif Paksa (Otoritas Owner)
+                  Tutup Shift Paksa (Otoritas Owner)
                 </h3>
               </div>
               <button
@@ -1420,7 +1420,7 @@ export function AdminShiftsView() {
                 Menutup paksa sesi kasir <strong>{forceCloseTarget.cashier_name}</strong> secara administratif. Terminal kasir akan otomatis keluar dari sesi saat ini.
               </div>
 
-              {/* Sif Breakdown Summary */}
+              {/* Shift Breakdown Summary */}
               {(() => {
                 const op = Number(forceCloseTarget.opening_cash || 0);
                 const cs = Number(forceCloseTarget.cash_sales || 0);
@@ -1498,7 +1498,7 @@ export function AdminShiftsView() {
                   type="text"
                   value={forceCloseNotes}
                   onChange={(e) => setForceCloseNotes(e.target.value)}
-                  placeholder="Contoh: Kasir lupa tutup sif sebelum pulang"
+                  placeholder="Contoh: Kasir lupa tutup shift sebelum pulang"
                   style={{
                     width: '100%',
                     height: '36px',
@@ -1568,7 +1568,7 @@ export function AdminShiftsView() {
                 }}
               >
                 <ShieldAlert size={14} />
-                {isSubmittingForceClose ? 'Memproses...' : 'Tutup Sif Paksa'}
+                {isSubmittingForceClose ? 'Memproses...' : 'Tutup Shift Paksa'}
               </button>
             </div>
           </div>

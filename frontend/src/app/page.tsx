@@ -23,7 +23,7 @@ export default function RootPage() {
       if (savedMode === 'POS') {
         router.replace('/pos');
       } else {
-        router.replace('/dasbor');
+        router.replace('/dashboard');
       }
     }
   }, [user, isAuthenticated, isLoading, router]);

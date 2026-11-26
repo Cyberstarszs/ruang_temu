@@ -9,10 +9,12 @@ export default function DasborPage() {
 
   const handleNavigateTab = (tab: string) => {
     const slugMap: Record<string, string> = {
-      dashboard: 'dasbor',
+      dashboard: 'dashboard',
       orders: 'transaksi',
-      shifts: 'sif',
+      customers: 'pelanggan',
+      shifts: 'shift',
       products: 'menu',
+      matrix: 'matriks',
       inventory: 'stok',
       purchasing: 'pengadaan',
       promos: 'promo',

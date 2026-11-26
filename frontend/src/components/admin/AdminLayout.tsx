@@ -64,10 +64,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dasbor', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'orders', label: 'Transaksi', icon: ReceiptText },
   { id: 'customers', label: 'Pelanggan', icon: UserCheck },
-  { id: 'shifts', label: 'Sif', icon: Wallet },
+  { id: 'shifts', label: 'Shift', icon: Wallet },
   { id: 'products', label: 'Menu', icon: Coffee },
   { id: 'matrix', label: 'Matriks Menu', icon: TrendingUp },
   { id: 'inventory', label: 'Stok', icon: Boxes },
@@ -79,10 +79,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const TAB_SLUG_MAP: Record<AdminTab, string> = {
-  dashboard: 'dasbor',
+  dashboard: 'dashboard',
   orders: 'transaksi',
   customers: 'pelanggan',
-  shifts: 'sif',
+  shifts: 'shift',
   products: 'menu',
   matrix: 'matriks',
   inventory: 'stok',
@@ -177,7 +177,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const getActiveTabTitle = () => {
     const item = NAV_ITEMS.find((n) => n.id === activeTab);
-    return item ? item.label : 'Dasbor';
+    return item ? item.label : 'Dashboard';
   };
 
   const renderActiveView = () => {
