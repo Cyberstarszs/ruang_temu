@@ -4,6 +4,13 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { Customer, CustomerStats, CustomerDetail, CustomerTier } from '@/types';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Users,
   Search,
   Plus,
@@ -652,31 +659,24 @@ export function AdminCustomersView() {
           })}
         </div>
 
-        {/* Sort By Dropdown */}
+        {/* Sort By Dropdown (Shadcn UI Select seragam seperti halaman lainnya) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a', whiteSpace: 'nowrap' }}>Urutkan:</span>
-          <select
-            value={sortBy}
-            onChange={(e: any) => setSortBy(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '8px',
-              border: '1px solid #e4e4e7',
-              background: '#f8f8f6',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#1c2826',
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="spent">Belanja Terbanyak</option>
-            <option value="visits">Kunjungan Terbanyak</option>
-            <option value="points">Poin Loyalitas Terbanyak</option>
-            <option value="recent">Kunjungan Terbaru</option>
-            <option value="newest">Paling Baru Terdaftar</option>
-            <option value="name">Nama (A-Z)</option>
-          </select>
+          <div style={{ width: '185px' }}>
+            <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5', fontSize: '12px', fontWeight: 600 }}>
+                <SelectValue placeholder="Pilih Urutan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="spent">Belanja Terbanyak</SelectItem>
+                <SelectItem value="visits">Kunjungan Terbanyak</SelectItem>
+                <SelectItem value="points">Poin Loyalitas Terbanyak</SelectItem>
+                <SelectItem value="recent">Kunjungan Terbaru</SelectItem>
+                <SelectItem value="newest">Paling Baru Terdaftar</SelectItem>
+                <SelectItem value="name">Nama (A-Z)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -1379,25 +1379,17 @@ export function AdminCustomersView() {
                   <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#3f3f46' }}>
                     Tier Keanggotaan
                   </label>
-                  <select
-                    value={formTier}
-                    onChange={(e: any) => setFormTier(e.target.value)}
-                    style={{
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      fontSize: '13px',
-                      outline: 'none',
-                      background: '#ffffff',
-                      color: '#1c2826',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <option value="CLASSIC">Classic (Standar)</option>
-                    <option value="SILVER">Silver</option>
-                    <option value="GOLD">Gold</option>
-                    <option value="PLATINUM">Platinum</option>
-                  </select>
+                  <Select value={formTier} onValueChange={(val: any) => setFormTier(val)}>
+                    <SelectTrigger style={{ width: '100%', height: '38px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '13px', fontWeight: 600 }}>
+                      <SelectValue placeholder="Pilih Tier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CLASSIC">Classic (Standar)</SelectItem>
+                      <SelectItem value="SILVER">Silver</SelectItem>
+                      <SelectItem value="GOLD">Gold</SelectItem>
+                      <SelectItem value="PLATINUM">Platinum</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
