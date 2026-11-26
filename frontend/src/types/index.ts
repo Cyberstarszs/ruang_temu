@@ -107,13 +107,66 @@ export interface DiningTable {
   }> | null;
 }
 
+export type CustomerTier = 'CLASSIC' | 'SILVER' | 'GOLD' | 'PLATINUM';
+
 export interface Customer {
   id: string;
   name: string;
   phone_number: string;
-  tier: 'CLASSIC' | 'SILVER' | 'GOLD';
+  tier: CustomerTier;
   loyalty_points: number;
   created_at: string;
+  total_orders?: number;
+  total_spent?: number | string;
+  last_visit?: string | null;
+}
+
+export interface CustomerStats {
+  totalCustomers: number;
+  totalLoyaltyPoints: number;
+  activeCustomers30d: number;
+  totalCustomerRevenue: number;
+  totalCustomerOrders: number;
+  averageOrderValue: number;
+  tierCounts: {
+    CLASSIC: number;
+    SILVER: number;
+    GOLD: number;
+    PLATINUM: number;
+  };
+}
+
+export interface CustomerDetailOrderItem {
+  id: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+export interface CustomerDetailPayment {
+  id: string;
+  method: string;
+  amountPaid: number | string;
+}
+
+export interface CustomerDetailOrder {
+  id: string;
+  order_number: string;
+  order_type: 'DINE_IN' | 'TAKEAWAY';
+  subtotal: number | string;
+  discount_amount: number | string;
+  total_amount: number | string;
+  status: 'PENDING_PAYMENT_AT_CASHIER' | 'PAID' | 'CANCELLED' | 'EXPIRED';
+  created_at: string;
+  paid_at?: string | null;
+  table_number?: string | null;
+  items: CustomerDetailOrderItem[];
+  payments: CustomerDetailPayment[];
+}
+
+export interface CustomerDetail extends Customer {
+  recentOrders: CustomerDetailOrder[];
 }
 
 export interface Promo {

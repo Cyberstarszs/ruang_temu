@@ -327,10 +327,33 @@ export const api = {
   customers: {
     search: (query = '') =>
       request<{ success: boolean; data: any[] }>(`/customers${query ? `?search=${encodeURIComponent(query)}` : ''}`),
-    create: (payload: { name: string; phoneNumber: string }) =>
+    getAll: (params?: { search?: string; tier?: string; sortBy?: string; limit?: number; offset?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.search) q.append('search', params.search);
+      if (params?.tier && params.tier !== 'ALL') q.append('tier', params.tier);
+      if (params?.sortBy) q.append('sortBy', params.sortBy);
+      if (params?.limit) q.append('limit', String(params.limit));
+      if (params?.offset) q.append('offset', String(params.offset));
+      const qs = q.toString();
+      return request<{ success: boolean; data: any[]; meta?: any }>(`/customers${qs ? `?${qs}` : ''}`);
+    },
+    getStats: () =>
+      request<{ success: boolean; data: any }>('/customers/stats'),
+    getById: (id: string) =>
+      request<{ success: boolean; data: any }>(`/customers/${id}`),
+    create: (payload: { name: string; phoneNumber: string; tier?: string; loyaltyPoints?: number }) =>
       request<{ success: boolean; data: any; message: string }>('/customers', {
         method: 'POST',
         body: JSON.stringify(payload),
+      }),
+    update: (id: string, payload: { name: string; phoneNumber: string; tier?: string; loyaltyPoints?: number }) =>
+      request<{ success: boolean; data: any; message: string }>(`/customers/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean; message: string; data?: any }>(`/customers/${id}`, {
+        method: 'DELETE',
       }),
   },
 

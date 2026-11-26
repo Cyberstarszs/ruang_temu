@@ -22,11 +22,13 @@ import {
   PanelLeftOpen,
   ChevronDown,
   TrendingUp,
+  UserCheck,
 } from 'lucide-react';
 
 import { AdminDashboardView } from './AdminDashboardView';
 import { AdminProductsView } from './AdminProductsView';
 import { AdminMenuMatrixView } from './AdminMenuMatrixView';
+import { AdminCustomersView } from './AdminCustomersView';
 import { AdminInventoryView } from './AdminInventoryView';
 import { AdminPurchasingView } from './AdminPurchasingView';
 import { AdminShiftsView } from './AdminShiftsView';
@@ -44,6 +46,7 @@ interface AdminLayoutProps {
 export type AdminTab =
   | 'dashboard'
   | 'orders'
+  | 'customers'
   | 'shifts'
   | 'products'
   | 'matrix'
@@ -63,6 +66,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dasbor', icon: LayoutDashboard },
   { id: 'orders', label: 'Transaksi', icon: ReceiptText },
+  { id: 'customers', label: 'Pelanggan', icon: UserCheck },
   { id: 'shifts', label: 'Sif', icon: Wallet },
   { id: 'products', label: 'Menu', icon: Coffee },
   { id: 'matrix', label: 'Matriks Menu', icon: TrendingUp },
@@ -77,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
 const TAB_SLUG_MAP: Record<AdminTab, string> = {
   dashboard: 'dasbor',
   orders: 'transaksi',
+  customers: 'pelanggan',
   shifts: 'sif',
   products: 'menu',
   matrix: 'matriks',
@@ -93,6 +98,9 @@ const SLUG_TAB_MAP: Record<string, AdminTab> = {
   dashboard: 'dashboard',
   transaksi: 'orders',
   orders: 'orders',
+  pelanggan: 'customers',
+  customers: 'customers',
+  'data-pelanggan': 'customers',
   sif: 'shifts',
   shifts: 'shifts',
   shift: 'shifts',
@@ -180,6 +188,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         return <AdminProductsView />;
       case 'matrix':
         return <AdminMenuMatrixView />;
+      case 'customers':
+        return <AdminCustomersView />;
       case 'inventory':
         return <AdminInventoryView />;
       case 'purchasing':
