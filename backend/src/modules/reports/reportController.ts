@@ -104,8 +104,12 @@ export async function getHourlyHeatmap(req: Request, res: Response, next: NextFu
 
 export async function getMenuMatrix(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const productsRes = await pool.query(`
-      SELECT 
+    const { from, to, date } = req.query;
+    const fromDate = from ? String(from) : (date ? String(date) : null);
+    const toDate = to ? String(to) : fromDate;
+
+    const productsRes = await pool.query(
+      `SELECT 
         p.id,
         p.sku,
         p.name,
@@ -126,6 +130,8 @@ export async function getMenuMatrix(req: Request, res: Response, next: NextFunct
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             WHERE oi.product_id = p.id AND o.status = 'PAID'
+              AND ($1::text IS NULL OR DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') >= $1::date)
+              AND ($2::text IS NULL OR DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') <= $2::date)
           ),
           0
         ) as total_quantity_sold,
@@ -135,13 +141,16 @@ export async function getMenuMatrix(req: Request, res: Response, next: NextFunct
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             WHERE oi.product_id = p.id AND o.status = 'PAID'
+              AND ($1::text IS NULL OR DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') >= $1::date)
+              AND ($2::text IS NULL OR DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') <= $2::date)
           ),
           0
         ) as total_revenue
       FROM products p
       WHERE p.is_active = TRUE
-      ORDER BY total_quantity_sold DESC, p.name ASC
-    `);
+      ORDER BY total_quantity_sold DESC, p.name ASC`,
+      [fromDate, toDate]
+    );
 
     const rawList = productsRes.rows.map((row) => {
       const price = Number(row.price);
@@ -194,6 +203,10 @@ export async function getMenuMatrix(req: Request, res: Response, next: NextFunct
           averageQuantity: Math.round(avgQty * 10) / 10,
           maxQuantity: maxQty,
           totalProducts: categorized.length,
+        },
+        dateRange: {
+          from: fromDate,
+          to: toDate,
         },
       },
     });

@@ -364,8 +364,17 @@ export const api = {
 
   // Reports & Analytics
   reports: {
-    getMenuMatrix: () =>
-      request<{ success: boolean; data: any }>('/reports/menu-matrix'),
+    getMenuMatrix: (params?: { from?: string; to?: string; date?: string }) => {
+      let q = '';
+      if (params) {
+        const urlParams = new URLSearchParams();
+        if (params.from) urlParams.append('from', params.from);
+        if (params.to) urlParams.append('to', params.to);
+        if (params.date) urlParams.append('date', params.date);
+        q = urlParams.toString() ? `?${urlParams.toString()}` : '';
+      }
+      return request<{ success: boolean; data: any }>(`/reports/menu-matrix${q}`);
+    },
     getDailySummary: (dateOrParams?: string | { date?: string; from?: string; to?: string }) => {
       let q = '';
       if (typeof dateOrParams === 'string') {

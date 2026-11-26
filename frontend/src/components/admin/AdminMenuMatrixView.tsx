@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { MenuMatrixItem, MenuMatrixResponse } from '@/types';
 import { rupiah } from '@/lib/utils';
+import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
   TrendingUp,
   RotateCcw,
@@ -18,6 +19,7 @@ import {
   ArrowUpRight,
   Boxes,
   CheckCircle2,
+  Calendar,
 } from 'lucide-react';
 
 export function AdminMenuMatrixView() {
@@ -30,11 +32,71 @@ export function AdminMenuMatrixView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
 
-  const fetchMatrix = async () => {
+  // Filter Tanggal (Default: 30 Hari Terakhir untuk analisis F&B yang representatif)
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+    const past = new Date(today);
+    past.setDate(past.getDate() - 29);
+    return { from: formatDate(past), to: formatDate(today) };
+  });
+
+  const setQuickRange = (type: 'today' | '7days' | '30days' | 'all') => {
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+
+    if (type === 'today') {
+      const t = formatDate(today);
+      setDateRange({ from: t, to: t });
+    } else if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      setDateRange({ from: formatDate(past), to: formatDate(today) });
+    } else if (type === '30days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 29);
+      setDateRange({ from: formatDate(past), to: formatDate(today) });
+    } else if (type === 'all') {
+      setDateRange({ from: '', to: '' });
+    }
+  };
+
+  const isCurrentPreset = (type: 'today' | '7days' | '30days' | 'all') => {
+    if (type === 'all') {
+      return !dateRange.from && !dateRange.to;
+    }
+    if (!dateRange.from || !dateRange.to) return false;
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+
+    if (type === 'today') {
+      return dateRange.from === dateRange.to && dateRange.from === formatDate(today);
+    }
+    if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      return dateRange.from === formatDate(past) && dateRange.to === formatDate(today);
+    }
+    if (type === '30days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 29);
+      return dateRange.from === formatDate(past) && dateRange.to === formatDate(today);
+    }
+    return false;
+  };
+
+  const fetchMatrix = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const res = await api.reports.getMenuMatrix();
+      const params =
+        dateRange.from && dateRange.to
+          ? { from: dateRange.from, to: dateRange.to }
+          : undefined;
+      const res = await api.reports.getMenuMatrix(params);
       if (res.success && res.data) {
         setData(res.data);
         if (res.data.products && res.data.products.length > 0) {
@@ -51,11 +113,11 @@ export function AdminMenuMatrixView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange]);
 
   useEffect(() => {
     fetchMatrix();
-  }, []);
+  }, [fetchMatrix]);
 
   const getQuadrantInfo = (quadrant: string) => {
     switch (quadrant) {
@@ -174,9 +236,28 @@ export function AdminMenuMatrixView() {
               <TrendingUp size={18} />
             </span>
             <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                Matriks Menu (Menu Engineering — BCG Matrix)
-              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h1 style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
+                  Matriks Menu (Menu Engineering — BCG Matrix)
+                </h1>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    background: '#eef6ef',
+                    color: '#2d6a4f',
+                    border: '1px solid #c2e0c7',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Calendar size={11} />
+                  {dateRange.from && dateRange.to ? `${dateRange.from} s.d. ${dateRange.to}` : 'Semua Waktu'}
+                </span>
+              </div>
               <p style={{ fontSize: '12.5px', color: '#6b7280', margin: '2px 0 0' }}>
                 Analisis strategis portofolio menu kafe: membandingkan volume penjualan riil terhadap margin laba HPP.
               </p>
@@ -184,8 +265,96 @@ export function AdminMenuMatrixView() {
           </div>
         </div>
 
-        {/* Action Controls: View Mode & Refresh */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Action Controls: Date Filters, View Mode & Refresh */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Quick Range Presets - Persis seperti AdminOrdersView */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setQuickRange('today')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: isCurrentPreset('today') ? '1px solid #57695b' : '1px solid #e2e4dc',
+                background: isCurrentPreset('today') ? '#57695b' : '#f7f7f5',
+                color: isCurrentPreset('today') ? '#ffffff' : '#4b5563',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              Hari Ini
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQuickRange('7days')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: isCurrentPreset('7days') ? '1px solid #57695b' : '1px solid #e2e4dc',
+                background: isCurrentPreset('7days') ? '#57695b' : '#f7f7f5',
+                color: isCurrentPreset('7days') ? '#ffffff' : '#4b5563',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              7 Hari
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQuickRange('30days')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: isCurrentPreset('30days') ? '1px solid #57695b' : '1px solid #e2e4dc',
+                background: isCurrentPreset('30days') ? '#57695b' : '#f7f7f5',
+                color: isCurrentPreset('30days') ? '#ffffff' : '#4b5563',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              30 Hari
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQuickRange('all')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: isCurrentPreset('all') ? '1px solid #57695b' : '1px solid #e2e4dc',
+                background: isCurrentPreset('all') ? '#57695b' : '#f7f7f5',
+                color: isCurrentPreset('all') ? '#ffffff' : '#4b5563',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              Semua
+            </button>
+          </div>
+
+          <div style={{ width: '1px', height: '22px', background: '#e2e4dc', margin: '0 2px' }} />
+
+          {/* DateRangePicker */}
+          <DateRangePicker
+            value={dateRange}
+            onChange={(r) => setDateRange(r)}
+            placeholder="Pilih Tanggal..."
+            align="right"
+            showApplyButton={false}
+          />
+
+          <div style={{ width: '1px', height: '22px', background: '#e2e4dc', margin: '0 2px' }} />
+
           {/* Switcher Grafik vs Tabel */}
           <div
             style={{
