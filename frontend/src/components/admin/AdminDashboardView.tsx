@@ -231,28 +231,6 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
             Ringkasan Performa
           </span>
-          <button
-            type="button"
-            onClick={() => onNavigateTab ? onNavigateTab('matrix') : router.push('/matriks')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '4px 10px',
-              borderRadius: '7px',
-              border: '1px solid #2d6a4f',
-              backgroundColor: '#eef6ef',
-              color: '#2d6a4f',
-              fontSize: '11px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.12s ease',
-            }}
-            title="Buka Halaman Analisis Matriks Menu BCG Lengkap"
-          >
-            <TrendingUp size={12} />
-            Matriks Menu (BCG)
-          </button>
         </div>
 
         {/* Filter Presets & Date Picker */}
