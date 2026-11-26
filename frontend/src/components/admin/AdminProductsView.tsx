@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Product, Ingredient, ProductRecipeItem } from '@/types';
 import {
@@ -25,13 +26,12 @@ import {
   ChevronDown,
   TrendingUp,
 } from 'lucide-react';
-import { MenuMatrixModal } from '@/components/pos/MenuMatrixModal';
 
 export function AdminProductsView() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -595,7 +595,7 @@ export function AdminProductsView() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
-              onClick={() => setIsMatrixModalOpen(true)}
+              onClick={() => router.push('/matriks')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -610,7 +610,7 @@ export function AdminProductsView() {
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
-              title="Analisis Matriks Menu BCG (Popularitas vs Margin Keuntungan)"
+              title="Buka Halaman Analisis Matriks Menu BCG Lengkap"
             >
               <TrendingUp size={14} />
               Matriks Menu (BCG)
@@ -2232,10 +2232,6 @@ export function AdminProductsView() {
             </div>
           </div>
         </div>
-      )}
-      {/* Menu Matrix BCG Modal */}
-      {isMatrixModalOpen && (
-        <MenuMatrixModal onClose={() => setIsMatrixModalOpen(false)} />
       )}
     </div>
   );

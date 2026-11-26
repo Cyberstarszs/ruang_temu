@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { DailySummary, HourlyHeatmapItem, Ingredient, Order } from '@/types';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import { RotateCcw, TrendingUp } from 'lucide-react';
-import { MenuMatrixModal } from '@/components/pos/MenuMatrixModal';
 
 interface AdminDashboardViewProps {
   onNavigateTab?: (tab: string) => void;
 }
 
 export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
-  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+  const router = useRouter();
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     return { from: today, to: today };
@@ -233,7 +233,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           </span>
           <button
             type="button"
-            onClick={() => setIsMatrixModalOpen(true)}
+            onClick={() => onNavigateTab ? onNavigateTab('matrix') : router.push('/matriks')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -248,7 +248,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
               cursor: 'pointer',
               transition: 'all 0.12s ease',
             }}
-            title="Analisis Matriks Menu BCG (Popularitas vs Margin)"
+            title="Buka Halaman Analisis Matriks Menu BCG Lengkap"
           >
             <TrendingUp size={12} />
             Matriks Menu (BCG)
@@ -829,7 +829,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
             </h3>
             <button
               type="button"
-              onClick={() => setIsMatrixModalOpen(true)}
+              onClick={() => onNavigateTab ? onNavigateTab('matrix') : router.push('/matriks')}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -843,7 +843,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
                 borderRadius: '6px',
                 cursor: 'pointer',
               }}
-              title="Lihat Analisis Matriks Menu BCG Lengkap"
+              title="Buka Halaman Analisis Matriks Menu BCG Lengkap"
             >
               <TrendingUp size={12} />
               Analisis BCG
@@ -1092,10 +1092,6 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
         )}
       </div>
 
-      {/* Menu Matrix BCG Decision Analytics Modal */}
-      {isMatrixModalOpen && (
-        <MenuMatrixModal onClose={() => setIsMatrixModalOpen(false)} />
-      )}
     </div>
   );
 }

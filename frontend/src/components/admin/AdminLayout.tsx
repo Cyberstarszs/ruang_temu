@@ -21,10 +21,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
+  TrendingUp,
 } from 'lucide-react';
 
 import { AdminDashboardView } from './AdminDashboardView';
 import { AdminProductsView } from './AdminProductsView';
+import { AdminMenuMatrixView } from './AdminMenuMatrixView';
 import { AdminInventoryView } from './AdminInventoryView';
 import { AdminPurchasingView } from './AdminPurchasingView';
 import { AdminShiftsView } from './AdminShiftsView';
@@ -44,6 +46,7 @@ export type AdminTab =
   | 'orders'
   | 'shifts'
   | 'products'
+  | 'matrix'
   | 'inventory'
   | 'purchasing'
   | 'promos'
@@ -62,6 +65,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'orders', label: 'Transaksi', icon: ReceiptText },
   { id: 'shifts', label: 'Sif', icon: Wallet },
   { id: 'products', label: 'Menu', icon: Coffee },
+  { id: 'matrix', label: 'Matriks Menu', icon: TrendingUp },
   { id: 'inventory', label: 'Stok', icon: Boxes },
   { id: 'purchasing', label: 'Pengadaan', icon: Truck },
   { id: 'promos', label: 'Promo', icon: BadgePercent },
@@ -75,6 +79,7 @@ const TAB_SLUG_MAP: Record<AdminTab, string> = {
   orders: 'transaksi',
   shifts: 'sif',
   products: 'menu',
+  matrix: 'matriks',
   inventory: 'stok',
   purchasing: 'pengadaan',
   promos: 'promo',
@@ -93,6 +98,9 @@ const SLUG_TAB_MAP: Record<string, AdminTab> = {
   shift: 'shifts',
   menu: 'products',
   products: 'products',
+  matriks: 'matrix',
+  matrix: 'matrix',
+  'matriks-menu': 'matrix',
   stok: 'inventory',
   inventory: 'inventory',
   pengadaan: 'purchasing',
@@ -170,6 +178,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         return <AdminDashboardView onNavigateTab={(tab) => handleSelectTab(tab as AdminTab)} />;
       case 'products':
         return <AdminProductsView />;
+      case 'matrix':
+        return <AdminMenuMatrixView />;
       case 'inventory':
         return <AdminInventoryView />;
       case 'purchasing':
