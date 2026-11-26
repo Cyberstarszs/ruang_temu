@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { HeldOrder } from '@/types';
 import { rupiah, formatDateTime } from '@/lib/utils';
 import { Icon } from '@/components/common/Icons';
@@ -18,6 +18,7 @@ export function HeldOrdersModal({
   onDelete,
   onClose,
 }: HeldOrdersModalProps) {
+  const [orderToDelete, setOrderToDelete] = useState<HeldOrder | null>(null);
   return (
     <div className="bo-modal-layer" onClick={onClose}>
       <div
@@ -237,11 +238,7 @@ export function HeldOrdersModal({
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (window.confirm('Hapus pesanan tahanan ini?')) {
-                              onDelete(order.id);
-                            }
-                          }}
+                          onClick={() => setOrderToDelete(order)}
                           style={{
                             padding: '7px 12px',
                             borderRadius: '6px',
@@ -317,6 +314,59 @@ export function HeldOrdersModal({
           </button>
         </footer>
       </div>
+
+      {/* Dialog Konfirmasi Hapus Pesanan Tahanan Kustom */}
+      {orderToDelete && (
+        <div
+          className="bo-modal-layer"
+          style={{ zIndex: 1100 }}
+          onClick={() => setOrderToDelete(null)}
+        >
+          <div
+            className="bo-confirm"
+            role="alertdialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span>
+              <Icon name="trash" size={26} />
+            </span>
+            <h2>Hapus Pesanan Tahanan?</h2>
+            <p>
+              Pesanan untuk{' '}
+              <strong>
+                {orderToDelete.customer?.name
+                  ? orderToDelete.customer.name
+                  : orderToDelete.orderType === 'DINE_IN'
+                  ? orderToDelete.selectedTable?.number
+                    ? `Meja ${orderToDelete.selectedTable.number}`
+                    : 'Dine-In'
+                  : orderToDelete.takeawayName
+                  ? `Takeaway (${orderToDelete.takeawayName})`
+                  : 'Takeaway'}
+              </strong>{' '}
+              ({rupiah(orderToDelete.grandTotal)}) akan dihapus permanen dari daftar antrean tahan.
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={() => setOrderToDelete(null)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => {
+                  onDelete(orderToDelete.id);
+                  setOrderToDelete(null);
+                }}
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
