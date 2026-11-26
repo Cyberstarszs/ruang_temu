@@ -8,9 +8,10 @@ export interface DatePickerProps {
   onChange: (date: string) => void;
   placeholder?: string;
   className?: string;
+  fullWidth?: boolean;
 }
 
-export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...' }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...', fullWidth = false }: DatePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -117,21 +118,30 @@ export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...' }
     : placeholder;
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
+    <div
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        display: fullWidth ? 'block' : 'inline-block',
+        width: fullWidth ? '100%' : 'auto',
+      }}
+    >
       {/* Trigger Button (Shadcn UI style) */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          display: 'inline-flex',
+          display: 'flex',
           alignItems: 'center',
+          justifyContent: fullWidth ? 'space-between' : 'flex-start',
           gap: '8px',
-          height: '34px',
-          padding: '0 12px',
+          width: fullWidth ? '100%' : 'auto',
+          height: '36px',
+          padding: '0 10px',
           background: '#ffffff',
-          border: '1px solid #e2e4dc',
+          border: '1px solid #d1d5db',
           borderRadius: '8px',
-          fontSize: '12px',
+          fontSize: '12.5px',
           fontWeight: 500,
           color: value ? '#1c2826' : '#71717a',
           cursor: 'pointer',
@@ -143,12 +153,16 @@ export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...' }
           e.currentTarget.style.background = '#fafbf9';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = '#e2e4dc';
+          e.currentTarget.style.borderColor = '#d1d5db';
           e.currentTarget.style.background = '#ffffff';
         }}
       >
-        <CalendarIcon size={14} color="#57695b" />
-        <span style={{ fontWeight: value ? 600 : 500 }}>{displayText}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <CalendarIcon size={14} color="#57695b" style={{ flexShrink: 0 }} />
+          <span style={{ fontWeight: value ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {displayText}
+          </span>
+        </div>
         {value && (
           <span
             onClick={clearDate}
@@ -164,6 +178,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...' }
               color: '#71717a',
               cursor: 'pointer',
               marginLeft: '2px',
+              flexShrink: 0,
             }}
           >
             <X size={10} />

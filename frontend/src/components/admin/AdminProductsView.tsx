@@ -51,6 +51,7 @@ export function AdminProductsView() {
   const [newIsPackaging, setNewIsPackaging] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isIngredientDropdownOpen, setIsIngredientDropdownOpen] = useState(false);
+  const [recipeError, setRecipeError] = useState('');
   const qtyInputRef = useRef<HTMLInputElement | null>(null);
 
   // Add / Edit Product Modal
@@ -136,6 +137,7 @@ export function AdminProductsView() {
     setNewIsPackaging(false);
     setIngredientSearch('');
     setIsIngredientDropdownOpen(false);
+    setRecipeError('');
     try {
       const res = await api.products.getRecipes(product.id);
       if (res.success && res.data) {
@@ -155,9 +157,10 @@ export function AdminProductsView() {
 
   const handleAddRecipeIngredient = () => {
     if (!newIngredientId || !newIngredientQty || Number(newIngredientQty) <= 0) {
-      alert('Pilih bahan baku dan masukkan takaran yang valid (> 0).');
+      setRecipeError('Pilih bahan baku dan masukkan takaran yang valid (> 0).');
       return;
     }
+    setRecipeError('');
 
     const ing = ingredients.find((i) => i.id === newIngredientId);
     if (!ing) return;
@@ -197,6 +200,7 @@ export function AdminProductsView() {
     setNewIsPackaging(false);
     setIngredientSearch('');
     setIsIngredientDropdownOpen(false);
+    setRecipeError('');
   };
 
   const handleRemoveRecipeIngredient = (ingredientId: string) => {
@@ -215,10 +219,11 @@ export function AdminProductsView() {
       const res = await api.products.updateRecipes(formulatingProduct.id, payload);
       if (res.success) {
         setFormulatingProduct(null);
+        setRecipeError('');
         loadData();
       }
     } catch (err: any) {
-      alert(err.message || 'Gagal menyimpan resep.');
+      setRecipeError(err.message || 'Gagal menyimpan resep.');
     }
   };
 
@@ -1381,6 +1386,42 @@ export function AdminProductsView() {
                 );
               })()}
 
+              {/* Recipe Error Banner */}
+              {recipeError && (
+                <div
+                  style={{
+                    marginBottom: '10px',
+                    padding: '8px 12px',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: '#991b1b',
+                    fontSize: '12px',
+                  }}
+                >
+                  <AlertCircle size={15} style={{ flexShrink: 0, color: '#dc2626' }} />
+                  <span style={{ flex: 1, fontWeight: 500 }}>{recipeError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRecipeError('')}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#991b1b',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
               {/* Input Tambah Bahan (Sederhana, Bersih & Tidak Sempit) */}
               <div
                 style={{
@@ -1418,6 +1459,7 @@ export function AdminProductsView() {
                       onChange={(e) => {
                         setIngredientSearch(e.target.value);
                         if (newIngredientId) setNewIngredientId('');
+                        if (recipeError) setRecipeError('');
                         setIsIngredientDropdownOpen(true);
                       }}
                       style={{
@@ -1549,7 +1591,10 @@ export function AdminProductsView() {
                     step="any"
                     placeholder="Takaran"
                     value={newIngredientQty}
-                    onChange={(e) => setNewIngredientQty(e.target.value)}
+                    onChange={(e) => {
+                      setNewIngredientQty(e.target.value);
+                      if (recipeError) setRecipeError('');
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();

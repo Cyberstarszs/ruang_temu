@@ -1227,6 +1227,9 @@ export function AdminInventoryView() {
                       {ingUsageUnit}
                     </span>
                   </div>
+                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
+                    1 {ingPurchaseUnit || 'satuan beli'} = {ingConversionRate || 1} {ingUsageUnit} (konversi resep & stok)
+                  </span>
                 </div>
               </div>
 

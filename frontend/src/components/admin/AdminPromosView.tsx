@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   BadgePercent,
   Plus,
@@ -1127,19 +1128,11 @@ export function AdminPromosView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Mulai Berlaku <span style={{ color: '#b91c1c' }}>*</span>
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <DatePicker
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 8px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '12px',
-                      outline: 'none',
-                    }}
+                    onChange={(val) => setStartDate(val)}
+                    placeholder="Pilih tanggal mulai..."
+                    fullWidth
                   />
                 </div>
 
@@ -1147,19 +1140,11 @@ export function AdminPromosView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Berakhir Pada <span style={{ color: '#b91c1c' }}>*</span>
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <DatePicker
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 8px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '12px',
-                      outline: 'none',
-                    }}
+                    onChange={(val) => setEndDate(val)}
+                    placeholder="Pilih tanggal selesai..."
+                    fullWidth
                   />
                 </div>
               </div>
