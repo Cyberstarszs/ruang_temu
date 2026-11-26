@@ -462,32 +462,34 @@ export function PosHeader({
 
                 {/* Secondary tools & shortcuts */}
                 <div style={{ padding: '6px 0 2px 0', borderTop: '1px solid #f1f5f9', marginTop: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShiftDropdownOpen(false);
-                      onOpenMatrix();
-                    }}
-                    style={{
-                      padding: '7px 10px',
-                      border: 'none',
-                      background: 'transparent',
-                      borderRadius: '8px',
-                      fontSize: '12.5px',
-                      color: '#475569',
-                      width: '100%',
-                      textAlign: 'left',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <Icon name="trendingUp" size={15} />
-                    Matriks Keputusan Menu (BCG)
-                  </button>
+                  {user?.role === 'OWNER' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShiftDropdownOpen(false);
+                        onOpenMatrix();
+                      }}
+                      style={{
+                        padding: '7px 10px',
+                        border: 'none',
+                        background: 'transparent',
+                        borderRadius: '8px',
+                        fontSize: '12.5px',
+                        color: '#475569',
+                        width: '100%',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Icon name="trendingUp" size={15} />
+                      Matriks Keputusan Menu (BCG)
+                    </button>
+                  )}
 
                   {user?.role === 'OWNER' && onSwitchToAdmin && (
                     <button
@@ -727,20 +729,22 @@ export function PosHeader({
 
             {moreMenuOpen && (
               <div className="pos-nav-dropdown">
-                {/* Matriks Keputusan Menu BCG */}
-                <button
-                  onClick={() => {
-                    setMoreMenuOpen(false);
-                    onOpenMatrix();
-                  }}
-                  className="pos-dropdown-item"
-                >
-                  <Icon name="trendingUp" size={16} />
-                  <div>
-                    <strong>Matriks Menu (BCG)</strong>
-                    <small>Analisis kontribusi & strategi menu</small>
-                  </div>
-                </button>
+                {/* Matriks Keputusan Menu BCG (Khusus Owner) */}
+                {user?.role === 'OWNER' && (
+                  <button
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      onOpenMatrix();
+                    }}
+                    className="pos-dropdown-item"
+                  >
+                    <Icon name="trendingUp" size={16} />
+                    <div>
+                      <strong>Matriks Menu (BCG)</strong>
+                      <small>Analisis kontribusi & strategi menu</small>
+                    </div>
+                  </button>
+                )}
 
                 {/* Backoffice (Khusus Owner) */}
                 {user?.role === 'OWNER' && onSwitchToAdmin && (

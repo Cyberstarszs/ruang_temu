@@ -4,13 +4,15 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { DailySummary, HourlyHeatmapItem, Ingredient, Order } from '@/types';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, TrendingUp } from 'lucide-react';
+import { MenuMatrixModal } from '@/components/pos/MenuMatrixModal';
 
 interface AdminDashboardViewProps {
   onNavigateTab?: (tab: string) => void;
 }
 
 export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     return { from: today, to: today };
@@ -225,9 +227,33 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           border: '1px solid #e7e8e3',
         }}
       >
-        <span style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
-          Ringkasan Performa
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
+            Ringkasan Performa
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsMatrixModalOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              borderRadius: '7px',
+              border: '1px solid #2d6a4f',
+              backgroundColor: '#eef6ef',
+              color: '#2d6a4f',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+            title="Analisis Matriks Menu BCG (Popularitas vs Margin)"
+          >
+            <TrendingUp size={12} />
+            Matriks Menu (BCG)
+          </button>
+        </div>
 
         {/* Filter Presets & Date Picker */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -797,9 +823,32 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
             gap: '12px',
           }}
         >
-          <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-            Menu Terlaris
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+              Menu Terlaris
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsMatrixModalOpen(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#2d6a4f',
+                background: '#eef6ef',
+                border: '1px solid #c2e0c7',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+              title="Lihat Analisis Matriks Menu BCG Lengkap"
+            >
+              <TrendingUp size={12} />
+              Analisis BCG
+            </button>
+          </div>
 
           {!summary?.topProducts || summary.topProducts.length === 0 ? (
             <div
@@ -1042,6 +1091,11 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           </div>
         )}
       </div>
+
+      {/* Menu Matrix BCG Decision Analytics Modal */}
+      {isMatrixModalOpen && (
+        <MenuMatrixModal onClose={() => setIsMatrixModalOpen(false)} />
+      )}
     </div>
   );
 }

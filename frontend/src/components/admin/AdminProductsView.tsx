@@ -23,12 +23,15 @@ import {
   UploadCloud,
   Loader2,
   ChevronDown,
+  TrendingUp,
 } from 'lucide-react';
+import { MenuMatrixModal } from '@/components/pos/MenuMatrixModal';
 
 export function AdminProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -588,26 +591,52 @@ export function AdminProductsView() {
             })}
           </div>
 
-          {/* Tombol Tambah Menu */}
-          <button
-            onClick={openAddProductModal}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 14px',
-              background: '#57695b',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-          >
-            <Plus size={14} />
-            Tambah Menu
-          </button>
+          {/* Tombol Aksi Kanan: Matriks BCG & Tambah Menu */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setIsMatrixModalOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                background: '#eef6ef',
+                color: '#2d6a4f',
+                border: '1.5px solid #2d6a4f',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Analisis Matriks Menu BCG (Popularitas vs Margin Keuntungan)"
+            >
+              <TrendingUp size={14} />
+              Matriks Menu (BCG)
+            </button>
+
+            {/* Tombol Tambah Menu */}
+            <button
+              onClick={openAddProductModal}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                background: '#57695b',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              <Plus size={14} />
+              Tambah Menu
+            </button>
+          </div>
         </div>
 
         {/* Baris Bawah: Dropdown Filter & Pencarian */}
@@ -2203,6 +2232,10 @@ export function AdminProductsView() {
             </div>
           </div>
         </div>
+      )}
+      {/* Menu Matrix BCG Modal */}
+      {isMatrixModalOpen && (
+        <MenuMatrixModal onClose={() => setIsMatrixModalOpen(false)} />
       )}
     </div>
   );
