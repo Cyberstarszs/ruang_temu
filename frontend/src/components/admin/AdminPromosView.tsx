@@ -197,10 +197,18 @@ export function AdminPromosView() {
     setCode(p.code);
     setName(p.name);
     setDiscountType(p.discount_type);
-    setDiscountValue(String(p.discount_value));
-    setMinSpend(String(p.min_spend || '0'));
-    setMaxDiscount(p.max_discount ? String(p.max_discount) : '');
-    setQuota(p.quota ? String(p.quota) : '');
+
+    const cleanNum = (val: any) => {
+      if (val === null || val === undefined || val === '') return '';
+      const num = Number(val);
+      if (isNaN(num)) return '';
+      return num % 1 === 0 ? String(Math.round(num)) : String(num);
+    };
+
+    setDiscountValue(cleanNum(p.discount_value));
+    setMinSpend(cleanNum(p.min_spend || '0'));
+    setMaxDiscount(p.max_discount ? cleanNum(p.max_discount) : '');
+    setQuota(p.quota ? cleanNum(p.quota) : '');
     setStartDate(String(p.start_date).slice(0, 10));
     setEndDate(String(p.end_date).slice(0, 10));
     setModalError('');
@@ -306,7 +314,7 @@ export function AdminPromosView() {
     }
 
     const pay = Math.max(0, testAmount - disc);
-    return `Belanja Rp 100.000 hemat Rp ${Math.round(disc).toLocaleString('id-ID')} (Pelanggan Bayar: Rp ${Math.round(pay).toLocaleString('id-ID')})`;
+    return `Belanja Rp 100.000 hemat Rp ${Math.round(disc).toLocaleString('id-ID')} • Bayar Rp ${Math.round(pay).toLocaleString('id-ID')}`;
   }, [discountType, discountValue, maxDiscount]);
 
   return (
@@ -903,9 +911,9 @@ export function AdminPromosView() {
             style={{
               background: '#ffffff',
               borderRadius: '14px',
-              maxWidth: '520px',
+              maxWidth: '560px',
               width: '100%',
-              maxHeight: '90vh',
+              maxHeight: '92vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
@@ -1125,6 +1133,8 @@ export function AdminPromosView() {
                     onChange={(val) => setStartDate(val)}
                     placeholder="Pilih tanggal mulai..."
                     fullWidth
+                    position="top"
+                    align="left"
                   />
                 </div>
 
@@ -1137,28 +1147,32 @@ export function AdminPromosView() {
                     onChange={(val) => setEndDate(val)}
                     placeholder="Pilih tanggal selesai..."
                     fullWidth
+                    position="top"
+                    align="right"
                   />
                 </div>
               </div>
 
-              {/* Rangkuman Simulasi 1 Baris */}
+              {/* Rangkuman Simulasi */}
               <div
                 style={{
                   background: '#f4f6f2',
-                  padding: '8px 12px',
-                  borderRadius: '7px',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
                   border: '1px solid #e2e6de',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '11.5px',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  fontSize: '12px',
                   color: '#47564a',
+                  lineHeight: '1.4',
                 }}
               >
-                <Sparkles size={13} color="#57695b" style={{ flexShrink: 0 }} />
-                <span>
-                  <strong>Simulasi:</strong> {simulationText}
-                </span>
+                <Sparkles size={14} color="#57695b" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+                  <strong style={{ color: '#1c2826' }}>Simulasi: </strong>
+                  <span>{simulationText}</span>
+                </div>
               </div>
 
               {/* Buttons */}

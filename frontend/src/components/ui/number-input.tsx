@@ -12,12 +12,19 @@ export interface NumberInputProps
 
 export function formatThousand(val: string | number | undefined | null, allowDecimal = false): string {
   if (val === undefined || val === null || val === '') return '';
-  const str = String(val);
+  let str = String(val);
+
+  // Strip trailing unnecessary .00 or ,00 (e.g. "30000.00" -> "30000", "15.00" -> "15")
+  str = str.replace(/[.,]00$/, '');
+
   if (allowDecimal && (str.includes('.') || str.includes(','))) {
     const parts = str.replace(',', '.').split('.');
     const intPart = parts[0].replace(/\D/g, '');
     const formattedInt = intPart ? Number(intPart).toLocaleString('id-ID') : '0';
-    return parts.length > 1 ? `${formattedInt},${parts[1]}` : formattedInt;
+    if (parts.length > 1 && parts[1] && parts[1] !== '00') {
+      return `${formattedInt},${parts[1]}`;
+    }
+    return formattedInt;
   }
   const digits = str.replace(/\D/g, '');
   if (!digits) return '';

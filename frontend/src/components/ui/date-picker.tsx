@@ -9,11 +9,54 @@ export interface DatePickerProps {
   placeholder?: string;
   className?: string;
   fullWidth?: boolean;
+  align?: 'left' | 'right';
+  position?: 'bottom' | 'top' | 'auto';
 }
 
-export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...', fullWidth = false }: DatePickerProps) {
+export function DatePicker({
+  value,
+  onChange,
+  placeholder = 'Pilih tanggal...',
+  fullWidth = false,
+  align,
+  position = 'auto',
+}: DatePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = React.useState<'bottom' | 'top'>('bottom');
+  const [computedAlign, setComputedAlign] = React.useState<'left' | 'right'>('left');
+
+  React.useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const windowWidth = window.innerWidth;
+
+      if (position === 'top') {
+        setPlacement('top');
+      } else if (position === 'bottom') {
+        setPlacement('bottom');
+      } else {
+        const spaceBelow = windowHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        if (spaceBelow < 310 && spaceAbove > 200) {
+          setPlacement('top');
+        } else {
+          setPlacement('bottom');
+        }
+      }
+
+      if (align) {
+        setComputedAlign(align);
+      } else {
+        if (rect.left + 265 > windowWidth) {
+          setComputedAlign('right');
+        } else {
+          setComputedAlign('left');
+        }
+      }
+    }
+  }, [isOpen, position, align]);
 
   // Parse initial view month/year
   const selectedDate = value ? new Date(value + 'T00:00:00') : null;
@@ -191,14 +234,18 @@ export function DatePicker({ value, onChange, placeholder = 'Pilih tanggal...', 
         <div
           style={{
             position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
+            ...(placement === 'top'
+              ? { bottom: 'calc(100% + 6px)', top: 'auto' }
+              : { top: 'calc(100% + 6px)', bottom: 'auto' }),
+            ...(computedAlign === 'right'
+              ? { right: 0, left: 'auto' }
+              : { left: 0, right: 'auto' }),
             zIndex: 99999,
             width: '260px',
             background: '#ffffff',
             borderRadius: '12px',
             border: '1px solid #e2e4dc',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
             padding: '12px',
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             animation: 'fadeIn 0.15s ease-out',
