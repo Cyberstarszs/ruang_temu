@@ -119,6 +119,16 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       if (prodRes.success && prodRes.data) {
         setProducts(prodRes.data);
         await cacheCatalogData('products', prodRes.data);
+
+        // Pre-warm / prefetch gambar katalog ke Service Worker Image Cache
+        if (typeof window !== 'undefined' && 'caches' in window) {
+          prodRes.data.forEach((p: Product) => {
+            const img = p.image_url;
+            if (img && img.startsWith('http')) {
+              fetch(img, { mode: 'no-cors' }).catch(() => {});
+            }
+          });
+        }
       }
       if (tableRes.success && tableRes.data) {
         setTables(tableRes.data);

@@ -1,10 +1,12 @@
 /**
  * Service Worker untuk Ruang Temu POS Offline Cache
- * Meng-cache aset statis aplikasi agar halaman kasir tetap dapat dimuat
+ * Meng-cache aset statis aplikasi & gambar katalog produk
+ * agar terminal kasir tetap dapat menampilkan visual menu
  * saat router Wi-Fi lokal atau koneksi internet kafe terputus.
  */
 
-const CACHE_NAME = 'ruang-temu-pos-v1';
+const CACHE_NAME = 'ruang-temu-pos-v2';
+const IMAGE_CACHE_NAME = 'ruang-temu-images-v1';
 const STATIC_ASSETS = [
   '/',
   '/pos',
@@ -19,7 +21,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[ServiceWorker] Gagal precache beberapa aset:', err);
+        console.warn('[ServiceWorker] Gagal precache beberapa aset statis:', err);
       });
     })
   );
@@ -31,7 +33,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key !== CACHE_NAME && key !== IMAGE_CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -52,7 +54,40 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network First, Fallback to Cache Strategy untuk halaman & aset statis
+  // 1. Image Caching Strategy (Cache First, Network Fallback + Opaque Response Support)
+  const isImage =
+    event.request.destination === 'image' ||
+    url.hostname.includes('unsplash.com') ||
+    url.pathname.match(/\.(png|jpg|jpeg|webp|svg|gif)$/i);
+
+  if (isImage) {
+    event.respondWith(
+      caches.open(IMAGE_CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return fetch(event.request)
+            .then((networkResponse) => {
+              if (
+                networkResponse &&
+                (networkResponse.status === 200 || networkResponse.type === 'opaque')
+              ) {
+                cache.put(event.request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => {
+              // Jika offline dan belum ter-cache, kembalikan cached jika ada
+              return cachedResponse;
+            });
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. Network First, Fallback to Cache Strategy untuk halaman & app shell
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {

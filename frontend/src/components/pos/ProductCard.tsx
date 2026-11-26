@@ -59,6 +59,10 @@ export function ProductCard({
 }: ProductCardProps) {
   const resolvedImage = getProductImage(product);
   const [imageError, setImageError] = useState(!resolvedImage);
+
+  React.useEffect(() => {
+    setImageError(!resolvedImage);
+  }, [resolvedImage]);
   const isSoldOut = Boolean(product.isSoldOut || product.is_force_sold_out || product.is_auto_sold_out);
   const isFavorite = Boolean(product.is_favorite);
 
