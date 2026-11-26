@@ -752,6 +752,37 @@ export function CartSidebar({
             </button>
           </div>
 
+          {/* Active Note Preview Pill if closed */}
+          {orderNote && !showNoteBox && (
+            <div
+              onClick={() => setShowNoteBox(true)}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: '#f8faf9',
+                border: '1px dashed #57695b',
+                borderRadius: '6px',
+                fontSize: '11px',
+                color: '#57695b',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '6px',
+              }}
+              title="Klik untuk mengubah catatan pesanan"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', minWidth: 0 }}>
+                <span style={{ fontSize: '12px', flexShrink: 0 }}>📝</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic', fontWeight: 600 }}>
+                  "{orderNote}"
+                </span>
+              </div>
+              <small style={{ color: '#57695b', fontWeight: 700, flexShrink: 0, textDecoration: 'underline' }}>
+                Ubah
+              </small>
+            </div>
+          )}
+
           {/* Collapsible Promo Input Box */}
           {showPromoBox && (
             <div

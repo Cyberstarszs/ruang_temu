@@ -29,6 +29,7 @@ interface ReceiptModalProps {
     cashReceived?: number | null;
     cashChange?: number | null;
     isOffline?: boolean;
+    notes?: string | null;
   };
   onClose: () => void;
 }
@@ -83,6 +84,33 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
             <span>
               <strong>Mode Offline:</strong> Transaksi tersimpan lokal di kasir (IndexedDB). Struk tetap dapat dicetak dan transaksi akan otomatis disinkronkan ke server pusat saat koneksi pulih.
             </span>
+          </div>
+        )}
+
+        {/* Global Order Note Banner */}
+        {orderData.notes && (
+          <div
+            style={{
+              margin: '12px 20px 0',
+              padding: '10px 14px',
+              backgroundColor: '#fefce8',
+              border: '1px solid #fef08a',
+              borderRadius: '8px',
+              color: '#854d0e',
+              fontSize: '12.5px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              lineHeight: 1.4,
+            }}
+          >
+            <Icon name="stickyNote" size={16} />
+            <div>
+              <strong style={{ display: 'block', fontSize: '11px', color: '#a16207', textTransform: 'uppercase' }}>
+                Catatan Pesanan:
+              </strong>
+              <span>"{orderData.notes}"</span>
+            </div>
           </div>
         )}
 
@@ -235,6 +263,22 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                   <div style={{ margin: '8px 0', borderBottom: '1px dashed #888' }} />
                 </div>
 
+                {/* Global Order Note on Customer Receipt */}
+                {orderData.notes && (
+                  <div
+                    style={{
+                      marginBottom: '10px',
+                      padding: '6px 8px',
+                      border: '1px dashed #888',
+                      backgroundColor: '#fafafa',
+                      fontSize: '11px',
+                    }}
+                  >
+                    <b>Catatan Pesanan:</b>
+                    <div style={{ marginTop: '2px', fontStyle: 'italic' }}>"{orderData.notes}"</div>
+                  </div>
+                )}
+
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>
                   <div>Harga sudah bersih (0% Pajak, 0% Layanan)</div>
                   <div>Terima kasih atas kunjungan Anda!</div>
@@ -269,6 +313,12 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                     </div>
                   ))}
                 </div>
+                {orderData.notes && (
+                  <div style={{ marginTop: '10px', paddingTop: '6px', borderTop: '2px solid #111', fontSize: '11px' }}>
+                    <b>CATATAN PESANAN:</b>
+                    <div style={{ marginTop: '2px' }}>"{orderData.notes}"</div>
+                  </div>
+                )}
               </>
             )}
 
@@ -298,6 +348,12 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                     </div>
                   ))}
                 </div>
+                {orderData.notes && (
+                  <div style={{ marginTop: '10px', paddingTop: '6px', borderTop: '2px solid #111', fontSize: '11px' }}>
+                    <b>CATATAN PESANAN:</b>
+                    <div style={{ marginTop: '2px' }}>"{orderData.notes}"</div>
+                  </div>
+                )}
               </>
             )}
           </div>

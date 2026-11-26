@@ -21,6 +21,9 @@ interface PaymentModalProps {
     referenceNumber?: string;
   }) => Promise<void>;
   claimedDownPayment?: number;
+  orderNote?: string;
+  orderType?: string;
+  tableNumber?: string | null;
 }
 
 export function PaymentModal({
@@ -28,6 +31,9 @@ export function PaymentModal({
   onClose,
   onProcessPayment,
   claimedDownPayment = 0,
+  orderNote,
+  orderType,
+  tableNumber,
 }: PaymentModalProps) {
   const [method, setMethod] = useState<'CASH' | 'QRIS' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'SPLIT'>('CASH');
   const [cashReceived, setCashReceived] = useState<number>(Math.ceil(grandTotal / 10000) * 10000 || grandTotal);
@@ -165,6 +171,52 @@ export function PaymentModal({
             </div>
             <b style={{ fontSize: '26px', color: '#57695b', fontWeight: 700 }}>{rupiah(grandTotal)}</b>
           </div>
+
+          {/* Catatan Khusus Pesanan (Global Order Note) */}
+          {orderNote && (
+            <div
+              style={{
+                padding: '10px 14px',
+                backgroundColor: '#fefce8',
+                border: '1.5px solid #fde047',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+              }}
+            >
+              <div style={{ color: '#ca8a04', marginTop: '1px', flexShrink: 0 }}>
+                <Icon name="stickyNote" size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: '#854d0e',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Catatan Pesanan {orderType === 'TAKEAWAY' ? '(Takeaway)' : tableNumber ? `(Meja ${tableNumber})` : ''}:
+                </span>
+                <p
+                  style={{
+                    margin: '2px 0 0',
+                    fontSize: '13px',
+                    color: '#713f12',
+                    fontWeight: 600,
+                    lineHeight: 1.4,
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  "{orderNote}"
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Payment Method Tabs */}
           <div

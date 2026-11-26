@@ -392,6 +392,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
         cashReceived: paymentData.cashReceived,
         cashChange: paymentData.cashChange,
         isOffline: true,
+        notes: orderNote.trim() || (orderType === 'TAKEAWAY' && takeawayName ? `Takeaway: ${takeawayName}` : undefined),
       };
 
       const saved = await saveOfflineOrder(payload, offlineReceipt);
@@ -439,6 +440,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
           cashReceived: paymentData.cashReceived,
           cashChange: paymentData.cashChange,
           isOffline: false,
+          notes: createdOrder.notes || orderNote.trim() || (orderType === 'TAKEAWAY' && takeawayName ? `Takeaway: ${takeawayName}` : undefined),
         });
 
         // Clear cart
@@ -495,6 +497,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       paymentMethod: payment?.method || 'CASH',
       cashReceived: payment?.cashReceived,
       cashChange: payment?.cashChange,
+      notes: order.notes,
     });
   };
 
@@ -850,6 +853,9 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
           onClose={() => setPaymentModalOpen(false)}
           onProcessPayment={handleProcessPayment}
           claimedDownPayment={claimedDownPayment}
+          orderNote={orderNote}
+          orderType={orderType}
+          tableNumber={selectedTable?.number}
         />
       )}
 

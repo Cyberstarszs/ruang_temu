@@ -573,6 +573,64 @@ export function PosHeader({
           <Icon name="wallet" size={14} />
           <span className="pos-nav-text">Pengeluaran</span>
         </button>
+
+        {/* Status Offline Badge (Berdampingan dengan Pengeluaran di Kiri) */}
+        {!isOnline && (
+          <div
+            className="pos-nav-btn"
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.18)',
+              border: '1px solid #ef4444',
+              color: '#ef4444',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0 10px',
+              cursor: 'default',
+            }}
+            title="Koneksi terputus! Mode Offline aktif. Transaksi tersimpan lokal di kasir."
+          >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#ef4444',
+                boxShadow: '0 0 6px #ef4444',
+              }}
+            />
+            <span className="pos-nav-text">Offline</span>
+          </div>
+        )}
+
+        {/* Pending Offline Orders Sync Button */}
+        {pendingOfflineCount > 0 && (
+          <button
+            type="button"
+            onClick={() => triggerSync()}
+            disabled={isSyncing || !isOnline}
+            className="pos-nav-btn"
+            style={{
+              backgroundColor: isSyncing ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              border: isSyncing ? '1px solid #3b82f6' : '1px solid #f59e0b',
+              color: isSyncing ? '#2563eb' : '#b45309',
+              fontWeight: 600,
+            }}
+            title={
+              isSyncing
+                ? 'Sedang menyinkronkan data transaksi ke server...'
+                : !isOnline
+                ? `${pendingOfflineCount} transaksi tersimpan lokal di kasir. Menunggu koneksi pulih...`
+                : `Klik untuk sinkronisasi ${pendingOfflineCount} transaksi offline ke server sekarang`
+            }
+          >
+            <Icon name="rotateCcw" size={14} className={isSyncing ? 'spin' : ''} />
+            <span className="pos-nav-text">
+              {isSyncing ? 'Sinkron...' : `Sinkron (${pendingOfflineCount})`}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Center: Brand Wordmark (Mathematically Centered, Safe Zone Protected) */}
@@ -595,64 +653,6 @@ export function PosHeader({
 
         {/* Right: Quick Operational Tools */}
         <div className="pos-navbar-actions">
-          {/* Status Offline Badge */}
-          {!isOnline && (
-            <div
-              className="pos-nav-btn"
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.18)',
-                border: '1px solid #ef4444',
-                color: '#ef4444',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '0 10px',
-                cursor: 'default',
-              }}
-              title="Koneksi terputus! Mode Offline aktif. Transaksi tersimpan lokal di kasir."
-            >
-              <span
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: '#ef4444',
-                  boxShadow: '0 0 6px #ef4444',
-                }}
-              />
-              <span className="pos-nav-text">Offline</span>
-            </div>
-          )}
-
-          {/* Pending Offline Orders Sync Button */}
-          {pendingOfflineCount > 0 && (
-            <button
-              type="button"
-              onClick={() => triggerSync()}
-              disabled={isSyncing || !isOnline}
-              className="pos-nav-btn"
-              style={{
-                backgroundColor: isSyncing ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                border: isSyncing ? '1px solid #3b82f6' : '1px solid #f59e0b',
-                color: isSyncing ? '#2563eb' : '#b45309',
-                fontWeight: 600,
-              }}
-              title={
-                isSyncing
-                  ? 'Sedang menyinkronkan data transaksi ke server...'
-                  : !isOnline
-                  ? `${pendingOfflineCount} transaksi tersimpan lokal di kasir. Menunggu koneksi pulih...`
-                  : `Klik untuk sinkronisasi ${pendingOfflineCount} transaksi offline ke server sekarang`
-              }
-            >
-              <Icon name="rotateCcw" size={14} className={isSyncing ? 'spin' : ''} />
-              <span className="pos-nav-text">
-                {isSyncing ? 'Sinkron...' : `Sinkron (${pendingOfflineCount})`}
-              </span>
-            </button>
-          )}
-
           {/* Held Orders (Pesanan Ditahan) */}
           <button
             onClick={onOpenHeldOrders}
