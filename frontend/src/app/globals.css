@@ -18405,6 +18405,19 @@ textarea:focus-visible {
   display: inline-flex !important;
   align-items: center !important;
 }
+
+/* Offline Sync Spin Helper */
+.spin {
+  animation: pos-spin 0.9s linear infinite;
+}
+@keyframes pos-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 .new-pos .new-product-grid > article {
   min-width: 0;
   min-height: auto;
@@ -21646,4 +21659,17 @@ body,
   max-width: fit-content !important;
   display: inline-flex !important;
   align-items: center !important;
+}
+
+/* Offline Sync Spin Helper */
+.spin {
+  animation: pos-spin 0.9s linear infinite;
+}
+@keyframes pos-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

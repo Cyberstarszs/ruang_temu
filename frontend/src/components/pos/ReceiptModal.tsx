@@ -28,6 +28,7 @@ interface ReceiptModalProps {
     paymentMethod: string;
     cashReceived?: number | null;
     cashChange?: number | null;
+    isOffline?: boolean;
   };
   onClose: () => void;
 }
@@ -60,6 +61,30 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
             <Icon name="close" size={20} />
           </button>
         </header>
+
+        {/* Offline Notification Banner */}
+        {orderData.isOffline && (
+          <div
+            style={{
+              margin: '12px 20px 0',
+              padding: '10px 14px',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: '8px',
+              color: '#92400e',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              lineHeight: 1.4,
+            }}
+          >
+            <Icon name="circleAlert" size={18} />
+            <span>
+              <strong>Mode Offline:</strong> Transaksi tersimpan lokal di kasir (IndexedDB). Struk tetap dapat dicetak dan transaksi akan otomatis disinkronkan ke server pusat saat koneksi pulih.
+            </span>
+          </div>
+        )}
 
         {/* Tab switchers */}
         <div className="pos-type-tabs" style={{ margin: '12px 20px 0' }}>
@@ -116,6 +141,20 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                   <b style={{ fontSize: '16px', letterSpacing: '1px', display: 'block' }}>RUANG TEMU</b>
                   <span style={{ fontSize: '11px', display: 'block' }}>Coffee, Eatery, Community</span>
                   <span style={{ fontSize: '10px', color: '#555' }}>Jl. Ruang Temu No. 1</span>
+                  {orderData.isOffline && (
+                    <div
+                      style={{
+                        margin: '6px 0 2px',
+                        padding: '3px 0',
+                        border: '1px dashed #111',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      [ STRUK TRANSAKSI OFFLINE ]
+                    </div>
+                  )}
                   <div style={{ margin: '8px 0', borderBottom: '1px dashed #888' }} />
                 </div>
 
@@ -208,6 +247,11 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
               <>
                 <div style={{ textAlign: 'center', marginBottom: '12px', borderBottom: '2px solid #111', paddingBottom: '6px' }}>
                   <b style={{ fontSize: '15px' }}>CHECKER: BAR KOPI</b>
+                  {orderData.isOffline && (
+                    <div style={{ fontSize: '10px', fontWeight: 700, marginTop: '2px' }}>
+                      [ OFFLINE - TERSIMPAN LOKAL ]
+                    </div>
+                  )}
                   <div style={{ fontSize: '11px', marginTop: '4px' }}>
                     {orderData.tableNumber ? `MEJA: ${orderData.tableNumber}` : 'TAKEAWAY'}
                   </div>
@@ -232,6 +276,11 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
               <>
                 <div style={{ textAlign: 'center', marginBottom: '12px', borderBottom: '2px solid #111', paddingBottom: '6px' }}>
                   <b style={{ fontSize: '15px' }}>CHECKER: DAPUR MAKANAN</b>
+                  {orderData.isOffline && (
+                    <div style={{ fontSize: '10px', fontWeight: 700, marginTop: '2px' }}>
+                      [ OFFLINE - TERSIMPAN LOKAL ]
+                    </div>
+                  )}
                   <div style={{ fontSize: '11px', marginTop: '4px' }}>
                     {orderData.tableNumber ? `MEJA: ${orderData.tableNumber}` : 'TAKEAWAY'}
                   </div>

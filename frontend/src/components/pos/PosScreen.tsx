@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useShift } from '@/context/ShiftContext';
 import { useCart } from '@/context/CartContext';
+import { useOfflineSync } from '@/context/OfflineSyncContext';
+import { saveOfflineOrder, cacheCatalogData, getCachedCatalogData } from '@/lib/offlineQueue';
 import { PosHeader } from './PosHeader';
 import { ProductCard } from './ProductCard';
 import { ProductCustomizationModal } from './ProductCustomizationModal';
@@ -27,6 +29,7 @@ interface PosScreenProps {
 
 export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
   const { shift, hasActiveShift, isLoading: shiftLoading, refreshShift } = useShift();
+  const { isOnline, refreshPendingCount } = useOfflineSync();
 
   // State: Data from Backend
   const [products, setProducts] = useState<Product[]>([]);
@@ -104,7 +107,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch initial products, tables, and pending QR count
+  // Fetch initial products, tables, and pending QR count (dengan caching offline IndexedDB)
   const loadData = useCallback(async () => {
     try {
       setLoadingData(true);
@@ -115,13 +118,29 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
 
       if (prodRes.success && prodRes.data) {
         setProducts(prodRes.data);
+        await cacheCatalogData('products', prodRes.data);
       }
       if (tableRes.success && tableRes.data) {
         setTables(tableRes.data);
+        await cacheCatalogData('tables', tableRes.data);
       }
     } catch (err) {
-      console.error('Error loading master data:', err);
-      showToast('Gagal memuat data dari server backend.');
+      console.error('Error loading master data, fallback to IndexedDB cache:', err);
+      const [cachedProds, cachedTables] = await Promise.all([
+        getCachedCatalogData<Product[]>('products'),
+        getCachedCatalogData<DiningTable[]>('tables'),
+      ]);
+
+      if (cachedProds && cachedProds.length > 0) {
+        setProducts(cachedProds);
+        showToast('Mode Offline: Memuat menu dari memori lokal perangkat.');
+      } else {
+        showToast('Gagal memuat data dari server backend.');
+      }
+
+      if (cachedTables && cachedTables.length > 0) {
+        setTables(cachedTables);
+      }
     } finally {
       setLoadingData(false);
     }
@@ -315,7 +334,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     }
   };
 
-  // Direct Checkout Execution
+  // Direct Checkout Execution (Online dengan Failover Otomatis ke IndexedDB Offline Queue)
   const handleProcessPayment = async (paymentData: any) => {
     if (!hasActiveShift || !shift) {
       setActiveShiftModal('open');
@@ -346,17 +365,15 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       notes: orderNote.trim() || (orderType === 'TAKEAWAY' && takeawayName ? `Takeaway: ${takeawayName}` : undefined),
     };
 
-    const res = await api.orders.checkoutDirect(payload);
-
-    if (res.success && res.data) {
-      const createdOrder = res.data.order;
-      setReceiptData({
-        orderNumber: createdOrder.order_number,
-        orderType: createdOrder.order_type,
+    // Fungsi pembantu jika checkout harus dialihkan ke antrean offline kasir
+    const executeOfflineFallback = async () => {
+      const offlineReceipt = {
+        orderNumber: `RT-OFF-${Date.now().toString().slice(-6)}`,
+        orderType,
         tableNumber: selectedTable?.number || null,
-        cashierName: shift.cashier_name || 'Kasir',
+        cashierName: shift?.cashier_name || 'Kasir',
         customerName: customer?.name || (orderType === 'TAKEAWAY' ? takeawayName : undefined),
-        createdAt: createdOrder.created_at,
+        createdAt: new Date().toISOString(),
         items: cart.map((item) => ({
           productName: item.product.name,
           quantity: item.quantity,
@@ -374,15 +391,82 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
         paymentMethod: paymentData.paymentMethod,
         cashReceived: paymentData.cashReceived,
         cashChange: paymentData.cashChange,
-      });
+        isOffline: true,
+      };
 
-      // Clear cart
+      const saved = await saveOfflineOrder(payload, offlineReceipt);
+      await refreshPendingCount();
+
+      setReceiptData(saved.receiptData);
       handleClearCart();
       setPaymentModalOpen(false);
-      showToast('Transaksi Berhasil! Tiket otomatis dikirim ke stasiun cetak.');
-      await Promise.all([loadData(), refreshShift()]);
-    } else {
-      throw new Error(res.message || 'Gagal menyelesaikan checkout.');
+      showToast(`⚡ Mode Offline: Transaksi #${saved.orderNumber} disimpan di kasir. Struk siap dicetak!`);
+    };
+
+    // Jika perangkat mendeteksi sedang offline, langsung simpan ke IndexedDB
+    if (!isOnline) {
+      await executeOfflineFallback();
+      return;
+    }
+
+    try {
+      const res = await api.orders.checkoutDirect(payload);
+
+      if (res.success && res.data) {
+        const createdOrder = res.data.order;
+        setReceiptData({
+          orderNumber: createdOrder.order_number,
+          orderType: createdOrder.order_type,
+          tableNumber: selectedTable?.number || null,
+          cashierName: shift.cashier_name || 'Kasir',
+          customerName: customer?.name || (orderType === 'TAKEAWAY' ? takeawayName : undefined),
+          createdAt: createdOrder.created_at,
+          items: cart.map((item) => ({
+            productName: item.product.name,
+            quantity: item.quantity,
+            unitPrice: item.customization
+              ? item.product.price + item.customization.unitPriceAdjustment
+              : item.product.price,
+            subtotal: item.itemSubtotal,
+            printTarget: item.product.print_target,
+            notes: item.customization?.notes || item.customization?.selectedOptions?.join(', '),
+          })),
+          subtotal,
+          discountAmount,
+          claimedDownPayment,
+          totalAmount: grandTotal,
+          paymentMethod: paymentData.paymentMethod,
+          cashReceived: paymentData.cashReceived,
+          cashChange: paymentData.cashChange,
+          isOffline: false,
+        });
+
+        // Clear cart
+        handleClearCart();
+        setPaymentModalOpen(false);
+        showToast('Transaksi Berhasil! Tiket otomatis dikirim ke stasiun cetak.');
+        await Promise.all([loadData(), refreshShift()]);
+      } else {
+        throw new Error(res.message || 'Gagal menyelesaikan checkout.');
+      }
+    } catch (err: any) {
+      // Deteksi kegagalan jaringan (Wi-Fi putus / timeout / server offline)
+      const isNetworkIssue =
+        !navigator.onLine ||
+        err.name === 'TypeError' ||
+        err.message?.toLowerCase().includes('fetch') ||
+        err.message?.toLowerCase().includes('network') ||
+        err.message?.toLowerCase().includes('failed') ||
+        err.statusCode === 502 ||
+        err.statusCode === 503 ||
+        err.statusCode === 504;
+
+      if (isNetworkIssue) {
+        console.warn('[POS] Jaringan terputus saat checkout, menyimpan transaksi ke antrean offline...');
+        await executeOfflineFallback();
+      } else {
+        throw err;
+      }
     }
   };
 
