@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
+import { NumberInput, formatThousand } from '@/components/ui/number-input';
 import {
   Boxes,
   Plus,
@@ -35,7 +36,7 @@ const cleanNumStr = (val: any, fallback = '0') => {
 
 const parseCleanNumber = (val: string) => {
   if (!val) return 0;
-  const normalized = String(val).replace(',', '.');
+  const normalized = String(val).replace(/\./g, '').replace(',', '.');
   const n = parseFloat(normalized);
   return isNaN(n) ? 0 : n;
 };
@@ -1206,9 +1207,8 @@ export function AdminInventoryView() {
                     Isi per {ingPurchaseUnit || 'Beli'}
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="number"
-                      step="any"
+                    <NumberInput
+                      allowDecimal
                       required
                       value={ingConversionRate}
                       onChange={(e) => handleConversionRateChange(e.target.value)}
@@ -1228,7 +1228,7 @@ export function AdminInventoryView() {
                     </span>
                   </div>
                   <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
-                    1 {ingPurchaseUnit || 'satuan beli'} = {ingConversionRate || 1} {ingUsageUnit} (konversi resep & stok)
+                    1 {ingPurchaseUnit || 'satuan beli'} = {formatThousand(ingConversionRate, true) || 1} {ingUsageUnit} (konversi resep & stok)
                   </span>
                 </div>
               </div>
@@ -1239,10 +1239,8 @@ export function AdminInventoryView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Harga Beli per {ingPurchaseUnit || 'Satuan'} (Rp)
                   </label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="Contoh: 150000"
+                  <NumberInput
+                    placeholder="Contoh: 150.000"
                     value={ingPurchasePrice}
                     onChange={(e) => handlePurchasePriceChange(e.target.value)}
                     style={{
@@ -1261,9 +1259,8 @@ export function AdminInventoryView() {
                     Biaya HPP per {ingUsageUnit} (Rp)
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="number"
-                      step="any"
+                    <NumberInput
+                      allowDecimal
                       required
                       value={ingUnitCost}
                       onChange={(e) => handleUnitCostChange(e.target.value)}
@@ -1293,9 +1290,8 @@ export function AdminInventoryView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Batas Stok Aman ({ingUsageUnit})
                   </label>
-                  <input
-                    type="number"
-                    step="any"
+                  <NumberInput
+                    allowDecimal
                     required
                     placeholder="500"
                     value={ingSafeStock}
@@ -1315,9 +1311,8 @@ export function AdminInventoryView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     {editingIng ? 'Stok Fisik Gudang' : 'Stok Awal'} ({ingUsageUnit})
                   </label>
-                  <input
-                    type="number"
-                    step="any"
+                  <NumberInput
+                    allowDecimal
                     required
                     placeholder="0"
                     value={ingStockActual}
@@ -1513,9 +1508,8 @@ export function AdminInventoryView() {
                             {sysVal.toLocaleString('id-ID')}
                           </td>
                           <td style={{ textAlign: 'center', padding: '8px' }}>
-                            <input
-                              type="number"
-                              step="any"
+                            <NumberInput
+                              allowDecimal
                               value={opnameCounts[ing.id] ?? sysVal}
                               onChange={(e) => setOpnameCounts({ ...opnameCounts, [ing.id]: e.target.value })}
                               style={{
@@ -1686,9 +1680,8 @@ export function AdminInventoryView() {
                 <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                   Jumlah Terbuang ({selectedWasteIng?.usage_unit || 'satuan'}) <span style={{ color: '#b91c1c' }}>*</span>
                 </label>
-                <input
-                  type="number"
-                  step="any"
+                <NumberInput
+                  allowDecimal
                   required
                   placeholder="Contoh: 250"
                   value={wasteQuantity}

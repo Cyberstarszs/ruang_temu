@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Truck,
   Plus,
@@ -1443,9 +1444,8 @@ export function AdminPurchasingView() {
                             />
 
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                              <input
-                                type="number"
-                                step="any"
+                              <NumberInput
+                                allowDecimal
                                 placeholder="Qty"
                                 value={item.quantity}
                                 onChange={(e) => {
@@ -1468,9 +1468,8 @@ export function AdminPurchasingView() {
                               </span>
                             </div>
 
-                            <input
-                              type="number"
-                              step="any"
+                            <NumberInput
+                              allowDecimal
                               placeholder="Harga"
                               value={item.unitCost}
                               onChange={(e) => {

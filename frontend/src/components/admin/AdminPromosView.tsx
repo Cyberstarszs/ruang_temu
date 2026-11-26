@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   BadgePercent,
   Plus,
@@ -1033,12 +1034,9 @@ export function AdminPromosView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Nilai Diskon ({discountType === 'PERCENT' ? '%' : 'Rp'}) <span style={{ color: '#b91c1c' }}>*</span>
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     required
-                    min={1}
-                    max={discountType === 'PERCENT' ? 100 : undefined}
-                    placeholder={discountType === 'PERCENT' ? '20' : '15000'}
+                    placeholder={discountType === 'PERCENT' ? '20' : '15.000'}
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
                     style={{
@@ -1060,9 +1058,7 @@ export function AdminPromosView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Minimal Belanja (Rp)
                   </label>
-                  <input
-                    type="number"
-                    min={0}
+                  <NumberInput
                     placeholder="0 (Tanpa Minimum)"
                     value={minSpend}
                     onChange={(e) => setMinSpend(e.target.value)}
@@ -1081,9 +1077,7 @@ export function AdminPromosView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Maksimal Diskon (Rp) {discountType === 'PERCENT' ? '' : '(Tidak Berlaku)'}
                   </label>
-                  <input
-                    type="number"
-                    min={0}
+                  <NumberInput
                     disabled={discountType === 'FIXED_AMOUNT'}
                     placeholder={discountType === 'PERCENT' ? 'Kosongkan jika bebas' : '-'}
                     value={discountType === 'PERCENT' ? maxDiscount : ''}
@@ -1107,9 +1101,7 @@ export function AdminPromosView() {
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Batas Kuota
                   </label>
-                  <input
-                    type="number"
-                    min={1}
+                  <NumberInput
                     placeholder="∞ (Bebas)"
                     value={quota}
                     onChange={(e) => setQuota(e.target.value)}

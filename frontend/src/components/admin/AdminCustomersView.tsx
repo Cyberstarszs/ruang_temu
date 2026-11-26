@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Users,
   Search,
@@ -1396,9 +1397,7 @@ export function AdminCustomersView() {
                   <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#3f3f46' }}>
                     Poin Loyalitas
                   </label>
-                  <input
-                    type="number"
-                    min={0}
+                  <NumberInput
                     value={formPoints}
                     onChange={(e) => setFormPoints(Math.max(0, parseInt(e.target.value) || 0))}
                     style={{

@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   RotateCcw,
   Search,
@@ -1470,11 +1471,10 @@ export function AdminShiftsView() {
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c2826', marginBottom: '4px' }}>
                   Hitung Uang Fisik di Laci Kas (Rp):
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={forceCloseActualCash}
                   onChange={(e) => setForceCloseActualCash(e.target.value)}
-                  placeholder="Masukkan nominal fisik di laci kas..."
+                  placeholder="Contoh: 500.000"
                   style={{
                     width: '100%',
                     height: '36px',

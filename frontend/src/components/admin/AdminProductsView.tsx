@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Coffee,
   Plus,
@@ -1585,10 +1586,9 @@ export function AdminProductsView() {
 
                 {/* Input Qty Takaran */}
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '110px', flexShrink: 0 }}>
-                  <input
+                  <NumberInput
                     ref={qtyInputRef}
-                    type="number"
-                    step="any"
+                    allowDecimal
                     placeholder="Takaran"
                     value={newIngredientQty}
                     onChange={(e) => {
@@ -2071,10 +2071,9 @@ export function AdminProductsView() {
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '3px' }}>
                     Harga Jual (Rp)
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     required
-                    placeholder="cth: 25000"
+                    placeholder="cth: 25.000"
                     value={formPrice}
                     onChange={(e) => setFormPrice(e.target.value)}
                     style={{

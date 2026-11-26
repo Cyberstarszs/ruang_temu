@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   Settings,
   Store,
@@ -534,10 +535,8 @@ export function AdminSettingsView() {
                     <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                       Pajak Resto / PB1 (%)
                     </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
+                    <NumberInput
+                      allowDecimal
                       value={taxRate}
                       onChange={(e) => setTaxRate(e.target.value)}
                       placeholder="0"
@@ -556,10 +555,8 @@ export function AdminSettingsView() {
                     <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                       Service Charge (%)
                     </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
+                    <NumberInput
+                      allowDecimal
                       value={serviceChargeRate}
                       onChange={(e) => setServiceChargeRate(e.target.value)}
                       placeholder="0"
