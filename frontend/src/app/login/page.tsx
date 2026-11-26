@@ -24,5 +24,9 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, user, isLoading, router]);
 
+  if (isLoading || (isAuthenticated && user)) {
+    return null;
+  }
+
   return <LoginForm />;
 }

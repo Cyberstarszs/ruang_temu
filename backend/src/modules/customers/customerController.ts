@@ -33,6 +33,10 @@ export async function createCustomer(req: Request, res: Response, next: NextFunc
     }
 
     const cleanPhone = phoneNumber.trim().replace(/\D/g, '');
+    if (cleanPhone.length < 8 || cleanPhone.length > 15) {
+      res.status(400).json({ success: false, message: 'Nomor telepon harus terdiri dari 8 hingga 15 digit angka.' });
+      return;
+    }
 
     const result = await pool.query(
       `INSERT INTO customers (name, phone_number, tier, loyalty_points)

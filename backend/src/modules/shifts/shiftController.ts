@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../../config/database';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 
 export async function getCurrentShift(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -197,7 +200,7 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
 
 export async function recordCashMovement(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { shiftId, type, category, description, amount } = req.body;
+    const { shiftId, type, category, description, amount, receipt_url } = req.body;
 
     if (!shiftId || !type || !category || !amount || Number(amount) <= 0) {
       res.status(400).json({ success: false, message: 'ID Sif, jenis (CASH_IN/CASH_OUT), kategori, dan nominal wajib diisi.' });
@@ -224,16 +227,78 @@ export async function recordCashMovement(req: Request, res: Response, next: Next
     }
 
     const insertRes = await pool.query(
-      `INSERT INTO cash_movements (shift_id, type, category, description, amount)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO cash_movements (shift_id, type, category, description, amount, receipt_url)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [shiftId, type, category, description || category, Number(amount)]
+      [shiftId, type, category, description || category, Number(amount), receipt_url || null]
     );
 
     res.status(201).json({
       success: true,
       message: `Pencatatan kas operasional (${type}) berhasil disimpan.`,
       data: insertRes.rows[0],
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadReceiptImage(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { image, filename } = req.body;
+    if (!image || typeof image !== 'string') {
+      res.status(400).json({ success: false, message: 'Data bukti foto (base64) wajib dikirimkan.' });
+      return;
+    }
+
+    const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    let mimeType = 'image/jpeg';
+    let base64Data = image;
+
+    if (matches && matches.length === 3) {
+      mimeType = matches[1];
+      base64Data = matches[2];
+    }
+
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+    };
+
+    const ext = mimeToExt[mimeType.toLowerCase()] || (filename ? path.extname(filename).toLowerCase() : '.jpg');
+    if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      res.status(400).json({ success: false, message: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WebP.' });
+      return;
+    }
+
+    const buffer = Buffer.from(base64Data, 'base64');
+    if (buffer.length > 5 * 1024 * 1024) {
+      res.status(400).json({ success: false, message: 'Ukuran file foto bukti melebihi batas 5MB.' });
+      return;
+    }
+
+    const uploadsDir = path.resolve(__dirname, '../../..', 'uploads', 'receipts');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const safeUniqueName = `receipt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+    const targetPath = path.join(uploadsDir, safeUniqueName);
+
+    await fs.promises.writeFile(targetPath, buffer);
+
+    const publicUrl = `/uploads/receipts/${safeUniqueName}`;
+
+    res.json({
+      success: true,
+      message: 'Foto bukti pengeluaran berhasil diunggah.',
+      data: {
+        url: publicUrl,
+        filename: safeUniqueName,
+        size: buffer.length,
+      },
     });
   } catch (err) {
     next(err);

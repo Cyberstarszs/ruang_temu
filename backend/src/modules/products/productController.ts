@@ -18,6 +18,41 @@ export async function getProducts(req: Request, res: Response, next: NextFunctio
             AND pr.is_packaging_only = FALSE
             AND i.stock_actual < pr.quantity
         ) as is_auto_sold_out,
+        -- Recipe Total HPP
+        COALESCE(
+          (
+            SELECT SUM(pr.quantity * i.unit_cost)
+            FROM product_recipes pr
+            JOIN ingredients i ON pr.ingredient_id = i.id
+            WHERE pr.product_id = p.id
+          ),
+          0
+        ) as recipe_hpp,
+        -- Recipe Ingredient Count
+        (
+          SELECT COUNT(*)
+          FROM product_recipes pr
+          WHERE pr.product_id = p.id
+        )::int as recipe_count,
+        -- Recipe Ingredients List
+        COALESCE(
+          (
+            SELECT json_agg(json_build_object(
+              'ingredient_id', pr.ingredient_id,
+              'name', i.name,
+              'code', i.code,
+              'quantity', pr.quantity,
+              'unit', i.usage_unit,
+              'unit_cost', i.unit_cost,
+              'item_hpp', (pr.quantity * i.unit_cost),
+              'is_packaging_only', pr.is_packaging_only
+            ) ORDER BY pr.is_packaging_only ASC, i.name ASC)
+            FROM product_recipes pr
+            JOIN ingredients i ON pr.ingredient_id = i.id
+            WHERE pr.product_id = p.id
+          ),
+          '[]'::json
+        ) as recipes,
         -- Modifiers
         COALESCE(
           (
@@ -40,7 +75,10 @@ export async function getProducts(req: Request, res: Response, next: NextFunctio
     const products = productsRes.rows.map((row) => ({
       ...row,
       price: Number(row.price),
-      isSoldOut: row.is_force_sold_out || row.is_auto_sold_out,
+      recipe_hpp: Math.round(Number(row.recipe_hpp) || 0),
+      recipe_count: Number(row.recipe_count) || 0,
+      recipes: row.recipes || [],
+      isSoldOut: Boolean(row.is_force_sold_out || row.is_auto_sold_out),
     }));
 
     res.json({

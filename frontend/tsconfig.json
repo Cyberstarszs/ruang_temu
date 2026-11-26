@@ -36,6 +36,15 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "vite.config.ts",
+    "src/views",
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/router",
+    "src/api/client.ts",
+    "src/components/ModifierModal.tsx",
+    "src/components/NotificationsDrawer.tsx",
+    "src/utils/thermalPrinter.ts"
   ]
 }

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { pool } from '../config/database';
 
 export interface AuthUser {
   id: string;
@@ -16,7 +17,7 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ success: false, message: 'Autentikasi diperlukan. Token tidak ditemukan.' });
@@ -29,7 +30,25 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     const decoded = jwt.verify(token, secret, {
       algorithms: ['HS256'],
     }) as AuthUser;
-    req.user = decoded;
+
+    // Security Check: Verify user is still active in database (Immediate Revocation Check)
+    const userCheck = await pool.query(
+      'SELECT id, name, username, role, is_active FROM users WHERE id = $1',
+      [decoded.id]
+    );
+
+    if (userCheck.rows.length === 0 || !userCheck.rows[0].is_active) {
+      res.status(403).json({ success: false, message: 'Akun Anda telah dinonaktifkan. Silakan hubungi pemilik toko.' });
+      return;
+    }
+
+    const liveUser = userCheck.rows[0];
+    req.user = {
+      id: liveUser.id,
+      name: liveUser.name,
+      username: liveUser.username,
+      role: liveUser.role,
+    };
     next();
   } catch (err: any) {
     res.status(401).json({ success: false, message: 'Sesi telah kedaluwarsa atau token tidak valid.' });

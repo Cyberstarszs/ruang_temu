@@ -3,7 +3,8 @@ import { pool } from '../../config/database';
 
 export async function getAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { action, limit = 50 } = req.query;
+    const { action, limit } = req.query;
+    const safeLimit = Math.min(200, Math.max(1, parseInt(String(limit || 50), 10) || 50));
     let queryStr = `
       SELECT 
         al.*,
@@ -20,7 +21,7 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
     }
 
     queryStr += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1}`;
-    params.push(Number(limit));
+    params.push(safeLimit);
 
     const result = await pool.query(queryStr, params);
     res.json({

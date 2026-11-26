@@ -1,8 +1,15 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { Ingredient } from '@/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Boxes,
   Plus,
@@ -11,11 +18,11 @@ import {
   Trash2,
   Pencil,
   AlertTriangle,
-  RotateCcw,
   X,
   CheckCircle2,
-  Info,
-  ChevronDown,
+  Scale,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 
 const cleanNumStr = (val: any, fallback = '0') => {
@@ -27,7 +34,7 @@ const cleanNumStr = (val: any, fallback = '0') => {
 
 const parseCleanNumber = (val: string) => {
   if (!val) return 0;
-  const normalized = val.replace(',', '.');
+  const normalized = String(val).replace(',', '.');
   const n = parseFloat(normalized);
   return isNaN(n) ? 0 : n;
 };
@@ -37,9 +44,11 @@ export function AdminInventoryView() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CRITICAL' | 'SAFE'>('ALL');
+  const [filterUnit, setFilterUnit] = useState<string>('ALL');
 
   // Stock Opname Modal State
   const [isOpnameModalOpen, setIsOpnameModalOpen] = useState(false);
+  const [opnameSearch, setOpnameSearch] = useState('');
   const [opnameCounts, setOpnameCounts] = useState<{ [id: string]: string }>({});
   const [opnameNotes, setOpnameNotes] = useState<{ [id: string]: string }>({});
   const [isSubmittingOpname, setIsSubmittingOpname] = useState(false);
@@ -47,11 +56,10 @@ export function AdminInventoryView() {
   // Wastage Modal State
   const [isWastageModalOpen, setIsWastageModalOpen] = useState(false);
   const [wasteIngredientId, setWasteIngredientId] = useState('');
-  const [wasteSearch, setWasteSearch] = useState('');
-  const [isWasteDropdownOpen, setIsWasteDropdownOpen] = useState(false);
   const [wasteQuantity, setWasteQuantity] = useState('');
   const [wasteReason, setWasteReason] = useState('Kedaluwarsa / Rusak');
   const [wasteError, setWasteError] = useState('');
+  const [isSubmittingWastage, setIsSubmittingWastage] = useState(false);
 
   // Add / Edit Ingredient Modal State
   const [isIngModalOpen, setIsIngModalOpen] = useState(false);
@@ -61,26 +69,26 @@ export function AdminInventoryView() {
   const [ingUsageUnit, setIngUsageUnit] = useState<'gram' | 'ml' | 'pcs'>('gram');
   const [ingPurchaseUnit, setIngPurchaseUnit] = useState('kg');
   const [ingConversionRate, setIngConversionRate] = useState('1000');
+  const [ingPurchasePrice, setIngPurchasePrice] = useState('150000');
+  const [ingUnitCost, setIngUnitCost] = useState('150');
   const [ingStockActual, setIngStockActual] = useState('0');
   const [ingSafeStock, setIngSafeStock] = useState('500');
-  const [ingUnitCost, setIngUnitCost] = useState('150');
   const [ingError, setIngError] = useState('');
+  const [isSubmittingIng, setIsSubmittingIng] = useState(false);
 
-  // Floating Popover for '...' details
-  const [ingPopover, setIngPopover] = useState<{
-    title: string;
-    details: Array<{ label: string; value: string }>;
-    rect: { top: number; left: number };
-  } | null>(null);
+  // Delete Confirmation Modal State
+  const [deleteIngTarget, setDeleteIngTarget] = useState<Ingredient | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeletingIng, setIsDeletingIng] = useState(false);
 
-  const openIngPopover = (e: React.MouseEvent, title: string, details: Array<{ label: string; value: string }>) => {
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setIngPopover({
-      title,
-      details,
-      rect: { top: rect.bottom, left: rect.left },
-    });
+  // Toast Notification
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage({ type, text });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
   };
 
   const loadData = async () => {
@@ -92,6 +100,7 @@ export function AdminInventoryView() {
       }
     } catch (err) {
       console.error('Failed to load ingredients:', err);
+      showToast('Gagal memuat data inventaris.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -100,6 +109,49 @@ export function AdminInventoryView() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Dual-sync handlers for Harga Beli & HPP
+  const handlePurchasePriceChange = (val: string) => {
+    setIngPurchasePrice(val);
+    const p = parseCleanNumber(val);
+    const rate = parseCleanNumber(ingConversionRate) || 1;
+    setIngUnitCost(cleanNumStr(p / rate, '0'));
+  };
+
+  const handleUnitCostChange = (val: string) => {
+    setIngUnitCost(val);
+    const u = parseCleanNumber(val);
+    const rate = parseCleanNumber(ingConversionRate) || 1;
+    setIngPurchasePrice(cleanNumStr(u * rate, '0'));
+  };
+
+  const handleConversionRateChange = (val: string) => {
+    setIngConversionRate(val);
+    const rate = parseCleanNumber(val) || 1;
+    const p = parseCleanNumber(ingPurchasePrice);
+    if (p > 0) {
+      setIngUnitCost(cleanNumStr(p / rate, '0'));
+    }
+  };
+
+  const handleUsageUnitChange = (unit: 'gram' | 'ml' | 'pcs') => {
+    setIngUsageUnit(unit);
+    let purch = 'kg';
+    let rate = 1000;
+    if (unit === 'ml') {
+      purch = 'liter';
+      rate = 1000;
+    } else if (unit === 'pcs') {
+      purch = 'pcs';
+      rate = 1;
+    }
+    setIngPurchaseUnit(purch);
+    setIngConversionRate(String(rate));
+    const p = parseCleanNumber(ingPurchasePrice);
+    if (p > 0) {
+      setIngUnitCost(cleanNumStr(p / rate, '0'));
+    }
+  };
 
   // Opname Handlers
   const openOpnameModal = () => {
@@ -111,6 +163,7 @@ export function AdminInventoryView() {
     });
     setOpnameCounts(initialCounts);
     setOpnameNotes(initialNotes);
+    setOpnameSearch('');
     setIsOpnameModalOpen(true);
   };
 
@@ -125,7 +178,7 @@ export function AdminInventoryView() {
 
       const res = await api.inventory.submitStocktake(items);
       if (res.success) {
-        alert('Stok opname berhasil disimpan dan mutasi stok telah dicatat.');
+        showToast('Stok opname berhasil disimpan.');
         setIsOpnameModalOpen(false);
         loadData();
       }
@@ -138,56 +191,53 @@ export function AdminInventoryView() {
 
   // Wastage Handlers
   const openWastageModal = (preselectedId?: string) => {
-    if (preselectedId) {
-      const selected = ingredients.find((i) => i.id === preselectedId);
-      setWasteIngredientId(preselectedId);
-      setWasteSearch(selected ? selected.name : '');
-    } else {
-      setWasteIngredientId('');
-      setWasteSearch('');
-    }
+    setWasteIngredientId(preselectedId || (ingredients[0]?.id ?? ''));
     setWasteQuantity('');
     setWasteReason('Kedaluwarsa / Rusak');
     setWasteError('');
-    setIsWasteDropdownOpen(false);
     setIsWastageModalOpen(true);
   };
 
   const handleSubmitWastage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!wasteIngredientId || !wasteQuantity || parseCleanNumber(wasteQuantity) <= 0) {
-      setWasteError('Pilih bahan dan masukkan jumlah limbah valid (> 0).');
+    const qty = parseCleanNumber(wasteQuantity);
+    if (!wasteIngredientId || qty <= 0) {
+      setWasteError('Pilih bahan dan masukkan jumlah yang valid (> 0).');
       return;
     }
 
+    setIsSubmittingWastage(true);
     try {
       const res = await api.inventory.recordWastage({
         ingredientId: wasteIngredientId,
-        quantity: parseCleanNumber(wasteQuantity),
+        quantity: qty,
         reason: wasteReason,
       });
 
       if (res.success) {
-        alert(res.message || 'Limbah bahan berhasil dicatat.');
+        showToast('Limbah bahan berhasil dicatat.');
         setIsWastageModalOpen(false);
         loadData();
       }
     } catch (err: any) {
       setWasteError(err.message || 'Gagal mencatat limbah.');
+    } finally {
+      setIsSubmittingWastage(false);
     }
   };
 
   // Add / Edit Handlers
   const openAddModal = () => {
     setEditingIng(null);
-    setIngCode(`ING-${Date.now().toString().slice(-4)}`);
+    setIngCode(`ING-${Math.floor(1000 + Math.random() * 9000)}`);
     setIngName('');
     setIngUsageUnit('gram');
     setIngPurchaseUnit('kg');
     setIngConversionRate('1000');
+    setIngPurchasePrice('150000');
+    setIngUnitCost('150');
     setIngStockActual('0');
     setIngSafeStock('500');
-    setIngUnitCost('150');
     setIngError('');
     setIsIngModalOpen(true);
   };
@@ -198,10 +248,15 @@ export function AdminInventoryView() {
     setIngName(ing.name);
     setIngUsageUnit(ing.usage_unit);
     setIngPurchaseUnit(ing.purchase_unit);
-    setIngConversionRate(cleanNumStr(ing.conversion_rate, '1000'));
+    const conv = Number(ing.conversion_rate) || 1000;
+    const unitC = Number(ing.unit_cost) || 0;
+    const purchPrice = Math.round(unitC * conv);
+
+    setIngConversionRate(cleanNumStr(conv, '1000'));
+    setIngUnitCost(cleanNumStr(unitC, '150'));
+    setIngPurchasePrice(cleanNumStr(purchPrice, '150000'));
     setIngStockActual(cleanNumStr(ing.stock_actual, '0'));
     setIngSafeStock(cleanNumStr(ing.safe_stock, '500'));
-    setIngUnitCost(cleanNumStr(ing.unit_cost, '150'));
     setIngError('');
     setIsIngModalOpen(true);
   };
@@ -213,9 +268,10 @@ export function AdminInventoryView() {
       return;
     }
 
+    setIsSubmittingIng(true);
     try {
       const payload = {
-        code: ingCode.trim(),
+        code: ingCode.trim().toUpperCase(),
         name: ingName.trim(),
         usage_unit: ingUsageUnit,
         purchase_unit: ingPurchaseUnit.trim(),
@@ -228,39 +284,336 @@ export function AdminInventoryView() {
       if (editingIng) {
         const res = await api.inventory.update(editingIng.id, payload);
         if (res.success) {
+          showToast(`Bahan baku "${payload.name}" diperbarui.`);
           setIsIngModalOpen(false);
           loadData();
         }
       } else {
         const res = await api.inventory.create(payload);
         if (res.success) {
+          showToast(`Bahan baku "${payload.name}" ditambahkan.`);
           setIsIngModalOpen(false);
           loadData();
         }
       }
     } catch (err: any) {
-      setIngError(err.message || 'Gagal menyimpan bahan baku.');
+      setIngError(err.message || 'Gagal menyimpan bahan.');
+    } finally {
+      setIsSubmittingIng(false);
     }
   };
 
-  const filteredIngredients = ingredients.filter((ing) => {
-    const matchesSearch =
-      ing.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ing.code.toLowerCase().includes(searchQuery.toLowerCase());
+  // Delete Handler
+  const handleDeleteIngredient = async () => {
+    if (!deleteIngTarget) return;
+    setIsDeletingIng(true);
+    setDeleteError('');
+    try {
+      const res = await api.inventory.delete(deleteIngTarget.id);
+      if (res.success) {
+        showToast(res.message || `Bahan baku "${deleteIngTarget.name}" dihapus.`);
+        setDeleteIngTarget(null);
+        loadData();
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Gagal menghapus bahan.');
+    } finally {
+      setIsDeletingIng(false);
+    }
+  };
 
-    const isCritical = Number(ing.stock_actual) <= Number(ing.safe_stock);
-    const matchesFilter =
-      filterStatus === 'ALL' ||
-      (filterStatus === 'CRITICAL' && isCritical) ||
-      (filterStatus === 'SAFE' && !isCritical);
+  // Metrics Calculations
+  const metrics = useMemo(() => {
+    const totalIngredients = ingredients.length;
+    let outOfStock = 0;
+    let lowStock = 0;
+    let safeCount = 0;
+    let totalValue = 0;
 
-    return matchesSearch && matchesFilter;
-  });
+    let gramCount = 0;
+    let mlCount = 0;
+    let pcsCount = 0;
+
+    ingredients.forEach((ing) => {
+      const actual = Number(ing.stock_actual);
+      const safe = Number(ing.safe_stock);
+      const cost = Number(ing.unit_cost);
+
+      totalValue += actual * cost;
+
+      if (actual <= 0) {
+        outOfStock++;
+      } else if (actual <= safe) {
+        lowStock++;
+      } else {
+        safeCount++;
+      }
+
+      if (ing.usage_unit === 'gram') gramCount++;
+      else if (ing.usage_unit === 'ml') mlCount++;
+      else if (ing.usage_unit === 'pcs') pcsCount++;
+    });
+
+    const criticalCount = outOfStock + lowStock;
+    const safePercentage = totalIngredients > 0 ? Math.round((safeCount / totalIngredients) * 100) : 100;
+
+    return {
+      totalIngredients,
+      outOfStock,
+      lowStock,
+      criticalCount,
+      safeCount,
+      safePercentage,
+      totalValue,
+      gramCount,
+      mlCount,
+      pcsCount,
+    };
+  }, [ingredients]);
+
+  // Filtered ingredients
+  const filteredIngredients = useMemo(() => {
+    return ingredients.filter((ing) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        ing.name.toLowerCase().includes(q) ||
+        ing.code.toLowerCase().includes(q);
+
+      const actual = Number(ing.stock_actual);
+      const safe = Number(ing.safe_stock);
+      const isCritical = actual <= safe;
+
+      const matchesStatus =
+        filterStatus === 'ALL' ||
+        (filterStatus === 'CRITICAL' && isCritical) ||
+        (filterStatus === 'SAFE' && !isCritical);
+
+      const matchesUnit = filterUnit === 'ALL' || ing.usage_unit === filterUnit;
+
+      return matchesSearch && matchesStatus && matchesUnit;
+    });
+  }, [ingredients, searchQuery, filterStatus, filterUnit]);
+
+  // Selected wastage item info
+  const selectedWasteIng = useMemo(() => {
+    return ingredients.find((i) => i.id === wasteIngredientId);
+  }, [ingredients, wasteIngredientId]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
-      {/* Top Header Controls */}
-      {/* Minimal Action & Filter Bar */}
+      {/* Toast Alert Banner */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '24px',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 18px',
+            borderRadius: '10px',
+            background: toastMessage.type === 'success' ? '#15803d' : '#b91c1c',
+            color: '#ffffff',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            fontSize: '13px',
+            fontWeight: 600,
+          }}
+        >
+          {toastMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          <span>{toastMessage.text}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ffffff',
+              cursor: 'pointer',
+              padding: 0,
+              marginLeft: '6px',
+            }}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* 4 KPI Ringkasan Metrik Riil */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+          gap: '14px',
+        }}
+      >
+        {/* Card 1: Total Bahan */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '14px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Bahan Baku</span>
+            <div
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                background: '#f2f4ef',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#57695b',
+              }}
+            >
+              <Boxes size={16} />
+            </div>
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {metrics.totalIngredients} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Bahan</span>
+          </div>
+          <div style={{ fontSize: '11px', color: '#8b968f' }}>
+            {metrics.gramCount} gram • {metrics.mlCount} ml • {metrics.pcsCount} pcs
+          </div>
+        </div>
+
+        {/* Card 2: Stok Kritis */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '14px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Perlu Restok</span>
+            <div
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                background: metrics.criticalCount > 0 ? '#fee2e2' : '#dcfce7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: metrics.criticalCount > 0 ? '#b91c1c' : '#15803d',
+              }}
+            >
+              <AlertTriangle size={16} />
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: '22px',
+              fontWeight: 800,
+              color: metrics.criticalCount > 0 ? '#b91c1c' : '#15803d',
+            }}
+          >
+            {metrics.criticalCount}{' '}
+            <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>
+              {metrics.criticalCount > 0 ? 'Bahan Kritis' : 'Semua Aman'}
+            </span>
+          </div>
+          <div style={{ fontSize: '11px', color: '#8b968f' }}>
+            {metrics.outOfStock} Habis • {metrics.lowStock} Menipis
+          </div>
+        </div>
+
+        {/* Card 3: Nilai Aset */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '14px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Nilai Aset</span>
+            <div
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                background: '#f2f4ef',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#57695b',
+              }}
+            >
+              <Scale size={16} />
+            </div>
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            Rp {Math.round(metrics.totalValue).toLocaleString('id-ID')}
+          </div>
+          <div style={{ fontSize: '11px', color: '#8b968f' }}>
+            Saldo fisik aktual &times; HPP
+          </div>
+        </div>
+
+        {/* Card 4: Kesehatan Stok */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '14px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Status Stok</span>
+            <div
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                background: metrics.safePercentage >= 80 ? '#dcfce7' : '#fef3c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: metrics.safePercentage >= 80 ? '#15803d' : '#b45309',
+              }}
+            >
+              <ShieldCheck size={16} />
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: '22px',
+              fontWeight: 800,
+              color: metrics.safePercentage >= 80 ? '#15803d' : '#b45309',
+            }}
+          >
+            {metrics.safePercentage}%{' '}
+            <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Aman</span>
+          </div>
+          <div style={{ fontSize: '11px', color: '#8b968f' }}>
+            {metrics.safeCount} dari {metrics.totalIngredients} bahan aman
+          </div>
+        </div>
+      </div>
+
+      {/* Filter & Action Bar */}
       <div
         style={{
           display: 'flex',
@@ -269,59 +622,82 @@ export function AdminInventoryView() {
           justifyContent: 'space-between',
           gap: '12px',
           background: '#ffffff',
-          padding: '12px 18px',
+          padding: '10px 16px',
           borderRadius: '12px',
           border: '1px solid #e7e8e3',
         }}
       >
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setFilterStatus('ALL')}
+        {/* Left Side: Filter Status & Search */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div
             style={{
-              padding: '5px 12px',
+              display: 'inline-flex',
+              background: '#f4f5f1',
               borderRadius: '8px',
-              border: filterStatus === 'ALL' ? '1px solid #57695b' : '1px solid #e2e4dc',
-              background: filterStatus === 'ALL' ? '#57695b' : '#f7f7f5',
-              color: filterStatus === 'ALL' ? '#ffffff' : '#4b5563',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              cursor: 'pointer',
+              padding: '2px',
+              gap: '2px',
             }}
           >
-            Semua ({ingredients.length})
-          </button>
+            <button
+              onClick={() => setFilterStatus('ALL')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: filterStatus === 'ALL' ? '#57695b' : 'transparent',
+                color: filterStatus === 'ALL' ? '#ffffff' : '#64746b',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Semua ({metrics.totalIngredients})
+            </button>
+            <button
+              onClick={() => setFilterStatus('CRITICAL')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: filterStatus === 'CRITICAL' ? '#b91c1c' : 'transparent',
+                color: filterStatus === 'CRITICAL' ? '#ffffff' : '#64746b',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Kritis ({metrics.criticalCount})
+            </button>
+            <button
+              onClick={() => setFilterStatus('SAFE')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: filterStatus === 'SAFE' ? '#15803d' : 'transparent',
+                color: filterStatus === 'SAFE' ? '#ffffff' : '#64746b',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Aman ({metrics.safeCount})
+            </button>
+          </div>
 
-          <button
-            onClick={() => setFilterStatus('CRITICAL')}
-            style={{
-              padding: '5px 12px',
-              borderRadius: '8px',
-              border: filterStatus === 'CRITICAL' ? '1px solid #b91c1c' : '1px solid #e2e4dc',
-              background: filterStatus === 'CRITICAL' ? '#fee2e2' : '#f7f7f5',
-              color: filterStatus === 'CRITICAL' ? '#b91c1c' : '#4b5563',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Kritis ({ingredients.filter((i) => Number(i.stock_actual) <= Number(i.safe_stock)).length})
-          </button>
-
-          <button
-            onClick={() => setFilterStatus('SAFE')}
-            style={{
-              padding: '5px 12px',
-              borderRadius: '8px',
-              border: filterStatus === 'SAFE' ? '1px solid #15803d' : '1px solid #e2e4dc',
-              background: filterStatus === 'SAFE' ? '#dcfce7' : '#f7f7f5',
-              color: filterStatus === 'SAFE' ? '#15803d' : '#4b5563',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Aman
-          </button>
+          <div style={{ width: '140px' }}>
+            <Select value={filterUnit} onValueChange={setFilterUnit}>
+              <SelectTrigger style={{ height: '30px', background: '#ffffff', fontSize: '11.5px' }}>
+                <SelectValue placeholder="Semua Satuan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Satuan</SelectItem>
+                <SelectItem value="gram">gram</SelectItem>
+                <SelectItem value="ml">ml</SelectItem>
+                <SelectItem value="pcs">pcs</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div
             style={{
@@ -329,46 +705,56 @@ export function AdminInventoryView() {
               alignItems: 'center',
               gap: '6px',
               background: '#f7f7f5',
-              padding: '5px 12px',
+              padding: '0 10px',
               borderRadius: '8px',
               border: '1px solid #e2e4dc',
-              minWidth: '180px',
-              marginLeft: '4px',
+              flex: '1 1 180px',
+              minWidth: '150px',
+              height: '30px',
             }}
           >
-            <Search size={14} color="#64746b" />
+            <Search size={13} color="#64746b" />
             <input
               type="text"
-              placeholder="Cari bahan..."
+              placeholder="Cari kode atau nama..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 border: 'none',
                 background: 'transparent',
                 outline: 'none',
-                fontSize: '12.5px',
+                fontSize: '11.5px',
                 color: '#1c2826',
                 width: '100%',
-                fontFamily: 'inherit',
               }}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {/* Right Side: Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={openOpnameModal}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '7px 12px',
+              gap: '5px',
+              padding: '6px 12px',
               background: '#f2f4ef',
               color: '#57695b',
               border: '1px solid #dcdfd5',
               borderRadius: '8px',
               fontWeight: 600,
-              fontSize: '12.5px',
+              fontSize: '12px',
               cursor: 'pointer',
             }}
           >
@@ -381,23 +767,19 @@ export function AdminInventoryView() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '7px 12px',
+              gap: '5px',
+              padding: '6px 12px',
               background: '#fff1f0',
               color: '#cf1322',
               border: '1px solid #ffa39e',
               borderRadius: '8px',
               fontWeight: 600,
-              fontSize: '12.5px',
+              fontSize: '12px',
               cursor: 'pointer',
-              transition: 'background 0.15s ease',
             }}
-            title="Catat limbah / kerusakan bahan umum (pilih bahan secara bebas)"
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#ffe5e3')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff1f0')}
           >
             <Trash2 size={14} />
-            Catat Limbah
+            Limbah
           </button>
 
           <button
@@ -405,43 +787,51 @@ export function AdminInventoryView() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '7px 14px',
+              gap: '5px',
+              padding: '6px 14px',
               background: '#57695b',
               color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
               fontWeight: 600,
-              fontSize: '12.5px',
+              fontSize: '12px',
               cursor: 'pointer',
             }}
           >
-            <Plus size={15} />
+            <Plus size={14} />
             Tambah Bahan
           </button>
         </div>
       </div>
 
-      {/* Ingredients Table */}
+      {/* Table: Bahan Baku */}
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '16px',
+          borderRadius: '14px',
           border: '1px solid #e7e8e3',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
           overflow: 'hidden',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', whiteSpace: 'nowrap' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '12px',
+              whiteSpace: 'nowrap',
+            }}
+          >
             <thead>
               <tr style={{ background: '#fbfbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
                 <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Kode</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Nama Bahan</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Satuan</th>
+                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Nama Bahan Baku</th>
+                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Satuan & Konversi</th>
                 <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Stok Aktual</th>
                 <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Batas Aman</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Biaya HPP</th>
+                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>HPP / Satuan</th>
+                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Total Nilai</th>
                 <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Status</th>
                 <th style={{ padding: '9px 14px', fontWeight: 600, fontSize: '11.5px', textAlign: 'right' }}>Aksi</th>
               </tr>
@@ -449,115 +839,88 @@ export function AdminInventoryView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
-                    Memuat data bahan baku...
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
+                    Memuat data inventaris...
                   </td>
                 </tr>
               ) : filteredIngredients.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#8b968f', fontStyle: 'italic' }}>
-                    Tidak ada bahan baku yang cocok dengan pencarian.
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#8b968f' }}>
+                    Tidak ada bahan baku yang sesuai.
                   </td>
                 </tr>
               ) : (
                 filteredIngredients.map((ing) => {
                   const actual = Number(ing.stock_actual);
                   const safe = Number(ing.safe_stock);
+                  const cost = Number(ing.unit_cost);
+                  const totalAssetVal = actual * cost;
                   const isOut = actual <= 0;
                   const isLow = !isOut && actual <= safe;
 
                   return (
-                    <tr key={ing.id} style={{ borderBottom: '1px solid #f0f0eb', height: '42px' }}>
-                      {/* 1. Kode */}
+                    <tr
+                      key={ing.id}
+                      style={{
+                        borderBottom: '1px solid #f0f0eb',
+                        height: '42px',
+                      }}
+                    >
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1c2826', fontSize: '11.5px' }}>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            color: '#1c2826',
+                            fontSize: '11.5px',
+                            background: '#f2f4ef',
+                            padding: '2px 5px',
+                            borderRadius: '4px',
+                          }}
+                        >
                           {ing.code}
                         </span>
                       </td>
 
-                      {/* 2. Nama Bahan */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            color: '#1c2826',
-                            maxWidth: '180px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            display: 'inline-block',
-                            fontSize: '12px',
-                          }}
-                          title={ing.name}
-                        >
-                          {ing.name}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826' }}>
+                        {ing.name}
+                      </td>
+
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#4b5563' }}>
+                        <span>{ing.usage_unit}</span>
+                        <span style={{ fontSize: '10.5px', color: '#8b968f', marginLeft: '6px' }}>
+                          (1 {ing.purchase_unit} = {Number(ing.conversion_rate).toLocaleString('id-ID')} {ing.usage_unit})
                         </span>
                       </td>
 
-                      {/* 3. Satuan */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ color: '#4b5563', fontSize: '11.5px', fontWeight: 500 }}>{ing.usage_unit}</span>
-                          <button
-                            type="button"
-                            onClick={(e) =>
-                              openIngPopover(e, `Satuan Konversi: ${ing.name}`, [
-                                { label: 'Satuan Pakai (POS)', value: ing.usage_unit },
-                                { label: 'Satuan Beli (PO)', value: ing.purchase_unit },
-                                { label: 'Rasio Konversi', value: `1 ${ing.purchase_unit} = ${Number(ing.conversion_rate).toLocaleString('id-ID')} ${ing.usage_unit}` },
-                                { label: 'Biaya per ' + ing.usage_unit, value: `Rp ${Number(ing.unit_cost).toLocaleString('id-ID')}` },
-                              ])
-                            }
-                            title={`Klik untuk rincian konversi satuan (1 ${ing.purchase_unit} = ${Number(ing.conversion_rate).toLocaleString('id-ID')} ${ing.usage_unit})`}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              background: '#f2f4ef',
-                              border: '1px solid #dcdfd5',
-                              color: '#57695b',
-                              cursor: 'pointer',
-                              padding: 0,
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#57695b';
-                              e.currentTarget.style.color = '#ffffff';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = '#f2f4ef';
-                              e.currentTarget.style.color = '#57695b';
-                            }}
-                          >
-                            <Info size={11} />
-                          </button>
-                        </div>
+                      <td
+                        style={{
+                          padding: '8px 12px',
+                          verticalAlign: 'middle',
+                          fontWeight: 800,
+                          color: isOut ? '#b91c1c' : isLow ? '#b45309' : '#15803d',
+                        }}
+                      >
+                        {actual.toLocaleString('id-ID')} {ing.usage_unit}
                       </td>
 
-                      {/* 4. Stok Aktual */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 800, fontSize: '12.5px', color: isOut ? '#b91c1c' : isLow ? '#b45309' : '#1c2826' }}>
-                        {Number(ing.stock_actual).toLocaleString('id-ID')} {ing.usage_unit}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#6b7280' }}>
+                        {safe.toLocaleString('id-ID')} {ing.usage_unit}
                       </td>
 
-                      {/* 5. Batas Aman */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#6b7280', fontSize: '11.5px' }}>
-                        {Number(ing.safe_stock).toLocaleString('id-ID')} {ing.usage_unit}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 600, color: '#1c2826' }}>
+                        Rp {cost.toLocaleString('id-ID')} / {ing.usage_unit}
                       </td>
 
-                      {/* 6. Biaya HPP */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 600, color: '#1c2826', fontSize: '12px' }}>
-                        Rp {Number(ing.unit_cost).toLocaleString('id-ID')} / {ing.usage_unit}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826' }}>
+                        Rp {Math.round(totalAssetVal).toLocaleString('id-ID')}
                       </td>
 
-                      {/* 7. Status */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         {isOut ? (
                           <span
                             style={{
-                              padding: '2px 7px',
+                              padding: '2px 6px',
                               borderRadius: '5px',
                               background: '#fee2e2',
                               color: '#b91c1c',
@@ -570,7 +933,7 @@ export function AdminInventoryView() {
                         ) : isLow ? (
                           <span
                             style={{
-                              padding: '2px 7px',
+                              padding: '2px 6px',
                               borderRadius: '5px',
                               background: '#fef3c7',
                               color: '#b45309',
@@ -583,7 +946,7 @@ export function AdminInventoryView() {
                         ) : (
                           <span
                             style={{
-                              padding: '2px 7px',
+                              padding: '2px 6px',
                               borderRadius: '5px',
                               background: '#dcfce7',
                               color: '#15803d',
@@ -596,26 +959,22 @@ export function AdminInventoryView() {
                         )}
                       </td>
 
-                      {/* 8. Aksi */}
-                      <td style={{ padding: '8px 18px', verticalAlign: 'middle', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <td style={{ padding: '8px 14px', verticalAlign: 'middle', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                           <button
                             type="button"
                             onClick={() => openWastageModal(ing.id)}
                             style={{
-                              padding: '4px 10px',
+                              padding: '3px 8px',
                               background: '#fff1f0',
                               color: '#cf1322',
                               border: '1px solid #ffa39e',
-                              borderRadius: '6px',
+                              borderRadius: '5px',
                               fontSize: '11px',
                               fontWeight: 600,
                               cursor: 'pointer',
-                              transition: 'all 0.15s ease',
                             }}
-                            title={`Catat limbah langsung untuk bahan ${ing.name}`}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = '#ffe5e3')}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff1f0')}
+                            title="Catat limbah"
                           >
                             Limbah
                           </button>
@@ -624,27 +983,35 @@ export function AdminInventoryView() {
                             type="button"
                             onClick={() => openEditModal(ing)}
                             style={{
-                              padding: '4px 8px',
+                              padding: '4px 7px',
                               background: '#f7f7f5',
-                              color: '#64746b',
+                              color: '#4b5563',
                               border: '1px solid #e2e4dc',
-                              borderRadius: '6px',
+                              borderRadius: '5px',
                               cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              transition: 'all 0.15s ease',
                             }}
-                            title={`Edit Bahan: ${ing.name}`}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#e2e4dc';
-                              e.currentTarget.style.color = '#1c2826';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = '#f7f7f5';
-                              e.currentTarget.style.color = '#64746b';
-                            }}
+                            title="Edit bahan"
                           >
                             <Pencil size={12} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteIngTarget(ing);
+                              setDeleteError('');
+                            }}
+                            style={{
+                              padding: '4px 7px',
+                              background: '#fff5f5',
+                              color: '#dc2626',
+                              border: '1px solid #fed7d7',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                            }}
+                            title="Hapus bahan"
+                          >
+                            <Trash2 size={12} />
                           </button>
                         </div>
                       </td>
@@ -657,596 +1024,14 @@ export function AdminInventoryView() {
         </div>
       </div>
 
-      {/* STOCK OPNAME MODAL */}
-      {isOpnameModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '780px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '20px 24px',
-                borderBottom: '1px solid #e7e8e3',
-              }}
-            >
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  Formulir Stok Opname Fisik
-                </h3>
-                <p style={{ fontSize: '12px', color: '#64746b', margin: '4px 0 0 0' }}>
-                  Isi jumlah hitung fisik aktual di gudang kafe. Sistem akan menghitung selisih dan menyesuaikan saldo.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsOpnameModalOpen(false)}
-                style={{
-                  background: '#f7f7f5',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  color: '#64746b',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '24px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #e7e8e3', color: '#64746b' }}>
-                    <th style={{ textAlign: 'left', padding: '8px' }}>Bahan Baku</th>
-                    <th style={{ textAlign: 'right', padding: '8px' }}>Stok Sistem</th>
-                    <th style={{ textAlign: 'center', padding: '8px', width: '140px' }}>Hitungan Fisik</th>
-                    <th style={{ textAlign: 'right', padding: '8px' }}>Selisih</th>
-                    <th style={{ textAlign: 'left', padding: '8px' }}>Catatan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ingredients.map((ing) => {
-                    const sysVal = Number(ing.stock_actual);
-                    const countVal = Number(opnameCounts[ing.id] ?? sysVal);
-                    const diff = countVal - sysVal;
-
-                    return (
-                      <tr key={ing.id} style={{ borderBottom: '1px solid #f0f0eb' }}>
-                        <td style={{ padding: '10px 8px', fontWeight: 600, color: '#1c2826' }}>
-                          {ing.name} <span style={{ fontSize: '11px', color: '#8b968f' }}>({ing.usage_unit})</span>
-                        </td>
-
-                        <td style={{ textAlign: 'right', padding: '10px 8px', color: '#64746b' }}>
-                          {sysVal.toLocaleString('id-ID')}
-                        </td>
-
-                        <td style={{ textAlign: 'center', padding: '10px 8px' }}>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={opnameCounts[ing.id] ?? sysVal}
-                            onChange={(e) =>
-                              setOpnameCounts({ ...opnameCounts, [ing.id]: e.target.value })
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #ccd1c4',
-                              textAlign: 'center',
-                              fontWeight: 700,
-                              fontSize: '13px',
-                            }}
-                          />
-                        </td>
-
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            padding: '10px 8px',
-                            fontWeight: 700,
-                            color: diff === 0 ? '#15803d' : diff > 0 ? '#0284c7' : '#b91c1c',
-                          }}
-                        >
-                          {diff > 0 ? `+${diff}` : diff}
-                        </td>
-
-                        <td style={{ padding: '10px 8px' }}>
-                          <input
-                            type="text"
-                            placeholder="Alasan penyesuaian..."
-                            value={opnameNotes[ing.id] ?? ''}
-                            onChange={(e) =>
-                              setOpnameNotes({ ...opnameNotes, [ing.id]: e.target.value })
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e4dc',
-                              fontSize: '12px',
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: '12px',
-                padding: '16px 24px',
-                borderTop: '1px solid #e7e8e3',
-                background: '#fbfbf9',
-              }}
-            >
-              <button
-                onClick={() => setIsOpnameModalOpen(false)}
-                style={{
-                  padding: '10px 18px',
-                  background: '#f0f0eb',
-                  border: '1px solid #dcdfd5',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#4b5563',
-                  cursor: 'pointer',
-                }}
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSubmitOpname}
-                disabled={isSubmittingOpname}
-                style={{
-                  padding: '10px 20px',
-                  background: '#57695b',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {isSubmittingOpname ? 'Menyimpan...' : 'Terapkan Hasil Opname'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RECORD WASTAGE MODAL */}
-      {isWastageModalOpen && (() => {
-        const selectedWasteIng = ingredients.find((i) => i.id === wasteIngredientId);
-
-        return (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.5)',
-              backdropFilter: 'blur(3px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: '16px',
-            }}
-          >
-            <div
-              style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                maxWidth: '480px',
-                width: '100%',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '18px 24px',
-                  borderBottom: '1px solid #e7e8e3',
-                }}
-              >
-                <div>
-                  <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                    Pencatatan Limbah (Wastage)
-                  </h3>
-                  <span style={{ fontSize: '12px', color: '#687768' }}>
-                    {selectedWasteIng ? `Mencatat pemborosan untuk: ${selectedWasteIng.name}` : 'Catat bahan baku rusak, tumpah, atau kedaluwarsa'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsWastageModalOpen(false)}
-                  style={{
-                    background: '#f7f7f5',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '6px',
-                    cursor: 'pointer',
-                    color: '#64746b',
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmitWastage} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {wasteError && (
-                  <div
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      background: '#fef2f2',
-                      border: '1px solid #fecaca',
-                      color: '#b91c1c',
-                      fontSize: '13px',
-                    }}
-                  >
-                    {wasteError}
-                  </div>
-                )}
-
-                {/* Searchable Combobox for Bahan Baku */}
-                <div style={{ position: 'relative' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Pilih Bahan Baku <span style={{ color: '#b91c1c' }}>*</span>
-                  </label>
-
-                  {/* Search Input Box */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: '#ffffff',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      padding: '0 12px',
-                      height: '42px',
-                      cursor: 'pointer',
-                      transition: 'border-color 0.15s ease',
-                    }}
-                    onClick={() => setIsWasteDropdownOpen(true)}
-                  >
-                    <Search size={15} color="#71717a" style={{ flexShrink: 0 }} />
-                    <input
-                      type="text"
-                      placeholder="Ketik untuk mencari nama / kode bahan..."
-                      value={wasteSearch}
-                      onFocus={() => setIsWasteDropdownOpen(true)}
-                      onChange={(e) => {
-                        setWasteSearch(e.target.value);
-                        if (wasteIngredientId) setWasteIngredientId('');
-                        setIsWasteDropdownOpen(true);
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        outline: 'none',
-                        fontSize: '13px',
-                        width: '100%',
-                        color: '#1c2826',
-                        fontWeight: wasteIngredientId ? 600 : 400,
-                      }}
-                    />
-                    {wasteIngredientId && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setWasteIngredientId('');
-                          setWasteSearch('');
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#9ca3af',
-                          cursor: 'pointer',
-                          padding: '2px',
-                        }}
-                        title="Hapus pilihan"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                    <ChevronDown size={15} color="#71717a" style={{ flexShrink: 0 }} />
-                  </div>
-
-                  {/* Dropdown Menu */}
-                  {isWasteDropdownOpen && (
-                    <>
-                      <div
-                        style={{ position: 'fixed', inset: 0, zIndex: 99991 }}
-                        onClick={() => setIsWasteDropdownOpen(false)}
-                      />
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 4px)',
-                          left: 0,
-                          right: 0,
-                          maxHeight: '220px',
-                          overflowY: 'auto',
-                          background: '#ffffff',
-                          borderRadius: '10px',
-                          border: '1px solid #d1d5db',
-                          boxShadow: '0 12px 28px rgba(0,0,0,0.18)',
-                          zIndex: 99992,
-                        }}
-                      >
-                        {ingredients.filter((ing) => {
-                          if (!wasteSearch.trim()) return true;
-                          const q = wasteSearch.toLowerCase();
-                          return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
-                        }).length === 0 ? (
-                          <div style={{ padding: '14px', fontSize: '12.5px', color: '#9ca3af', textAlign: 'center', fontStyle: 'italic' }}>
-                            Bahan baku &quot;{wasteSearch}&quot; tidak ditemukan.
-                          </div>
-                        ) : (
-                          ingredients
-                            .filter((ing) => {
-                              if (!wasteSearch.trim()) return true;
-                              const q = wasteSearch.toLowerCase();
-                              return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
-                            })
-                            .map((ing) => {
-                              const isSelected = ing.id === wasteIngredientId;
-                              const isOut = Number(ing.stock_actual) <= 0;
-                              const isLow = Number(ing.stock_actual) <= Number(ing.safe_stock);
-
-                              return (
-                                <div
-                                  key={ing.id}
-                                  onClick={() => {
-                                    setWasteIngredientId(ing.id);
-                                    setWasteSearch(ing.name);
-                                    setIsWasteDropdownOpen(false);
-                                    setWasteError('');
-                                  }}
-                                  style={{
-                                    padding: '10px 14px',
-                                    cursor: 'pointer',
-                                    background: isSelected ? '#f0f3ee' : '#ffffff',
-                                    borderBottom: '1px solid #f2f4ef',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: '12px',
-                                    transition: 'background 0.12s ease',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (!isSelected) e.currentTarget.style.background = '#f9fafb';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (!isSelected) e.currentTarget.style.background = '#ffffff';
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#1c2826' }}>
-                                        {ing.name}
-                                      </span>
-                                      <span style={{ fontSize: '10.5px', color: '#6b7280', background: '#f3f4f6', padding: '1px 5px', borderRadius: '4px', fontFamily: 'monospace' }}>
-                                        {ing.code}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    style={{
-                                      fontSize: '11.5px',
-                                      fontWeight: 700,
-                                      padding: '3px 8px',
-                                      borderRadius: '6px',
-                                      whiteSpace: 'nowrap',
-                                      background: isOut ? '#fef2f2' : isLow ? '#fffbeb' : '#f0fdf4',
-                                      color: isOut ? '#b91c1c' : isLow ? '#b45309' : '#15803d',
-                                      border: isOut ? '1px solid #fecaca' : isLow ? '1px solid #fde68a' : '1px solid #bbf7d0',
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    Saldo: {Number(ing.stock_actual).toLocaleString('id-ID')} {ing.usage_unit}
-                                  </div>
-                                </div>
-                              );
-                            })
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                  {/* Selected Ingredient Summary Card */}
-                  {selectedWasteIng && (
-                    <div
-                      style={{
-                        marginTop: '8px',
-                        padding: '10px 14px',
-                        background: '#f8faf6',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e4dc',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px',
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#687768', display: 'block' }}>Saldo Tersedia:</span>
-                        <strong style={{ fontSize: '13px', color: Number(selectedWasteIng.stock_actual) <= 0 ? '#b91c1c' : '#1c2826' }}>
-                          {Number(selectedWasteIng.stock_actual).toLocaleString('id-ID')} {selectedWasteIng.usage_unit}
-                        </strong>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '11px', color: '#687768', display: 'block' }}>Estimasi HPP:</span>
-                        <strong style={{ fontSize: '13px', color: '#57695b' }}>
-                          Rp {Number(selectedWasteIng.unit_cost).toLocaleString('id-ID')} / {selectedWasteIng.usage_unit}
-                        </strong>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Jumlah Bahan Terbuang / Rusak <span style={{ color: '#b91c1c' }}>*</span>
-                  </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      placeholder="Contoh: 250"
-                      value={wasteQuantity}
-                      onChange={(e) => setWasteQuantity(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        paddingRight: selectedWasteIng ? '70px' : '12px',
-                        borderRadius: '8px',
-                        border: '1px solid #d1d5db',
-                        fontSize: '13px',
-                        outline: 'none',
-                      }}
-                    />
-                    {selectedWasteIng && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          right: '10px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          color: '#687768',
-                          background: '#f2f4ef',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                        }}
-                      >
-                        {selectedWasteIng.usage_unit}
-                      </span>
-                    )}
-                  </div>
-                  {selectedWasteIng && Number(wasteQuantity) > Number(selectedWasteIng.stock_actual) && (
-                    <span style={{ display: 'block', fontSize: '11.5px', color: '#b45309', marginTop: '4px' }}>
-                      ⚠️ Jumlah limbah ({wasteQuantity} {selectedWasteIng.usage_unit}) melebihi saldo aktual ({Number(selectedWasteIng.stock_actual).toLocaleString('id-ID')} {selectedWasteIng.usage_unit}).
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Alasan Kerusakan / Limbah
-                  </label>
-                  <select
-                    value={wasteReason}
-                    onChange={(e) => setWasteReason(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '13px',
-                      background: '#ffffff',
-                    }}
-                  >
-                    <option value="Kedaluwarsa / Rusak">Kedaluwarsa / Rusak</option>
-                    <option value="Tumpah saat Barista Brewing">Tumpah saat Barista Brewing</option>
-                    <option value="Salah Takaran / Reject Rasa">Salah Takaran / Reject Rasa</option>
-                    <option value="Kemasan Rusak / Bocor">Kemasan Rusak / Bocor</option>
-                    <option value="Trial / Kalibrasi Mesin Kopi">Trial / Kalibrasi Mesin Kopi</option>
-                  </select>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '12px',
-                    marginTop: '12px',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setIsWastageModalOpen(false)}
-                    style={{
-                      padding: '10px 18px',
-                      background: '#f0f0eb',
-                      border: '1px solid #dcdfd5',
-                      borderRadius: '10px',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: '#4b5563',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '10px 20px',
-                      background: '#dc2626',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Catat & Kurangi Stok
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ADD / EDIT INGREDIENT MODAL */}
+      {/* MODAL: TAMBAH / EDIT BAHAN BAKU (SUPER SIMPLE & MINIMALIS) */}
       {isIngModalOpen && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1257,198 +1042,240 @@ export function AdminInventoryView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
+              borderRadius: '16px',
               maxWidth: '520px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
             }}
           >
+            {/* Header */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 24px',
+                padding: '16px 20px',
                 borderBottom: '1px solid #e7e8e3',
               }}
             >
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                {editingIng ? 'Edit Bahan Baku' : 'Tambah Bahan Baku Baru'}
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                {editingIng ? 'Edit Bahan Baku' : 'Tambah Bahan Baku'}
               </h3>
               <button
+                type="button"
                 onClick={() => setIsIngModalOpen(false)}
                 style={{
-                  background: '#f7f7f5',
+                  background: 'transparent',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
-                  cursor: 'pointer',
                   color: '#64746b',
+                  cursor: 'pointer',
+                  padding: '4px',
                 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveIngredient} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form
+              onSubmit={handleSaveIngredient}
+              style={{
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+              }}
+            >
               {ingError && (
                 <div
                   style={{
-                    padding: '10px 14px',
+                    padding: '8px 12px',
                     borderRadius: '8px',
                     background: '#fef2f2',
                     border: '1px solid #fecaca',
                     color: '#b91c1c',
-                    fontSize: '13px',
+                    fontSize: '12px',
                   }}
                 >
                   {ingError}
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+              {/* Baris 1: Kode & Nama */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Kode Bahan <span style={{ color: '#b91c1c' }}>*</span>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Kode SKU
                   </label>
                   <input
                     type="text"
                     required
                     value={ingCode}
-                    onChange={(e) => setIngCode(e.target.value)}
+                    onChange={(e) => setIngCode(e.target.value.toUpperCase())}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '8px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                       fontFamily: 'monospace',
+                      fontWeight: 700,
+                      outline: 'none',
                     }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Nama Bahan <span style={{ color: '#b91c1c' }}>*</span>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Nama Bahan Baku <span style={{ color: '#b91c1c' }}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Kopi Arabika House Blend"
+                    placeholder="Contoh: Kopi House Blend"
                     value={ingName}
                     onChange={(e) => setIngName(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '8px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
+                      outline: 'none',
                     }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* Baris 2: Satuan Pakai, Satuan Beli & Rasio */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Satuan Pemakaian (POS)
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Satuan Pakai (POS)
                   </label>
-                  <select
-                    value={ingUsageUnit}
-                    onChange={(e) => setIngUsageUnit(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '13px',
-                      background: '#ffffff',
-                    }}
-                  >
-                    <option value="gram">gram (gr)</option>
-                    <option value="ml">mililiter (ml)</option>
-                    <option value="pcs">pieces (pcs)</option>
-                  </select>
+                  <Select value={ingUsageUnit} onValueChange={(val) => handleUsageUnitChange(val as any)}>
+                    <SelectTrigger style={{ width: '100%', height: '36px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                      <SelectValue placeholder="Pilih Satuan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gram">gram (gr)</SelectItem>
+                      <SelectItem value="ml">mililiter (ml)</SelectItem>
+                      <SelectItem value="pcs">pieces (pcs)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Satuan Pembelian (PO)
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Satuan Beli
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: kg, botol, dus, pack"
+                    placeholder="kg, liter, pack"
                     value={ingPurchaseUnit}
                     onChange={(e) => setIngPurchaseUnit(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '8px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
+                      outline: 'none',
                     }}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                  Rasio Konversi (1 {ingPurchaseUnit || 'satuan beli'} = ... {ingUsageUnit})
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    placeholder="1000"
-                    value={ingConversionRate}
-                    onChange={(e) => setIngConversionRate(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '13px',
-                    }}
-                  />
-                  <span style={{ fontSize: '12px', color: '#687768', whiteSpace: 'nowrap' }}>
-                    {ingUsageUnit} per {ingPurchaseUnit || 'satuan'}
-                  </span>
-                </div>
-                <span style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>
-                  Contoh: 1 kg = 1000 gram, atau 1 liter = 1000 ml
-                </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Biaya per {ingUsageUnit} (Rp)
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Isi per {ingPurchaseUnit || 'Beli'}
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={ingConversionRate}
+                      onChange={(e) => handleConversionRateChange(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        paddingRight: '45px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ position: 'absolute', right: '8px', fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>
+                      {ingUsageUnit}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Baris 3: Harga Beli & HPP Otomatis */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Harga Beli per {ingPurchaseUnit || 'Satuan'} (Rp)
                   </label>
                   <input
                     type="number"
                     step="any"
-                    required
-                    placeholder="150"
-                    value={ingUnitCost}
-                    onChange={(e) => setIngUnitCost(e.target.value)}
+                    placeholder="Contoh: 150000"
+                    value={ingPurchasePrice}
+                    onChange={(e) => handlePurchasePriceChange(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '8px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
+                      outline: 'none',
                     }}
                   />
-                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
-                    HPP satuan pakai
-                  </span>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    Biaya HPP per {ingUsageUnit} (Rp)
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={ingUnitCost}
+                      onChange={(e) => handleUnitCostChange(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        paddingRight: '60px',
+                        borderRadius: '8px',
+                        border: '1px solid #57695b',
+                        background: '#fcfdfb',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        color: '#1c2826',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ position: 'absolute', right: '8px', fontSize: '10px', color: '#15803d', fontWeight: 700 }}>
+                      Otomatis
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Baris 4: Batas Aman & Stok Awal */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                     Batas Stok Aman ({ingUsageUnit})
                   </label>
                   <input
@@ -1460,59 +1287,71 @@ export function AdminInventoryView() {
                     onChange={(e) => setIngSafeStock(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '8px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
+                      outline: 'none',
                     }}
                   />
-                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
-                    Batas status kritis
-                  </span>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Stok Aktual ({ingUsageUnit})
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                    {editingIng ? 'Stok Fisik Gudang' : 'Stok Awal'} ({ingUsageUnit})
                   </label>
                   <input
                     type="number"
                     step="any"
                     required
-                    placeholder="1000"
+                    placeholder="0"
                     value={ingStockActual}
                     onChange={(e) => setIngStockActual(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '8px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '12.5px',
+                      outline: 'none',
                     }}
                   />
-                  <span style={{ display: 'block', fontSize: '10.5px', color: '#6b7280', marginTop: '3px' }}>
-                    Saldo fisik riil saat ini
-                  </span>
                 </div>
               </div>
 
+              {/* Rangkuman 1 Baris Minimalis */}
               <div
                 style={{
+                  background: '#f4f6f2',
+                  padding: '7px 12px',
+                  borderRadius: '7px',
+                  border: '1px solid #e2e6de',
                   display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '12px',
-                  marginTop: '12px',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '11.5px',
+                  color: '#47564a',
                 }}
               >
+                <span>
+                  1 {ingPurchaseUnit} = {Number(ingConversionRate).toLocaleString('id-ID')} {ingUsageUnit}
+                </span>
+                <strong>
+                  HPP: Rp {Math.round(parseCleanNumber(ingUnitCost)).toLocaleString('id-ID')} / {ingUsageUnit}
+                </strong>
+              </div>
+
+              {/* Tombol Aksi */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
                 <button
                   type="button"
                   onClick={() => setIsIngModalOpen(false)}
                   style={{
-                    padding: '10px 18px',
+                    padding: '7px 14px',
                     background: '#f0f0eb',
                     border: '1px solid #dcdfd5',
-                    borderRadius: '10px',
-                    fontSize: '13px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
                     fontWeight: 600,
                     color: '#4b5563',
                     cursor: 'pointer',
@@ -1522,18 +1361,19 @@ export function AdminInventoryView() {
                 </button>
                 <button
                   type="submit"
+                  disabled={isSubmittingIng}
                   style={{
-                    padding: '10px 20px',
+                    padding: '7px 18px',
                     background: '#57695b',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '13px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
-                  {editingIng ? 'Perbarui Bahan' : 'Simpan Bahan'}
+                  {isSubmittingIng ? 'Menyimpan...' : editingIng ? 'Perbarui Bahan' : 'Simpan Bahan'}
                 </button>
               </div>
             </form>
@@ -1541,66 +1381,488 @@ export function AdminInventoryView() {
         </div>
       )}
 
-      {/* QUICK DETAILS POPOVER FOR '...' */}
-      {ingPopover && (
+      {/* MODAL: STOK OPNAME FISIK (MINIMALIS) */}
+      {isOpnameModalOpen && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 99990,
-            background: 'transparent',
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
           }}
-          onClick={() => setIngPopover(null)}
         >
           <div
             style={{
-              position: 'fixed',
-              top: Math.min(ingPopover.rect.top + 6, typeof window !== 'undefined' ? window.innerHeight - 240 : 400),
-              left: Math.max(16, Math.min(ingPopover.rect.left - 40, typeof window !== 'undefined' ? window.innerWidth - 320 : 400)),
-              width: '300px',
               background: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #e2e4dc',
-              boxShadow: '0 16px 36px rgba(0,0,0,0.2)',
-              padding: '14px 16px',
-              zIndex: 99991,
+              borderRadius: '16px',
+              maxWidth: '780px',
+              width: '100%',
+              maxHeight: '88vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid #f0f0eb',
-                paddingBottom: '8px',
-                marginBottom: '10px',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e7e8e3',
               }}
             >
-              <strong style={{ fontSize: '12.5px', color: '#1c2826' }}>{ingPopover.title}</strong>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Stok Opname Fisik
+              </h3>
               <button
-                onClick={() => setIngPopover(null)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#888',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                type="button"
+                onClick={() => setIsOpnameModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
               >
-                <X size={14} />
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-              {ingPopover.details.map((it, idx) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #f5f5f2', paddingBottom: '3px' }}>
-                  <span style={{ color: '#71717a' }}>{it.label}:</span>
-                  <strong style={{ color: '#1c2826', textAlign: 'right', maxWidth: '170px' }}>{it.value}</strong>
+            <div
+              style={{
+                padding: '10px 20px',
+                background: '#fbfbf9',
+                borderBottom: '1px solid #e7e8e3',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#ffffff',
+                  padding: '0 10px',
+                  borderRadius: '7px',
+                  border: '1px solid #e2e4dc',
+                  width: '240px',
+                  height: '30px',
+                }}
+              >
+                <Search size={13} color="#64746b" />
+                <input
+                  type="text"
+                  placeholder="Cari bahan..."
+                  value={opnameSearch}
+                  onChange={(e) => setOpnameSearch(e.target.value)}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '11.5px', width: '100%' }}
+                />
+              </div>
+              <span style={{ fontSize: '11.5px', color: '#64746b' }}>{ingredients.length} Bahan Baku</span>
+            </div>
+
+            <div style={{ padding: '16px 20px', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e7e8e3', color: '#64746b' }}>
+                    <th style={{ textAlign: 'left', padding: '8px', fontSize: '11.5px', fontWeight: 600 }}>Bahan</th>
+                    <th style={{ textAlign: 'right', padding: '8px', fontSize: '11.5px', fontWeight: 600 }}>Stok Sistem</th>
+                    <th style={{ textAlign: 'center', padding: '8px', width: '130px', fontSize: '11.5px', fontWeight: 600 }}>Hitung Fisik</th>
+                    <th style={{ textAlign: 'right', padding: '8px', fontSize: '11.5px', fontWeight: 600 }}>Selisih</th>
+                    <th style={{ textAlign: 'left', padding: '8px', fontSize: '11.5px', fontWeight: 600 }}>Catatan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ingredients
+                    .filter((ing) => {
+                      if (!opnameSearch.trim()) return true;
+                      const q = opnameSearch.toLowerCase();
+                      return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
+                    })
+                    .map((ing) => {
+                      const sysVal = Number(ing.stock_actual);
+                      const countVal = Number(opnameCounts[ing.id] ?? sysVal);
+                      const diff = countVal - sysVal;
+
+                      return (
+                        <tr key={ing.id} style={{ borderBottom: '1px solid #f0f0eb' }}>
+                          <td style={{ padding: '8px', fontWeight: 600, color: '#1c2826' }}>
+                            {ing.name}{' '}
+                            <span style={{ fontSize: '10.5px', color: '#8b968f' }}>({ing.usage_unit})</span>
+                          </td>
+                          <td style={{ textAlign: 'right', padding: '8px', color: '#64746b' }}>
+                            {sysVal.toLocaleString('id-ID')}
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '8px' }}>
+                            <input
+                              type="number"
+                              step="any"
+                              value={opnameCounts[ing.id] ?? sysVal}
+                              onChange={(e) => setOpnameCounts({ ...opnameCounts, [ing.id]: e.target.value })}
+                              style={{
+                                width: '100%',
+                                padding: '5px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #ccd1c4',
+                                textAlign: 'center',
+                                fontWeight: 700,
+                                fontSize: '12.5px',
+                                outline: 'none',
+                              }}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              padding: '8px',
+                              fontWeight: 700,
+                              color: diff === 0 ? '#15803d' : diff > 0 ? '#0284c7' : '#b91c1c',
+                            }}
+                          >
+                            {diff === 0 ? '0' : diff > 0 ? `+${diff.toLocaleString('id-ID')}` : diff.toLocaleString('id-ID')}
+                          </td>
+                          <td style={{ padding: '8px' }}>
+                            <input
+                              type="text"
+                              placeholder="Alasan..."
+                              value={opnameNotes[ing.id] ?? ''}
+                              onChange={(e) => setOpnameNotes({ ...opnameNotes, [ing.id]: e.target.value })}
+                              style={{
+                                width: '100%',
+                                padding: '5px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #e2e4dc',
+                                fontSize: '11.5px',
+                                outline: 'none',
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '8px',
+                padding: '12px 20px',
+                borderTop: '1px solid #e7e8e3',
+                background: '#fbfbf9',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsOpnameModalOpen(false)}
+                style={{
+                  padding: '7px 14px',
+                  background: '#f0f0eb',
+                  border: '1px solid #dcdfd5',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#4b5563',
+                  cursor: 'pointer',
+                }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitOpname}
+                disabled={isSubmittingOpname}
+                style={{
+                  padding: '7px 18px',
+                  background: '#57695b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {isSubmittingOpname ? 'Menyimpan...' : 'Terapkan Hasil Opname'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PENCATATAN LIMBAH (MINIMALIS) */}
+      {isWastageModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '440px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e7e8e3',
+              }}
+            >
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Catat Limbah Bahan
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsWastageModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitWastage} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {wasteError && (
+                <div style={{ padding: '8px 12px', borderRadius: '7px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px' }}>
+                  {wasteError}
                 </div>
-              ))}
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  Pilih Bahan Baku <span style={{ color: '#b91c1c' }}>*</span>
+                </label>
+                <Select value={wasteIngredientId} onValueChange={setWasteIngredientId}>
+                  <SelectTrigger style={{ width: '100%', height: '36px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                    <SelectValue placeholder="Pilih Bahan Baku..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ingredients.map((ing) => (
+                      <SelectItem key={ing.id} value={ing.id}>
+                        {ing.name} ({ing.code}) - Saldo: {Number(ing.stock_actual).toLocaleString('id-ID')} {ing.usage_unit}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  Jumlah Terbuang ({selectedWasteIng?.usage_unit || 'satuan'}) <span style={{ color: '#b91c1c' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  placeholder="Contoh: 250"
+                  value={wasteQuantity}
+                  onChange={(e) => setWasteQuantity(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '12.5px',
+                    outline: 'none',
+                  }}
+                />
+                {selectedWasteIng && parseCleanNumber(wasteQuantity) > 0 && (
+                  <span style={{ display: 'block', fontSize: '11px', color: '#b91c1c', marginTop: '4px' }}>
+                    Kerugian: Rp {Math.round(parseCleanNumber(wasteQuantity) * Number(selectedWasteIng.unit_cost)).toLocaleString('id-ID')}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  Alasan Limbah
+                </label>
+                <Select value={wasteReason} onValueChange={setWasteReason}>
+                  <SelectTrigger style={{ width: '100%', height: '36px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                    <SelectValue placeholder="Pilih Alasan Limbah" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Kedaluwarsa / Rusak">Kedaluwarsa / Rusak</SelectItem>
+                    <SelectItem value="Tumpah saat Barista Brewing">Tumpah saat Barista Brewing</SelectItem>
+                    <SelectItem value="Salah Takaran / Reject QC">Salah Takaran / Reject QC</SelectItem>
+                    <SelectItem value="Kemasan Rusak / Bocor">Kemasan Rusak / Bocor</SelectItem>
+                    <SelectItem value="Kalibrasi Mesin & Trial">Kalibrasi Mesin & Trial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsWastageModalOpen(false)}
+                  style={{
+                    padding: '7px 14px',
+                    background: '#f0f0eb',
+                    border: '1px solid #dcdfd5',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#4b5563',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingWastage}
+                  style={{
+                    padding: '7px 16px',
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isSubmittingWastage ? 'Mencatat...' : 'Catat & Kurangi Stok'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: KONFIRMASI HAPUS */}
+      {deleteIngTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '400px',
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              padding: '20px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: '#fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#b91c1c',
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  Hapus Bahan Baku?
+                </h3>
+                <span style={{ fontSize: '11px', color: '#687768' }}>Tindakan ini tidak dapat dibatalkan</span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: '#4b5563', lineHeight: '1.4', margin: '0 0 14px 0' }}>
+              Apakah Anda yakin ingin menghapus bahan baku{' '}
+              <strong style={{ color: '#1c2826' }}>{deleteIngTarget.name}</strong> ({deleteIngTarget.code})?
+            </p>
+
+            {deleteError && (
+              <div
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '7px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  fontSize: '11.5px',
+                  lineHeight: '1.4',
+                  marginBottom: '14px',
+                }}
+              >
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteIngTarget(null);
+                  setDeleteError('');
+                }}
+                style={{
+                  padding: '6px 14px',
+                  background: '#f0f0eb',
+                  border: '1px solid #dcdfd5',
+                  borderRadius: '7px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#4b5563',
+                  cursor: 'pointer',
+                }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteIngredient}
+                disabled={isDeletingIng}
+                style={{
+                  padding: '6px 16px',
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '7px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {isDeletingIng ? 'Menghapus...' : 'Hapus'}
+              </button>
             </div>
           </div>
         </div>

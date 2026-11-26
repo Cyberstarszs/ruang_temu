@@ -1,23 +1,26 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Product, Ingredient, ProductRecipeItem } from '@/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Coffee,
   Plus,
   Search,
-  SlidersHorizontal,
-  Flame,
   Check,
   X,
   AlertCircle,
   Pencil,
   Trash2,
   Boxes,
-  RotateCcw,
   UploadCloud,
-  ImageIcon,
   Loader2,
   ChevronDown,
 } from 'lucide-react';
@@ -26,8 +29,14 @@ export function AdminProductsView() {
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'ALL' | 'AVAILABLE' | 'SOLDOUT'>('ALL');
+  const [recipeFilter, setRecipeFilter] = useState<'ALL' | 'HAS_RECIPE' | 'NO_RECIPE'>('ALL');
+  const [stationFilter, setStationFilter] = useState<'ALL' | 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeRecipePopover, setActiveRecipePopover] = useState<string | null>(null);
 
   // Recipe Formulation Modal
   const [formulatingProduct, setFormulatingProduct] = useState<Product | null>(null);
@@ -39,6 +48,7 @@ export function AdminProductsView() {
   const [newIsPackaging, setNewIsPackaging] = useState(false);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isIngredientDropdownOpen, setIsIngredientDropdownOpen] = useState(false);
+  const qtyInputRef = useRef<HTMLInputElement | null>(null);
 
   // Add / Edit Product Modal
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -52,9 +62,22 @@ export function AdminProductsView() {
   const [formImageUrl, setFormImageUrl] = useState('');
   const [showManualUrlInput, setShowManualUrlInput] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [modalError, setModalError] = useState('');
 
+  // Delete Confirmation Modal
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Auto-detect printer station from category
+  const getAutoStation = (category: string): 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE' => {
+    if (category === 'Makanan' || category === 'Camilan') {
+      return 'KITCHEN_PRINTER';
+    }
+    return 'BAR_PRINTER';
+  };
+
+  // Load Initial Data
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -79,21 +102,25 @@ export function AdminProductsView() {
     loadData();
   }, []);
 
+  // Quick Toggle Sold Out
   const handleToggleSoldOut = async (product: Product) => {
     try {
       const newStatus = !product.is_force_sold_out;
+      // Optimistic Update
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === product.id
+            ? { ...p, is_force_sold_out: newStatus, isSoldOut: newStatus || p.is_auto_sold_out }
+            : p
+        )
+      );
       const res = await api.products.toggleSoldOut(product.id, newStatus);
-      if (res.success) {
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === product.id
-              ? { ...p, is_force_sold_out: newStatus, isSoldOut: newStatus || p.is_auto_sold_out }
-              : p
-          )
-        );
+      if (!res.success) {
+        loadData();
       }
     } catch (err: any) {
       alert(err.message || 'Gagal mengubah status ketersediaan.');
+      loadData();
     }
   };
 
@@ -119,9 +146,13 @@ export function AdminProductsView() {
     }
   };
 
+  const selectedIngredientObj = useMemo(() => {
+    return ingredients.find((i) => i.id === newIngredientId) || null;
+  }, [ingredients, newIngredientId]);
+
   const handleAddRecipeIngredient = () => {
     if (!newIngredientId || !newIngredientQty || Number(newIngredientQty) <= 0) {
-      alert('Pilih bahan baku dan masukkan takaran valid (> 0).');
+      alert('Pilih bahan baku dan masukkan takaran yang valid (> 0).');
       return;
     }
 
@@ -180,7 +211,6 @@ export function AdminProductsView() {
 
       const res = await api.products.updateRecipes(formulatingProduct.id, payload);
       if (res.success) {
-        alert('Resep dan takaran HPP produk berhasil disimpan!');
         setFormulatingProduct(null);
         loadData();
       }
@@ -196,7 +226,7 @@ export function AdminProductsView() {
     setFormName('');
     setFormCategory('Kopi');
     setFormPrice('');
-    setFormPrintTarget('BAR_PRINTER');
+    setFormPrintTarget(getAutoStation('Kopi')); // Otomatis Bar untuk Kopi
     setFormIsFavorite(false);
     setFormImageUrl('');
     setShowManualUrlInput(false);
@@ -210,7 +240,7 @@ export function AdminProductsView() {
     setFormName(product.name);
     setFormCategory(product.category as any);
     setFormPrice(product.price.toString());
-    setFormPrintTarget(product.print_target as any);
+    setFormPrintTarget((product.print_target as any) || getAutoStation(product.category));
     setFormIsFavorite(Boolean(product.is_favorite));
     setFormImageUrl(product.image_url || '');
     setShowManualUrlInput(false);
@@ -218,12 +248,18 @@ export function AdminProductsView() {
     setIsProductModalOpen(true);
   };
 
+  // Saat kategori diubah, otomatis perbarui target cetak checker
+  const handleCategoryChange = (newCat: 'Kopi' | 'Non-Kopi' | 'Makanan' | 'Camilan' | 'Add-on') => {
+    setFormCategory(newCat);
+    setFormPrintTarget(getAutoStation(newCat));
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setModalError('File yang dipilih harus berupa gambar (JPG, PNG, atau WebP).');
+      setModalError('Format file harus berupa gambar (JPG, PNG, atau WebP).');
       return;
     }
 
@@ -263,7 +299,7 @@ export function AdminProductsView() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formSku.trim() || !formName.trim() || !formPrice) {
-      setModalError('SKU, nama produk, dan harga wajib diisi.');
+      setModalError('SKU, nama menu, dan harga jual wajib diisi.');
       return;
     }
 
@@ -292,89 +328,267 @@ export function AdminProductsView() {
         }
       }
     } catch (err: any) {
-      setModalError(err.message || 'Gagal menyimpan produk.');
+      setModalError(err.message || 'Gagal menyimpan menu.');
     }
   };
 
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Delete Product Handler
+  const handleDeleteProduct = async () => {
+    if (!deletingProduct) return;
+    setIsDeleting(true);
+    try {
+      const res = await api.products.delete(deletingProduct.id);
+      if (res.success) {
+        setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
+        setDeletingProduct(null);
+      } else {
+        alert(res.message || 'Gagal menghapus produk.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Terjadi kesalahan saat menghapus produk.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-  const categories = ['ALL', 'Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'];
+  // KPI Calculations
+  const totalProducts = products.length;
+  const availableCount = products.filter((p) => !p.isSoldOut).length;
+  const soldOutCount = products.filter((p) => p.isSoldOut).length;
+  const formulatedCount = products.filter((p) => (p.recipe_count || 0) > 0).length;
+  const unformulatedCount = totalProducts - formulatedCount;
+
+  // Average margin of formulated products with valid HPP
+  const formulatedWithCost = products.filter(
+    (p) => (p.recipe_count || 0) > 0 && (p.recipe_hpp || 0) > 0 && p.price > 0
+  );
+  const avgMargin =
+    formulatedWithCost.length > 0
+      ? Math.round(
+          formulatedWithCost.reduce(
+            (sum, p) => sum + ((p.price - (p.recipe_hpp || 0)) / p.price) * 100,
+            0
+          ) / formulatedWithCost.length
+        )
+      : 0;
+
+  const avgPrice =
+    totalProducts > 0
+      ? Math.round(products.reduce((sum, p) => sum + p.price, 0) / totalProducts)
+      : 0;
+
+  // Category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: products.length,
+      Kopi: 0,
+      'Non-Kopi': 0,
+      Makanan: 0,
+      Camilan: 0,
+      'Add-on': 0,
+    };
+    for (const p of products) {
+      if (counts[p.category] !== undefined) {
+        counts[p.category]++;
+      }
+    }
+    return counts;
+  }, [products]);
+
+  const categories = ['ALL', 'Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'] as const;
+
+  // Filtered Products
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (selectedCategory !== 'ALL' && p.category !== selectedCategory) return false;
+      if (availabilityFilter === 'AVAILABLE' && p.isSoldOut) return false;
+      if (availabilityFilter === 'SOLDOUT' && !p.isSoldOut) return false;
+      if (recipeFilter === 'HAS_RECIPE' && (p.recipe_count || 0) === 0) return false;
+      if (recipeFilter === 'NO_RECIPE' && (p.recipe_count || 0) > 0) return false;
+      if (stationFilter !== 'ALL' && p.print_target !== stationFilter) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = p.name.toLowerCase().includes(q);
+        const matchSku = p.sku.toLowerCase().includes(q);
+        const matchCategory = p.category.toLowerCase().includes(q);
+        if (!matchName && !matchSku && !matchCategory) return false;
+      }
+
+      return true;
+    });
+  }, [products, selectedCategory, availabilityFilter, recipeFilter, stationFilter, searchQuery]);
+
+  const isFilterActive =
+    selectedCategory !== 'ALL' ||
+    availabilityFilter !== 'ALL' ||
+    recipeFilter !== 'ALL' ||
+    stationFilter !== 'ALL' ||
+    Boolean(searchQuery.trim());
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '60px' }}>
-      {/* Minimal Action & Filter Bar */}
+      {/* 1. KARTU KPI RINGKASAN PRODUK (Minimalis & Ringkas) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+          gap: '14px',
+        }}
+      >
+        {/* Card 1: Total Menu */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Total Menu
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {totalProducts} Menu
+          </div>
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            Kopi: {categoryCounts['Kopi']} • Non-Kopi: {categoryCounts['Non-Kopi']} • Makanan: {categoryCounts['Makanan']}
+          </div>
+        </div>
+
+        {/* Card 2: Ketersediaan di Kasir */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Ketersediaan Kasir
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#2e7d32' }}>
+            {availableCount} Siap Jual
+          </div>
+          <div style={{ fontSize: '12px', color: soldOutCount > 0 ? '#b91c1c' : '#71717a' }}>
+            {soldOutCount > 0 ? `${soldOutCount} Menu Habis` : 'Semua menu siap jual'}
+          </div>
+        </div>
+
+        {/* Card 3: Formulasi Resep & HPP */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Resep & HPP
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {formulatedCount} Ber-Resep
+          </div>
+          <div style={{ fontSize: '12px', color: unformulatedCount > 0 ? '#d97706' : '#71717a' }}>
+            {unformulatedCount > 0 ? `${unformulatedCount} belum diisi resep` : 'Semua resep terhubung'}
+          </div>
+        </div>
+
+        {/* Card 4: Rata-rata Laba Kotor (Margin) */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Rata-rata Margin
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#2e7d32' }}>
+            {avgMargin > 0 ? `${avgMargin}%` : '-'}
+          </div>
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            Rata-rata harga: Rp {avgPrice.toLocaleString('id-ID')}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. BAR FILTER & PENCARIAN */}
       <div
         style={{
           display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
           gap: '12px',
           background: '#ffffff',
-          padding: '12px 18px',
+          padding: '14px 18px',
           borderRadius: '12px',
           border: '1px solid #e7e8e3',
         }}
       >
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: '8px',
-                border: selectedCategory === cat ? '1px solid #57695b' : '1px solid #e2e4dc',
-                background: selectedCategory === cat ? '#57695b' : '#f7f7f5',
-                color: selectedCategory === cat ? '#ffffff' : '#4b5563',
-                fontSize: '12.5px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {cat === 'ALL' ? 'Semua' : cat}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Baris Atas: Kategori Tabs & Tambah Menu */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+          }}
+        >
+          {/* Category Tabs */}
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: '#f7f7f5',
-              padding: '6px 12px',
+              gap: '4px',
+              background: '#f4f5f1',
+              padding: '2px',
               borderRadius: '8px',
-              border: '1px solid #e2e4dc',
-              minWidth: '280px',
+              border: '1px solid #e5e7e0',
+              flexWrap: 'wrap',
             }}
           >
-            <Search size={14} color="#71717a" />
-            <input
-              type="text"
-              placeholder="Cari SKU atau nama menu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                fontSize: '12.5px',
-                color: '#1c2826',
-                width: '100%',
-                fontFamily: 'inherit',
-              }}
-            />
+            {categories.map((cat) => {
+              const active = selectedCategory === cat;
+              const count = categoryCounts[cat] || 0;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: active ? '#57695b' : 'transparent',
+                    color: active ? '#ffffff' : '#4b5563',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
+                  }}
+                >
+                  {cat === 'ALL' ? 'Semua' : cat} ({count})
+                </button>
+              );
+            })}
           </div>
 
+          {/* Tombol Tambah Menu */}
           <button
             onClick={openAddProductModal}
             style={{
@@ -387,72 +601,207 @@ export function AdminProductsView() {
               border: 'none',
               borderRadius: '8px',
               fontWeight: 600,
-              fontSize: '12.5px',
+              fontSize: '12px',
               cursor: 'pointer',
             }}
           >
-            <Plus size={15} />
+            <Plus size={14} />
             Tambah Menu
           </button>
         </div>
+
+        {/* Baris Bawah: Dropdown Filter & Pencarian */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          {/* Filter Ketersediaan (Shadcn UI) */}
+          <div style={{ width: '180px' }}>
+            <Select value={availabilityFilter} onValueChange={(val) => setAvailabilityFilter(val as any)}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5' }}>
+                <SelectValue placeholder="Semua Ketersediaan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Ketersediaan</SelectItem>
+                <SelectItem value="AVAILABLE">Tersedia ({availableCount})</SelectItem>
+                <SelectItem value="SOLDOUT">Habis ({soldOutCount})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filter Status Resep (Shadcn UI) */}
+          <div style={{ width: '185px' }}>
+            <Select value={recipeFilter} onValueChange={(val) => setRecipeFilter(val as any)}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5' }}>
+                <SelectValue placeholder="Semua Resep" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Resep</SelectItem>
+                <SelectItem value="HAS_RECIPE">Sudah Ada Resep ({formulatedCount})</SelectItem>
+                <SelectItem value="NO_RECIPE">Belum Ada Resep ({unformulatedCount})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filter Station Cetak (Shadcn UI) */}
+          <div style={{ width: '175px' }}>
+            <Select value={stationFilter} onValueChange={(val) => setStationFilter(val as any)}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5' }}>
+                <SelectValue placeholder="Semua Station" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Station</SelectItem>
+                <SelectItem value="BAR_PRINTER">Bar (Minuman)</SelectItem>
+                <SelectItem value="KITCHEN_PRINTER">Dapur (Makanan)</SelectItem>
+                <SelectItem value="NONE">Tanpa Cetak</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Kotak Pencarian */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#f7f7f5',
+              padding: '0 12px',
+              borderRadius: '8px',
+              border: '1px solid #e2e4dc',
+              height: '34px',
+              flex: '1 1 200px',
+              minWidth: '180px',
+            }}
+          >
+            <Search size={13} color="#71717a" />
+            <input
+              type="text"
+              placeholder="Cari nama menu, SKU..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                outline: 'none',
+                fontSize: '12px',
+                color: '#1c2826',
+                width: '100%',
+              }}
+            />
+            {searchQuery && (
+              <span
+                onClick={() => setSearchQuery('')}
+                style={{ cursor: 'pointer', color: '#9ca3af', display: 'flex' }}
+                title="Hapus pencarian"
+              >
+                <X size={12} />
+              </span>
+            )}
+          </div>
+
+          {/* Reset Filter Button */}
+          {isFilterActive && (
+            <button
+              onClick={() => {
+                setSelectedCategory('ALL');
+                setAvailabilityFilter('ALL');
+                setRecipeFilter('ALL');
+                setStationFilter('ALL');
+                setSearchQuery('');
+              }}
+              style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: '#fee2e2',
+                border: 'none',
+                color: '#b91c1c',
+                fontWeight: 600,
+                cursor: 'pointer',
+                height: '32px',
+              }}
+            >
+              Reset Filter
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Products Table */}
+      {/* 3. TABEL KATALOG MENU */}
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '16px',
+          borderRadius: '14px',
           border: '1px solid #e7e8e3',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
           overflow: 'hidden',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', whiteSpace: 'nowrap' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '12px',
+              whiteSpace: 'nowrap',
+            }}
+          >
             <thead>
               <tr style={{ background: '#fbfbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px', width: '48px' }}>Foto</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>SKU</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Nama Menu</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Kategori</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Harga Jual</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Target Station</th>
-                <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Ketersediaan</th>
-                <th style={{ padding: '9px 14px', fontWeight: 600, fontSize: '11.5px', textAlign: 'right' }}>Aksi</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px', width: '44px' }}>Foto</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>SKU</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>Nama Menu</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>Kategori</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>Harga Jual</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>Resep & HPP Bahan</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>Station</th>
+                <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: '11.5px' }}>Ketersediaan</th>
+                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11.5px', textAlign: 'right' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#71717a' }}>
                     Memuat data menu...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#8b968f', fontStyle: 'italic' }}>
-                    Tidak ada produk yang sesuai dengan pencarian atau filter.
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>
+                    Tidak ada menu yang sesuai.
                   </td>
                 </tr>
               ) : (
                 filteredProducts.map((p) => {
                   const isSoldOut = Boolean(p.is_force_sold_out || p.is_auto_sold_out);
+                  const hasRecipe = (p.recipe_count || 0) > 0;
+                  const hpp = p.recipe_hpp || 0;
+                  const marginPct =
+                    hasRecipe && hpp > 0 && p.price > 0
+                      ? Math.round(((p.price - hpp) / p.price) * 100)
+                      : null;
+
                   return (
                     <tr
                       key={p.id}
                       style={{
                         borderBottom: '1px solid #f0f0eb',
-                        height: '42px',
-                        transition: 'background 0.15s',
+                        height: '46px',
+                        transition: 'background 0.12s',
                       }}
                     >
-                      {/* 0. Foto Thumbnail */}
-                      <td style={{ padding: '6px 12px', verticalAlign: 'middle', width: '48px' }}>
+                      {/* Foto */}
+                      <td style={{ padding: '6px 12px', verticalAlign: 'middle', width: '44px' }}>
                         <div
                           style={{
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '8px',
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: '6px',
                             overflow: 'hidden',
                             border: '1px solid #e2e4dc',
                             background: '#f4f4f2',
@@ -472,44 +821,49 @@ export function AdminProductsView() {
                               }}
                             />
                           ) : (
-                            <Coffee size={15} color="#8b968f" />
+                            <Coffee size={14} color="#8b968f" />
                           )}
                         </div>
                       </td>
 
-                      {/* 1. SKU */}
+                      {/* SKU */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1c2826', fontSize: '11.5px' }}>
                           {p.sku}
                         </span>
                       </td>
 
-                      {/* 2. Nama Menu */}
+                      {/* Nama Menu */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <span
                             style={{
                               fontWeight: 700,
                               color: '#1c2826',
-                              maxWidth: '180px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
                               fontSize: '12px',
                             }}
-                            title={p.name}
                           >
                             {p.name}
                           </span>
                           {p.is_favorite && (
-                            <span style={{ color: '#d97706', fontSize: '11px' }} title="Produk Favorit">
-                              ★
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                background: '#fef3c7',
+                                color: '#b45309',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                              }}
+                              title="Menu Favorit"
+                            >
+                              ★ Favorit
                             </span>
                           )}
                         </div>
                       </td>
 
-                      {/* 3. Kategori */}
+                      {/* Kategori */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span
                           style={{
@@ -525,21 +879,212 @@ export function AdminProductsView() {
                         </span>
                       </td>
 
-                      {/* 4. Harga Jual */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826', fontSize: '12.5px' }}>
+                      {/* Harga Jual */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
                         Rp {Number(p.price).toLocaleString('id-ID')}
                       </td>
 
-                      {/* 5. Target Station */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#64746b', fontSize: '11.5px' }}>
-                        {p.print_target === 'BAR_PRINTER'
-                          ? 'Bar (Kopi)'
-                          : p.print_target === 'KITCHEN_PRINTER'
-                          ? 'Dapur'
-                          : 'Tanpa Cetak'}
+                      {/* Resep & HPP Bahan */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', position: 'relative' }}>
+                        {hasRecipe ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <span style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
+                                  Rp {hpp.toLocaleString('id-ID')}
+                                </span>
+                                {marginPct !== null && (
+                                  <span
+                                    style={{
+                                      fontSize: '10px',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: marginPct < 0 ? '#fee2e2' : marginPct >= 50 ? '#dcfce7' : '#fef3c7',
+                                      color: marginPct < 0 ? '#b91c1c' : marginPct >= 50 ? '#15803d' : '#b45309',
+                                      fontWeight: 700,
+                                    }}
+                                    title={
+                                      marginPct < 0
+                                        ? `Defisit: Biaya HPP (Rp ${hpp.toLocaleString('id-ID')}) melebihi harga jual (Rp ${Number(p.price).toLocaleString('id-ID')})`
+                                        : `Laba Kotor: Rp ${(p.price - hpp).toLocaleString('id-ID')}`
+                                    }
+                                  >
+                                    {marginPct < 0 ? `${marginPct}% Rugi` : `${marginPct}% Laba`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Tombol Simbol Detail Resep (Klik untuk lihat popup rincian) */}
+                            <div style={{ position: 'relative' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveRecipePopover(activeRecipePopover === p.id ? null : p.id);
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '2px 7px',
+                                  borderRadius: '5px',
+                                  border: '1px solid #e2e4dc',
+                                  background: activeRecipePopover === p.id ? '#57695b' : '#f7f7f5',
+                                  color: activeRecipePopover === p.id ? '#ffffff' : '#4b5563',
+                                  fontSize: '10.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.1s ease',
+                                }}
+                                title="Klik untuk melihat rincian bahan resep"
+                              >
+                                <span>{p.recipe_count} Bahan</span>
+                                <ChevronDown size={11} />
+                              </button>
+
+                              {/* Popover Detail Resep (Floating, Simple, Rapi) */}
+                              {activeRecipePopover === p.id && (
+                                <>
+                                  <div
+                                    style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveRecipePopover(null);
+                                    }}
+                                  />
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      position: 'absolute',
+                                      top: 'calc(100% + 4px)',
+                                      left: 0,
+                                      background: '#ffffff',
+                                      borderRadius: '8px',
+                                      border: '1px solid #e2e4dc',
+                                      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                                      padding: '10px 12px',
+                                      zIndex: 999,
+                                      minWidth: '240px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '6px',
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingBottom: '4px',
+                                        borderBottom: '1px solid #f0f0eb',
+                                      }}
+                                    >
+                                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#1c2826' }}>
+                                        Komposisi Resep ({p.recipe_count} Bahan)
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveRecipePopover(null);
+                                          openRecipeModal(p);
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: '#57695b',
+                                          fontSize: '10.5px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          textDecoration: 'underline',
+                                          padding: 0,
+                                        }}
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      {p.recipes && p.recipes.length > 0 ? (
+                                        p.recipes.map((r, idx) => (
+                                          <div
+                                            key={idx}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              gap: '8px',
+                                              fontSize: '11px',
+                                            }}
+                                          >
+                                            <span style={{ color: '#374151' }}>
+                                              {r.name}
+                                              {r.is_packaging_only && (
+                                                <span style={{ fontSize: '9px', color: '#92400e', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', marginLeft: '4px' }}>
+                                                  Kemasan
+                                                </span>
+                                              )}
+                                            </span>
+                                            <span style={{ color: '#57695b', fontWeight: 600 }}>
+                                              {Number(r.quantity).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {r.unit}
+                                            </span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
+                                          Belum ada rincian bahan.
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingTop: '6px',
+                                        borderTop: '1px solid #f0f0eb',
+                                        fontSize: '11px',
+                                      }}
+                                    >
+                                      <span style={{ color: '#71717a' }}>Total HPP:</span>
+                                      <strong style={{ color: '#1c2826' }}>
+                                        Rp {hpp.toLocaleString('id-ID')}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openRecipeModal(p)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#9ca3af',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              padding: 0,
+                            }}
+                          >
+                            + Atur Resep
+                          </button>
+                        )}
                       </td>
 
-                      {/* 6. Ketersediaan */}
+                      {/* Station Cetak */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#64746b', fontSize: '11.5px' }}>
+                        {p.print_target === 'BAR_PRINTER'
+                          ? 'Bar'
+                          : p.print_target === 'KITCHEN_PRINTER'
+                          ? 'Dapur'
+                          : '-'}
+                      </td>
+
+                      {/* Ketersediaan */}
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <button
                           onClick={() => handleToggleSoldOut(p)}
@@ -547,20 +1092,26 @@ export function AdminProductsView() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            padding: '2px 8px',
+                            padding: '3px 8px',
                             borderRadius: '5px',
                             border: 'none',
                             background: isSoldOut ? '#fee2e2' : '#dcfce7',
                             color: isSoldOut ? '#b91c1c' : '#15803d',
                             fontWeight: 700,
-                            fontSize: '10.5px',
+                            fontSize: '11px',
                             cursor: 'pointer',
                           }}
-                          title="Klik untuk mengubah ketersediaan produk di kasir"
+                          title={
+                            p.is_auto_sold_out && !p.is_force_sold_out
+                              ? 'Otomatis habis karena ada stok bahan resep yang kurang di inventaris.'
+                              : p.is_force_sold_out
+                              ? 'Status habis diatur manual oleh kasir/admin.'
+                              : 'Klik untuk mengubah ketersediaan di kasir'
+                          }
                         >
                           {isSoldOut ? (
                             <>
-                              <X size={11} /> Habis
+                              <X size={11} /> {p.is_auto_sold_out && !p.is_force_sold_out ? 'Habis (Stok)' : 'Habis'}
                             </>
                           ) : (
                             <>
@@ -570,7 +1121,7 @@ export function AdminProductsView() {
                         </button>
                       </td>
 
-                      {/* 7. Aksi */}
+                      {/* Aksi */}
                       <td style={{ padding: '8px 14px', verticalAlign: 'middle', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                           <button
@@ -588,6 +1139,7 @@ export function AdminProductsView() {
                               fontSize: '11px',
                               cursor: 'pointer',
                             }}
+                            title="Aturan Resep & HPP"
                           >
                             <Boxes size={12} /> Resep
                           </button>
@@ -604,9 +1156,26 @@ export function AdminProductsView() {
                               display: 'flex',
                               alignItems: 'center',
                             }}
-                            title="Edit Data Produk"
+                            title="Edit Data Menu"
                           >
                             <Pencil size={12} />
+                          </button>
+
+                          <button
+                            onClick={() => setDeletingProduct(p)}
+                            style={{
+                              padding: '4px 6px',
+                              background: '#fef2f2',
+                              color: '#b91c1c',
+                              border: '1px solid #fecaca',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                            title="Nonaktifkan Menu"
+                          >
+                            <Trash2 size={12} />
                           </button>
                         </div>
                       </td>
@@ -619,13 +1188,13 @@ export function AdminProductsView() {
         </div>
       </div>
 
-      {/* RECIPE FORMULATION MODAL */}
+      {/* MODAL 1: ATURAN RESEP & HPP (Desain Baru: Ringkas, Compact & User-Friendly) */}
       {formulatingProduct && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.45)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
@@ -637,14 +1206,14 @@ export function AdminProductsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '680px',
+              borderRadius: '14px',
+              maxWidth: '640px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
             }}
           >
             {/* Modal Header */}
@@ -653,16 +1222,16 @@ export function AdminProductsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '20px 24px',
+                padding: '14px 18px',
                 borderBottom: '1px solid #e7e8e3',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  Formulasi Resep & Kalkulasi HPP
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  Resep & HPP: {formulatingProduct.name}
                 </h3>
-                <div style={{ fontSize: '13px', color: '#57695b', fontWeight: 600, marginTop: '2px' }}>
-                  {formulatingProduct.name} ({formulatingProduct.sku}) — Harga Jual: Rp{' '}
+                <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
+                  SKU: {formulatingProduct.sku} • Harga Jual: Rp{' '}
                   {Number(formulatingProduct.price).toLocaleString('id-ID')}
                 </div>
               </div>
@@ -671,390 +1240,425 @@ export function AdminProductsView() {
                 style={{
                   background: '#f7f7f5',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
+                  borderRadius: '6px',
+                  padding: '5px',
                   cursor: 'pointer',
                   color: '#64746b',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             {/* Modal Content */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Costing Summary Banner */}
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Ringkasan Biaya Compact (1 Baris Rapi) */}
               {(() => {
                 const totalHpp = Math.round(currentRecipes.reduce((sum, r) => sum + r.item_hpp, 0));
-                const grossProfit = Math.max(0, formulatingProduct.price - totalHpp);
-                const marginPct = formulatingProduct.price > 0 ? ((grossProfit / formulatingProduct.price) * 100).toFixed(1) : '0';
+                const grossProfit = formulatingProduct.price - totalHpp;
+                const isLoss = grossProfit < 0;
+                const marginPct =
+                  formulatingProduct.price > 0
+                    ? ((grossProfit / formulatingProduct.price) * 100).toFixed(1)
+                    : '0';
                 const zeroCostItems = currentRecipes.filter((r) => Number(r.unit_cost) === 0);
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                         background: '#fbfbf9',
-                        padding: '16px',
-                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
                         border: '1px solid #e7e8e3',
                       }}
                     >
                       <div>
-                        <div style={{ fontSize: '11px', color: '#64746b', textTransform: 'uppercase', fontWeight: 600 }}>
-                          Total HPP (Bahan)
-                        </div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '4px' }}>
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>Total HPP: </span>
+                        <strong style={{ fontSize: '14px', color: '#1c2826' }}>
                           Rp {totalHpp.toLocaleString('id-ID')}
-                        </div>
+                        </strong>
                       </div>
                       <div>
-                        <div style={{ fontSize: '11px', color: '#64746b', textTransform: 'uppercase', fontWeight: 600 }}>
-                          Laba Kotor / Porsi
-                        </div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#2e7d32', marginTop: '4px' }}>
-                          Rp {grossProfit.toLocaleString('id-ID')}
-                        </div>
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>
+                          {isLoss ? 'Rugi / Porsi: ' : 'Laba / Porsi: '}
+                        </span>
+                        <strong style={{ fontSize: '14px', color: isLoss ? '#b91c1c' : '#2e7d32' }}>
+                          {isLoss ? `-Rp ${Math.abs(grossProfit).toLocaleString('id-ID')}` : `Rp ${grossProfit.toLocaleString('id-ID')}`}
+                        </strong>
                       </div>
                       <div>
-                        <div style={{ fontSize: '11px', color: '#64746b', textTransform: 'uppercase', fontWeight: 600 }}>
-                          Marjin Margin (%)
-                        </div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#2e7d32', marginTop: '4px' }}>
-                          {marginPct}%
-                        </div>
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>Margin: </span>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            color: isLoss ? '#b91c1c' : '#2e7d32',
+                            background: isLoss ? '#fee2e2' : '#dcfce7',
+                            padding: '2px 7px',
+                            borderRadius: '5px',
+                          }}
+                        >
+                          {marginPct}% {isLoss ? 'Rugi' : ''}
+                        </span>
                       </div>
                     </div>
+
+                    {isLoss && (
+                      <div
+                        style={{
+                          padding: '8px 12px',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '8px',
+                          fontSize: '11.5px',
+                          color: '#b91c1c',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <AlertCircle size={14} color="#b91c1c" style={{ flexShrink: 0 }} />
+                        <span>
+                          <strong>Peringatan Defisit:</strong> Total HPP bahan (Rp {totalHpp.toLocaleString('id-ID')}) melebihi harga jual menu (Rp {Number(formulatingProduct.price).toLocaleString('id-ID')}). Setiap porsi merugi Rp {Math.abs(grossProfit).toLocaleString('id-ID')}.
+                        </span>
+                      </div>
+                    )}
 
                     {zeroCostItems.length > 0 && (
                       <div
                         style={{
-                          padding: '10px 14px',
+                          padding: '8px 12px',
                           background: '#fffbeb',
                           border: '1px solid #fef08a',
                           borderRadius: '8px',
-                          fontSize: '12px',
+                          fontSize: '11.5px',
                           color: '#92400e',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '8px',
+                          gap: '6px',
                         }}
                       >
-                        <AlertCircle size={16} color="#b45309" style={{ flexShrink: 0 }} />
-                        <div>
-                          <strong>Peringatan Biaya Satuan Rp 0:</strong> Terdapat{' '}
-                          <strong>{zeroCostItems.length} bahan baku</strong> dalam resep ini yang biaya per satuannya masih Rp 0 (belum diatur pada menu Stok). Persentase marjin ({marginPct}%) belum mencerminkan HPP riil.
-                        </div>
+                        <AlertCircle size={14} color="#b45309" style={{ flexShrink: 0 }} />
+                        <span>
+                          <strong>Perhatian:</strong> {zeroCostItems.length} bahan baku memiliki biaya satuan Rp 0 di inventaris stok.
+                        </span>
                       </div>
                     )}
                   </div>
                 );
               })()}
 
-              {/* Add Ingredient Form with Searchable Combobox */}
+              {/* Input Tambah Bahan (Sederhana, Bersih & Tidak Sempit) */}
               <div
                 style={{
-                  background: '#f2f4ef',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: '1px solid #dce0d5',
+                  background: '#f8f9f6',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e5dc',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
+                  alignItems: 'center',
+                  gap: '8px',
                 }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#415245' }}>
-                  Tambah Takaran Bahan ke Resep
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                  {/* Searchable Combobox */}
-                  <div style={{ position: 'relative', flex: '2 1 260px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: '#ffffff',
-                        border: '1px solid #ccd1c4',
-                        borderRadius: '8px',
-                        padding: '0 10px',
-                        height: '38px',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setIsIngredientDropdownOpen(true)}
-                    >
-                      <Search size={14} color="#71717a" style={{ flexShrink: 0 }} />
-                      <input
-                        type="text"
-                        placeholder="Ketik cari bahan baku (nama / kode)..."
-                        value={ingredientSearch}
-                        onFocus={() => setIsIngredientDropdownOpen(true)}
-                        onChange={(e) => {
-                          setIngredientSearch(e.target.value);
-                          if (newIngredientId) setNewIngredientId('');
-                          setIsIngredientDropdownOpen(true);
-                        }}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          outline: 'none',
-                          fontSize: '13px',
-                          width: '100%',
-                          color: '#1c2826',
-                          fontWeight: newIngredientId ? 600 : 400,
-                        }}
-                      />
-                      {newIngredientId && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setNewIngredientId('');
-                            setIngredientSearch('');
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#9ca3af',
-                            cursor: 'pointer',
-                            padding: '2px',
-                          }}
-                        >
-                          <X size={13} />
-                        </button>
-                      )}
-                      <ChevronDown size={14} color="#71717a" style={{ flexShrink: 0 }} />
-                    </div>
-
-                    {/* Searchable Dropdown Menu */}
-                    {isIngredientDropdownOpen && (
-                      <>
-                        <div
-                          style={{ position: 'fixed', inset: 0, zIndex: 99991 }}
-                          onClick={() => setIsIngredientDropdownOpen(false)}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '42px',
-                            left: 0,
-                            right: 0,
-                            maxHeight: '220px',
-                            overflowY: 'auto',
-                            background: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #ccd1c4',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                            zIndex: 99992,
-                          }}
-                        >
-                          {ingredients.filter((ing) => {
-                            if (!ingredientSearch.trim()) return true;
-                            const q = ingredientSearch.toLowerCase();
-                            return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
-                          }).length === 0 ? (
-                            <div style={{ padding: '12px', fontSize: '12px', color: '#9ca3af', textAlign: 'center', fontStyle: 'italic' }}>
-                              Bahan baku tidak ditemukan.
-                            </div>
-                          ) : (
-                            ingredients
-                              .filter((ing) => {
-                                if (!ingredientSearch.trim()) return true;
-                                const q = ingredientSearch.toLowerCase();
-                                return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
-                              })
-                              .map((ing) => {
-                                const cost = Number(ing.unit_cost);
-                                const isZeroCost = cost === 0;
-                                const isSelected = ing.id === newIngredientId;
-
-                                return (
-                                  <div
-                                    key={ing.id}
-                                    onClick={() => {
-                                      setNewIngredientId(ing.id);
-                                      setIngredientSearch(`${ing.name} (${ing.code})`);
-                                      setIsIngredientDropdownOpen(false);
-                                    }}
-                                    style={{
-                                      padding: '9px 12px',
-                                      borderBottom: '1px solid #f0f0eb',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '8px',
-                                      background: isSelected ? '#f2f4ef' : '#ffffff',
-                                      fontSize: '12.5px',
-                                      transition: 'background 0.1s ease',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      if (!isSelected) e.currentTarget.style.background = '#f9fafb';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (!isSelected) e.currentTarget.style.background = '#ffffff';
-                                    }}
-                                  >
-                                    <div>
-                                      <span style={{ fontWeight: 600, color: '#1c2826' }}>{ing.name}</span>
-                                      <span style={{ marginLeft: '6px', fontSize: '11px', color: '#71717a', fontFamily: 'monospace' }}>
-                                        ({ing.code})
-                                      </span>
-                                    </div>
-                                    <div>
-                                      {!isZeroCost ? (
-                                        <span style={{ fontSize: '11.5px', color: '#57695b', fontWeight: 600 }}>
-                                          Rp {cost.toLocaleString('id-ID')} / {ing.usage_unit}
-                                        </span>
-                                      ) : (
-                                        <span
-                                          style={{
-                                            fontSize: '10px',
-                                            background: '#fef3c7',
-                                            color: '#b45309',
-                                            padding: '2px 6px',
-                                            borderRadius: '4px',
-                                            fontWeight: 700,
-                                          }}
-                                          title="Bahan ini belum memiliki biaya/satuan di inventaris stok"
-                                        >
-                                          ⚠️ Biaya Rp 0
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="Takaran Qty"
-                    value={newIngredientQty}
-                    onChange={(e) => setNewIngredientQty(e.target.value)}
-                    style={{
-                      flex: '1 1 100px',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #ccd1c4',
-                      fontSize: '13px',
-                      height: '38px',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-
-                  <label
+                {/* Combobox Bahan Baku */}
+                <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+                  <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      fontSize: '12px',
-                      color: '#415245',
+                      background: '#ffffff',
+                      border: '1px solid #ccd1c4',
+                      borderRadius: '6px',
+                      padding: '0 8px',
+                      height: '34px',
                       cursor: 'pointer',
-                      height: '38px',
                     }}
+                    onClick={() => setIsIngredientDropdownOpen(true)}
                   >
+                    <Search size={13} color="#71717a" style={{ flexShrink: 0 }} />
                     <input
-                      type="checkbox"
-                      checked={newIsPackaging}
-                      onChange={(e) => setNewIsPackaging(e.target.checked)}
+                      type="text"
+                      placeholder="Pilih bahan baku..."
+                      value={ingredientSearch}
+                      onFocus={() => setIsIngredientDropdownOpen(true)}
+                      onChange={(e) => {
+                        setIngredientSearch(e.target.value);
+                        if (newIngredientId) setNewIngredientId('');
+                        setIsIngredientDropdownOpen(true);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        fontSize: '12px',
+                        width: '100%',
+                        color: '#1c2826',
+                        fontWeight: newIngredientId ? 600 : 400,
+                      }}
                     />
-                    Hanya Kemasan (Takeaway)
-                  </label>
+                    {newIngredientId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewIngredientId('');
+                          setIngredientSearch('');
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#9ca3af',
+                          cursor: 'pointer',
+                          padding: '1px',
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                    <ChevronDown size={13} color="#71717a" style={{ flexShrink: 0 }} />
+                  </div>
 
-                  <button
-                    onClick={handleAddRecipeIngredient}
-                    style={{
-                      padding: '0 16px',
-                      height: '38px',
-                      background: '#57695b',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    + Masukkan
-                  </button>
+                  {isIngredientDropdownOpen && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 99991 }}
+                        onClick={() => setIsIngredientDropdownOpen(false)}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '38px',
+                          left: 0,
+                          width: '100%',
+                          minWidth: '320px',
+                          maxHeight: '230px',
+                          overflowY: 'auto',
+                          background: '#ffffff',
+                          borderRadius: '8px',
+                          border: '1px solid #ccd1c4',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+                          zIndex: 99992,
+                        }}
+                      >
+                        {ingredients.filter((ing) => {
+                          if (!ingredientSearch.trim()) return true;
+                          const q = ingredientSearch.toLowerCase();
+                          return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
+                        }).length === 0 ? (
+                          <div style={{ padding: '10px 14px', fontSize: '11.5px', color: '#9ca3af', textAlign: 'center' }}>
+                            Bahan baku tidak ditemukan
+                          </div>
+                        ) : (
+                          ingredients
+                            .filter((ing) => {
+                              if (!ingredientSearch.trim()) return true;
+                              const q = ingredientSearch.toLowerCase();
+                              return ing.name.toLowerCase().includes(q) || ing.code.toLowerCase().includes(q);
+                            })
+                            .map((ing) => {
+                              const cost = Number(ing.unit_cost);
+                              const isSelected = ing.id === newIngredientId;
+
+                              return (
+                                <div
+                                  key={ing.id}
+                                  onClick={() => {
+                                    setNewIngredientId(ing.id);
+                                    setIngredientSearch(ing.name);
+                                    setIsIngredientDropdownOpen(false);
+                                    setTimeout(() => qtyInputRef.current?.focus(), 50);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderBottom: '1px solid #f0f0eb',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '10px',
+                                    background: isSelected ? '#f2f4ef' : '#ffffff',
+                                    fontSize: '12px',
+                                    transition: 'background 0.1s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected) e.currentTarget.style.background = '#f9fafb';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected) e.currentTarget.style.background = '#ffffff';
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                                    <span style={{ fontWeight: 600, color: '#1c2826', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {ing.name}
+                                    </span>
+                                    <span style={{ fontSize: '10px', color: '#71717a', background: '#f4f4f2', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>
+                                      {ing.code}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '11.5px', color: '#57695b', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                    Rp {cost.toLocaleString('id-ID')} <span style={{ color: '#9ca3af', fontWeight: 400 }}>/ {ing.usage_unit}</span>
+                                  </span>
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                {/* Input Qty Takaran */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '110px', flexShrink: 0 }}>
+                  <input
+                    ref={qtyInputRef}
+                    type="number"
+                    step="any"
+                    placeholder="Takaran"
+                    value={newIngredientQty}
+                    onChange={(e) => setNewIngredientQty(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddRecipeIngredient();
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0 8px',
+                      paddingRight: selectedIngredientObj ? '38px' : '8px',
+                      borderRadius: '6px',
+                      border: '1px solid #ccd1c4',
+                      fontSize: '12px',
+                      height: '34px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                  {selectedIngredientObj && (
+                    <span style={{ position: 'absolute', right: '8px', fontSize: '11px', color: '#57695b', fontWeight: 600, pointerEvents: 'none' }}>
+                      {selectedIngredientObj.usage_unit}
+                    </span>
+                  )}
+                </div>
+
+                {/* Checkbox Kemasan */}
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11.5px',
+                    color: '#415245',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    flexShrink: 0,
+                  }}
+                  title="Tandai jika bahan ini adalah kemasan/cup (tidak dihitung stok baku utama)"
+                >
+                  <input
+                    type="checkbox"
+                    checked={newIsPackaging}
+                    onChange={(e) => setNewIsPackaging(e.target.checked)}
+                    style={{ cursor: 'pointer', accentColor: '#57695b' }}
+                  />
+                  Kemasan
+                </label>
+
+                {/* Tombol Tambah */}
+                <button
+                  type="button"
+                  onClick={handleAddRecipeIngredient}
+                  style={{
+                    padding: '0 12px',
+                    height: '34px',
+                    background: '#57695b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Plus size={13} />
+                  <span>Tambah</span>
+                </button>
               </div>
 
-              {/* Recipe Ingredients Table */}
+              {/* Tabel Resep Bahan */}
               <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #e7e8e3', color: '#64746b' }}>
-                      <th style={{ textAlign: 'left', padding: '8px 4px' }}>Bahan Baku</th>
-                      <th style={{ textAlign: 'center', padding: '8px 4px' }}>Takaran</th>
-                      <th style={{ textAlign: 'right', padding: '8px 4px' }}>Biaya/Satuan</th>
-                      <th style={{ textAlign: 'right', padding: '8px 4px' }}>Subtotal HPP</th>
-                      <th style={{ textAlign: 'center', padding: '8px 4px' }}>Tipe</th>
-                      <th style={{ textAlign: 'center', padding: '8px 4px' }}></th>
+                    <tr style={{ borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
+                      <th style={{ textAlign: 'left', padding: '6px 4px', fontWeight: 600 }}>Bahan</th>
+                      <th style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600 }}>Takaran</th>
+                      <th style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600 }}>Biaya Satuan</th>
+                      <th style={{ textAlign: 'right', padding: '6px 4px', fontWeight: 600 }}>Subtotal</th>
+                      <th style={{ textAlign: 'center', padding: '6px 4px', fontWeight: 600 }}>Tipe</th>
+                      <th style={{ textAlign: 'center', padding: '6px 4px', width: '24px' }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {currentRecipes.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#8b968f', fontStyle: 'italic' }}>
-                          Belum ada bahan baku yang didaftarkan pada resep ini.
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '16px', color: '#9ca3af', fontStyle: 'italic' }}>
+                          Belum ada bahan baku. Pilih bahan di atas untuk memulai resep.
                         </td>
                       </tr>
                     ) : (
                       currentRecipes.map((r) => (
                         <tr key={r.ingredient_id} style={{ borderBottom: '1px solid #f0f0eb' }}>
-                          <td style={{ padding: '10px 4px', fontWeight: 600, color: '#1c2826' }}>
-                            {r.ingredient_name}
+                          <td style={{ padding: '7px 4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontWeight: 600, color: '#1c2826' }}>{r.ingredient_name}</span>
+                              {r.ingredient_code && (
+                                <span
+                                  style={{
+                                    fontSize: '9.5px',
+                                    color: '#71717a',
+                                    background: '#f4f4f2',
+                                    padding: '1px 4px',
+                                    borderRadius: '3px',
+                                  }}
+                                >
+                                  {r.ingredient_code}
+                                </span>
+                              )}
+                            </div>
                           </td>
-                          <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                            {r.quantity} {r.usage_unit}
+                          <td style={{ textAlign: 'center', padding: '7px 4px' }}>
+                            {Number(r.quantity).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {r.usage_unit}
                           </td>
-                          <td style={{ textAlign: 'right', padding: '10px 4px', color: '#64746b' }}>
-                            {Number(r.unit_cost) > 0 ? (
-                              `Rp ${Number(r.unit_cost).toLocaleString('id-ID')}`
-                            ) : (
-                              <span
-                                style={{
-                                  fontSize: '10px',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  background: '#fef3c7',
-                                  color: '#b45309',
-                                  fontWeight: 700,
-                                }}
-                                title="Biaya per satuan bahan belum ditentukan di menu Stok"
-                              >
-                                ⚠️ Biaya Rp 0
-                              </span>
-                            )}
+                          <td style={{ textAlign: 'right', padding: '7px 4px', color: '#64746b' }}>
+                            Rp {Number(r.unit_cost).toLocaleString('id-ID')}
                           </td>
-                          <td style={{ textAlign: 'right', padding: '10px 4px', fontWeight: 700, color: '#1c2826' }}>
+                          <td style={{ textAlign: 'right', padding: '7px 4px', fontWeight: 700, color: '#1c2826' }}>
                             Rp {Math.round(r.item_hpp).toLocaleString('id-ID')}
                           </td>
-                          <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                          <td style={{ textAlign: 'center', padding: '7px 4px' }}>
                             <span
                               style={{
-                                fontSize: '10px',
-                                padding: '2px 8px',
+                                fontSize: '9.5px',
+                                padding: '1px 5px',
                                 borderRadius: '4px',
                                 background: r.is_packaging_only ? '#fef3c7' : '#e0f2fe',
                                 color: r.is_packaging_only ? '#92400e' : '#0369a1',
                                 fontWeight: 600,
                               }}
                             >
-                              {r.is_packaging_only ? 'Kemasan' : 'Resep Utama'}
+                              {r.is_packaging_only ? 'Kemasan' : 'Utama'}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                          <td style={{ textAlign: 'center', padding: '7px 4px' }}>
                             <button
                               onClick={() => handleRemoveRecipeIngredient(r.ingredient_id)}
                               style={{
@@ -1062,17 +1666,31 @@ export function AdminProductsView() {
                                 border: 'none',
                                 color: '#ef4444',
                                 cursor: 'pointer',
-                                padding: '4px',
+                                padding: '2px',
                               }}
-                              title="Hapus bahan dari resep"
+                              title="Hapus"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={12} />
                             </button>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
+                  {currentRecipes.length > 0 && (
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid #e7e8e3', background: '#fbfbf9' }}>
+                        <td style={{ padding: '8px 4px', fontWeight: 700, color: '#1c2826' }}>
+                          Total ({currentRecipes.length} Bahan)
+                        </td>
+                        <td colSpan={2}></td>
+                        <td style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 800, color: '#1c2826', fontSize: '12px' }}>
+                          Rp {Math.round(currentRecipes.reduce((sum, r) => sum + r.item_hpp, 0)).toLocaleString('id-ID')}
+                        </td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             </div>
@@ -1083,8 +1701,8 @@ export function AdminProductsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'flex-end',
-                gap: '12px',
-                padding: '16px 24px',
+                gap: '8px',
+                padding: '12px 18px',
                 borderTop: '1px solid #e7e8e3',
                 background: '#fbfbf9',
               }}
@@ -1092,11 +1710,11 @@ export function AdminProductsView() {
               <button
                 onClick={() => setFormulatingProduct(null)}
                 style={{
-                  padding: '10px 18px',
+                  padding: '6px 14px',
                   background: '#f0f0eb',
                   border: '1px solid #dcdfd5',
-                  borderRadius: '10px',
-                  fontSize: '13px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   color: '#4b5563',
                   cursor: 'pointer',
@@ -1107,12 +1725,12 @@ export function AdminProductsView() {
               <button
                 onClick={handleSaveRecipes}
                 style={{
-                  padding: '10px 20px',
+                  padding: '6px 16px',
                   background: '#57695b',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '10px',
-                  fontSize: '13px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -1124,13 +1742,13 @@ export function AdminProductsView() {
         </div>
       )}
 
-      {/* ADD / EDIT PRODUCT MODAL */}
+      {/* MODAL 2: TAMBAH / EDIT MENU (Desain Simple, Minimalis & Otomatis Printer Station) */}
       {isProductModalOpen && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.45)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
@@ -1142,11 +1760,14 @@ export function AdminProductsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '520px',
+              borderRadius: '14px',
+              maxWidth: '460px',
               width: '100%',
-              overflow: 'hidden',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
             }}
           >
             <div
@@ -1154,11 +1775,11 @@ export function AdminProductsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 24px',
+                padding: '14px 18px',
                 borderBottom: '1px solid #e7e8e3',
               }}
             >
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
                 {editingProduct ? 'Edit Data Menu' : 'Tambah Menu Baru'}
               </h3>
               <button
@@ -1166,37 +1787,37 @@ export function AdminProductsView() {
                 style={{
                   background: '#f7f7f5',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
+                  borderRadius: '6px',
+                  padding: '5px',
                   cursor: 'pointer',
                   color: '#64746b',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form
+              onSubmit={handleSaveProduct}
+              style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
               {modalError && (
                 <div
                   style={{
-                    padding: '10px 14px',
-                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
                     background: '#fef2f2',
                     border: '1px solid #fecaca',
                     color: '#b91c1c',
-                    fontSize: '13px',
+                    fontSize: '11.5px',
                   }}
                 >
                   {modalError}
                 </div>
               )}
 
-              {/* Upload Gambar Menu */}
+              {/* Upload Foto Menu (Compact & Ramping) */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                  Foto Produk Menu
-                </label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1209,18 +1830,18 @@ export function AdminProductsView() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '14px',
-                      padding: '12px 14px',
+                      gap: '10px',
+                      padding: '8px 10px',
                       background: '#f9fafb',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       border: '1px solid #e5e7eb',
                     }}
                   >
                     <div
                       style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '8px',
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '6px',
                         overflow: 'hidden',
                         border: '1px solid #d1d5db',
                         background: '#f3f4f6',
@@ -1233,162 +1854,85 @@ export function AdminProductsView() {
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1f2937' }}>
-                          Foto Terpasang
-                        </span>
-                        <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                          {formImageUrl.startsWith('/uploads/') ? 'Unggahan Lokal' : 'Tautan Web'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          disabled={isUploadingImage}
-                          onClick={() => fileInputRef.current?.click()}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            background: '#ffffff',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            color: '#374151',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          {isUploadingImage ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
-                          Ganti Foto
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isUploadingImage}
-                          onClick={() => {
-                            setFormImageUrl('');
-                            setShowManualUrlInput(false);
-                          }}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            background: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            borderRadius: '6px',
-                            color: '#b91c1c',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Hapus Foto
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowManualUrlInput(!showManualUrlInput)}
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#6b7280',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                          }}
-                        >
-                          {showManualUrlInput ? 'Sembunyikan URL' : 'Edit URL Manual'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div
-                      onClick={() => !isUploadingImage && fileInputRef.current?.click()}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '18px',
-                        borderRadius: '10px',
-                        border: '1.5px dashed #cbd5e1',
-                        background: '#fbfbf9',
-                        cursor: isUploadingImage ? 'wait' : 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#57695b'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                    >
-                      {isUploadingImage ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                          <Loader2 size={22} color="#57695b" className="animate-spin" />
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#57695b' }}>
-                            Mengunggah foto menu...
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          <UploadCloud size={24} color="#57695b" style={{ marginBottom: '6px' }} />
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-                            Klik untuk Upload Foto Menu
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
-                            Format JPG, PNG, atau WebP (Maksimal 5MB)
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <button
                         type="button"
-                        onClick={() => setShowManualUrlInput(!showManualUrlInput)}
+                        disabled={isUploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          fontSize: '11.5px',
-                          color: '#57695b',
-                          cursor: 'pointer',
+                          padding: '3px 8px',
+                          fontSize: '11px',
                           fontWeight: 600,
-                          textDecoration: 'underline',
+                          background: '#ffffff',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '5px',
+                          color: '#374151',
+                          cursor: 'pointer',
                         }}
                       >
-                        {showManualUrlInput ? 'Tutup Input URL' : 'Atau gunakan tautan URL gambar eksternal'}
+                        Ganti Foto
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUploadingImage}
+                        onClick={() => {
+                          setFormImageUrl('');
+                          setShowManualUrlInput(false);
+                        }}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '5px',
+                          color: '#b91c1c',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Hapus Foto
                       </button>
                     </div>
                   </div>
-                )}
-
-                {showManualUrlInput && (
-                  <div style={{ marginTop: '8px', background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      Tautan URL Gambar Manual (https://...):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Tempel tautan URL gambar..."
-                      value={formImageUrl}
-                      onChange={(e) => setFormImageUrl(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '12px',
-                        color: '#1e293b',
-                        background: '#ffffff',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                ) : (
+                  <div
+                    onClick={() => !isUploadingImage && fileInputRef.current?.click()}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: '1.5px dashed #cbd5e1',
+                      background: '#fbfbf9',
+                      cursor: isUploadingImage ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {isUploadingImage ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Loader2 size={14} color="#57695b" className="animate-spin" />
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#57695b' }}>
+                          Mengunggah foto...
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <UploadCloud size={16} color="#57695b" />
+                        <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151' }}>
+                          Upload Foto (Opsional, maks. 5MB)
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+              {/* SKU & Nama Menu */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    SKU Produk
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '3px' }}>
+                    SKU
                   </label>
                   <input
                     type="text"
@@ -1397,133 +1941,135 @@ export function AdminProductsView() {
                     onChange={(e) => setFormSku(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
+                      padding: '7px 8px',
+                      borderRadius: '6px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '11.5px',
                       fontFamily: 'monospace',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '3px' }}>
                     Nama Menu
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="cth: Aren Latte Double Shot"
+                    placeholder="Nama menu..."
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
+                      padding: '7px 8px',
+                      borderRadius: '6px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '11.5px',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* Kategori & Harga Jual */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '3px' }}>
                     Kategori
                   </label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '13px',
-                      background: '#ffffff',
-                    }}
-                  >
-                    <option value="Kopi">Kopi</option>
-                    <option value="Non-Kopi">Non-Kopi</option>
-                    <option value="Makanan">Makanan</option>
-                    <option value="Camilan">Camilan</option>
-                    <option value="Add-on">Add-on</option>
-                  </select>
+                  <Select value={formCategory} onValueChange={(val) => handleCategoryChange(val as any)}>
+                    <SelectTrigger style={{ width: '100%', height: '34px', background: '#ffffff', borderRadius: '6px', border: '1px solid #d1d5db' }}>
+                      <SelectValue placeholder="Pilih Kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Kopi">Kopi</SelectItem>
+                      <SelectItem value="Non-Kopi">Non-Kopi</SelectItem>
+                      <SelectItem value="Makanan">Makanan</SelectItem>
+                      <SelectItem value="Camilan">Camilan</SelectItem>
+                      <SelectItem value="Add-on">Add-on</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    Harga Bersih (Rp)
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '3px' }}>
+                    Harga Jual (Rp)
                   </label>
                   <input
                     type="number"
                     required
-                    placeholder="25000"
+                    placeholder="cth: 25000"
                     value={formPrice}
                     onChange={(e) => setFormPrice(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
+                      padding: '7px 8px',
+                      borderRadius: '6px',
                       border: '1px solid #d1d5db',
-                      fontSize: '13px',
+                      fontSize: '11.5px',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
               </div>
 
+              {/* Cetak Pesanan (Station) - Otomatis Mengikuti Kategori */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                  Target Cetak Checker (Station)
-                </label>
-                <select
-                  value={formPrintTarget}
-                  onChange={(e) => setFormPrintTarget(e.target.value as any)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '13px',
-                    background: '#ffffff',
-                  }}
-                >
-                  <option value="BAR_PRINTER">Bar Printer (Station Minuman / Kopi)</option>
-                  <option value="KITCHEN_PRINTER">Kitchen Printer (Station Dapur / Makanan)</option>
-                  <option value="NONE">Tanpa Cetak Checker</option>
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#4b5563' }}>
+                    Cetak Pesanan (Station)
+                  </label>
+                  <span style={{ fontSize: '10.5px', color: '#57695b', fontWeight: 600 }}>
+                    {formCategory === 'Makanan' || formCategory === 'Camilan'
+                      ? 'Otomatis: Dapur'
+                      : 'Otomatis: Bar'}
+                  </span>
+                </div>
+                <Select value={formPrintTarget} onValueChange={(val) => setFormPrintTarget(val as any)}>
+                  <SelectTrigger style={{ width: '100%', height: '34px', background: '#ffffff', borderRadius: '6px', border: '1px solid #d1d5db' }}>
+                    <SelectValue placeholder="Pilih Station" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BAR_PRINTER">Bar (Minuman)</SelectItem>
+                    <SelectItem value="KITCHEN_PRINTER">Dapur (Makanan)</SelectItem>
+                    <SelectItem value="NONE">Tanpa Cetak</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Checkbox Menu Favorit */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <input
                   type="checkbox"
                   id="formFavorite"
                   checked={formIsFavorite}
                   onChange={(e) => setFormIsFavorite(e.target.checked)}
                 />
-                <label htmlFor="formFavorite" style={{ fontSize: '13px', color: '#374151', cursor: 'pointer' }}>
-                  Tandai sebagai Menu Favorit (Tampil prioritas di POS)
+                <label htmlFor="formFavorite" style={{ fontSize: '11.5px', color: '#374151', cursor: 'pointer' }}>
+                  Menu Favorit (Prioritas di kasir)
                 </label>
               </div>
 
+              {/* Tombol Simpan / Batal */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'flex-end',
-                  gap: '12px',
-                  marginTop: '12px',
+                  gap: '8px',
+                  marginTop: '6px',
                 }}
               >
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(false)}
                   style={{
-                    padding: '10px 18px',
+                    padding: '6px 14px',
                     background: '#f0f0eb',
                     border: '1px solid #dcdfd5',
-                    borderRadius: '10px',
-                    fontSize: '13px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
                     fontWeight: 600,
                     color: '#4b5563',
                     cursor: 'pointer',
@@ -1534,20 +2080,127 @@ export function AdminProductsView() {
                 <button
                   type="submit"
                   style={{
-                    padding: '10px 20px',
+                    padding: '6px 16px',
                     background: '#57695b',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '13px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
-                  {editingProduct ? 'Perbarui Menu' : 'Simpan Menu'}
+                  {editingProduct ? 'Perbarui' : 'Simpan'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: KONFIRMASI HAPUS MENU */}
+      {deletingProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '14px',
+              maxWidth: '380px',
+              width: '100%',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: '#fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#b91c1c',
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={16} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
+                  Nonaktifkan Menu?
+                </h4>
+                <div style={{ fontSize: '11.5px', color: '#71717a' }}>
+                  Menu tidak akan muncul lagi di kasir.
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: '#fbfbf9',
+                padding: '10px 12px',
+                borderRadius: '6px',
+                border: '1px solid #e7e8e3',
+                fontSize: '11.5px',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: '#1c2826' }}>{deletingProduct.name}</div>
+              <div style={{ color: '#71717a', marginTop: '2px' }}>
+                SKU: {deletingProduct.sku} • Rp {Number(deletingProduct.price).toLocaleString('id-ID')}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                disabled={isDeleting}
+                onClick={() => setDeletingProduct(null)}
+                style={{
+                  padding: '6px 14px',
+                  background: '#f0f0eb',
+                  border: '1px solid #dcdfd5',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  color: '#4b5563',
+                  cursor: 'pointer',
+                }}
+              >
+                Batal
+              </button>
+              <button
+                disabled={isDeleting}
+                onClick={handleDeleteProduct}
+                style={{
+                  padding: '6px 16px',
+                  background: '#b91c1c',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'wait' : 'pointer',
+                }}
+              >
+                {isDeleting ? 'Menonaktifkan...' : 'Ya, Nonaktifkan'}
+              </button>
+            </div>
           </div>
         </div>
       )}

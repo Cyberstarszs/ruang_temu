@@ -1,26 +1,26 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { ShiftAuditItem, CashMovement } from '@/types';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
-  Wallet,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   RotateCcw,
+  Search,
+  X,
+  Clock,
+  BookOpen,
+  ShieldAlert,
   ArrowDownLeft,
   ArrowUpRight,
-  User,
-  X,
-  FileSpreadsheet,
-  ChevronDown,
-  Filter,
-  Search,
-  ShieldAlert,
-  Info,
-  BookOpen,
+  Camera,
 } from 'lucide-react';
 
 export function AdminShiftsView() {
@@ -31,6 +31,7 @@ export function AdminShiftsView() {
   const [selectedShift, setSelectedShift] = useState<ShiftAuditItem | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [isLoadingMovements, setIsLoadingMovements] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   // Floating Popover for shift & cash reconciliation details
   const [shiftPopover, setShiftPopover] = useState<{
@@ -45,7 +46,8 @@ export function AdminShiftsView() {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     return { from: today, to: today };
   });
-  const [diffFilter, setDiffFilter] = useState<'ALL' | 'BALANCED' | 'OVER' | 'SHORT' | 'OPEN'>('ALL');
+  const [diffFilter, setDiffFilter] = useState<'ALL' | 'BALANCED' | 'DIFF' | 'OPEN'>('ALL');
+  const [cashierFilter, setCashierFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Force Close Shift Modal (Owner Only)
@@ -54,6 +56,69 @@ export function AdminShiftsView() {
   const [forceCloseNotes, setForceCloseNotes] = useState<string>('Kasir lupa tutup sif');
   const [isSubmittingForceClose, setIsSubmittingForceClose] = useState<boolean>(false);
   const [forceCloseError, setForceCloseError] = useState<string | null>(null);
+
+  const setQuickRange = (type: 'today' | '7days' | '30days') => {
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+
+    if (type === 'today') {
+      const t = formatDate(today);
+      setDateRange({ from: t, to: t });
+    } else if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      setDateRange({ from: formatDate(past), to: formatDate(today) });
+    } else if (type === '30days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 29);
+      setDateRange({ from: formatDate(past), to: formatDate(today) });
+    }
+  };
+
+  const isCurrentPreset = (type: 'today' | '7days' | '30days') => {
+    if (!dateRange.from || !dateRange.to) return false;
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+
+    if (type === 'today') {
+      return dateRange.from === dateRange.to && dateRange.from === formatDate(today);
+    }
+    if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      return dateRange.from === formatDate(past) && dateRange.to === formatDate(today);
+    }
+    if (type === '30days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 29);
+      return dateRange.from === formatDate(past) && dateRange.to === formatDate(today);
+    }
+    return false;
+  };
+
+  const loadShifts = async () => {
+    setIsLoading(true);
+    try {
+      const params: { limit?: number; from?: string; to?: string } = { limit: 150 };
+      if (dateRange.from) params.from = dateRange.from;
+      if (dateRange.to) params.to = dateRange.to;
+
+      const res = await api.shifts.getHistory(params);
+      if (res.success && res.data) {
+        setShifts(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load shift history:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadShifts();
+  }, [dateRange.from, dateRange.to]);
 
   const handleOpenForceClose = (shift: ShiftAuditItem) => {
     setForceCloseTarget(shift);
@@ -105,28 +170,6 @@ export function AdminShiftsView() {
     });
   };
 
-  const loadShifts = async () => {
-    setIsLoading(true);
-    try {
-      const params: { limit?: number; from?: string; to?: string } = { limit: 100 };
-      if (dateRange.from) params.from = dateRange.from;
-      if (dateRange.to) params.to = dateRange.to;
-
-      const res = await api.shifts.getHistory(params);
-      if (res.success && res.data) {
-        setShifts(res.data);
-      }
-    } catch (err) {
-      console.error('Failed to load shift history:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadShifts();
-  }, [dateRange.from, dateRange.to]);
-
   const handleOpenMovements = async (shift: ShiftAuditItem) => {
     setSelectedShift(shift);
     setIsLoadingMovements(true);
@@ -142,115 +185,396 @@ export function AdminShiftsView() {
     }
   };
 
-  // Filter Shifts Logic
-  const filteredShifts = shifts.filter((s) => {
-    // 1. Date Range Filter
-    if (dateRange.from) {
-      const openD = new Date(s.opened_at).toLocaleDateString('en-CA');
-      const closeD = s.closed_at ? new Date(s.closed_at).toLocaleDateString('en-CA') : openD;
-      const from = dateRange.from;
-      const to = dateRange.to || dateRange.from;
+  // Unique Cashier List
+  const cashierList = useMemo(() => {
+    const names = new Set<string>();
+    for (const s of shifts) {
+      if (s.cashier_name) names.add(s.cashier_name);
+    }
+    return Array.from(names).sort();
+  }, [shifts]);
 
-      const inRange = (openD >= from && openD <= to) || (closeD >= from && closeD <= to);
-      if (!inRange) {
+  // Filter Shifts Logic
+  const filteredShifts = useMemo(() => {
+    return shifts.filter((s) => {
+      if (cashierFilter !== 'ALL' && s.cashier_name !== cashierFilter) {
         return false;
       }
-    }
 
-    // 2. Difference Filter
-    const isOpen = s.status === 'OPEN';
-    const diff = Number(s.cash_difference || 0);
+      const isOpen = s.status === 'OPEN';
+      const diff = Number(s.cash_difference || 0);
 
-    if (diffFilter === 'OPEN' && !isOpen) return false;
-    if (diffFilter === 'BALANCED' && (isOpen || diff !== 0)) return false;
-    if (diffFilter === 'OVER' && (isOpen || diff <= 0)) return false;
-    if (diffFilter === 'SHORT' && (isOpen || diff >= 0)) return false;
+      if (diffFilter === 'OPEN' && !isOpen) return false;
+      if (diffFilter === 'BALANCED' && (isOpen || diff !== 0)) return false;
+      if (diffFilter === 'DIFF' && (isOpen || diff === 0)) return false;
 
-    // 3. Search Query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = s.cashier_name?.toLowerCase().includes(q);
-      const matchNotes = s.closing_notes?.toLowerCase().includes(q);
-      if (!matchName && !matchNotes) return false;
-    }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = s.cashier_name?.toLowerCase().includes(q);
+        const matchNotes = s.closing_notes?.toLowerCase().includes(q);
+        if (!matchName && !matchNotes) return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [shifts, cashierFilter, diffFilter, searchQuery]);
+
+  // KPI Calculations
+  const closedShifts = useMemo(() => shifts.filter((s) => s.status === 'CLOSED'), [shifts]);
+  const openShifts = useMemo(() => shifts.filter((s) => s.status === 'OPEN'), [shifts]);
+  const balancedShifts = useMemo(
+    () => closedShifts.filter((s) => Number(s.cash_difference || 0) === 0),
+    [closedShifts]
+  );
+  const diffShifts = useMemo(
+    () => closedShifts.filter((s) => Number(s.cash_difference || 0) !== 0),
+    [closedShifts]
+  );
+  const totalNetDiff = useMemo(
+    () => closedShifts.reduce((sum, s) => sum + Number(s.cash_difference || 0), 0),
+    [closedShifts]
+  );
+  const totalCashSales = useMemo(
+    () => shifts.reduce((sum, s) => sum + Number(s.cash_sales || 0), 0),
+    [shifts]
+  );
+  const totalAllSales = useMemo(
+    () => shifts.reduce((sum, s) => sum + Number(s.total_sales || 0), 0),
+    [shifts]
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Comprehensive Filter Toolbar (with Shadcn UI DateRangePicker & Selisih Filter) */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* 1. TOP BAR KONTROL: Rentang Tanggal & Tombol Segarkan */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+          background: '#ffffff',
+          padding: '12px 18px',
+          borderRadius: '12px',
+          border: '1px solid #e7e8e3',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
+            Riwayat Sif Kasir
+          </span>
+          <span
+            style={{
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: '#f2f4ef',
+              color: '#57695b',
+              fontWeight: 700,
+            }}
+          >
+            {filteredShifts.length} Sif
+          </span>
+        </div>
+
+        {/* Presets & Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setQuickRange('today')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: isCurrentPreset('today') ? '1px solid #57695b' : '1px solid #e2e4dc',
+              background: isCurrentPreset('today') ? '#57695b' : '#f7f7f5',
+              color: isCurrentPreset('today') ? '#ffffff' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            Hari Ini
+          </button>
+
+          <button
+            onClick={() => setQuickRange('7days')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: isCurrentPreset('7days') ? '1px solid #57695b' : '1px solid #e2e4dc',
+              background: isCurrentPreset('7days') ? '#57695b' : '#f7f7f5',
+              color: isCurrentPreset('7days') ? '#ffffff' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            7 Hari
+          </button>
+
+          <button
+            onClick={() => setQuickRange('30days')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: isCurrentPreset('30days') ? '1px solid #57695b' : '1px solid #e2e4dc',
+              background: isCurrentPreset('30days') ? '#57695b' : '#f7f7f5',
+              color: isCurrentPreset('30days') ? '#ffffff' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            30 Hari
+          </button>
+
+          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 2px' }} />
+
+          <DateRangePicker
+            value={dateRange}
+            onChange={(r) => setDateRange(r)}
+            placeholder="Pilih Tanggal Sif..."
+            align="right"
+            showApplyButton={false}
+          />
+
+          <button
+            onClick={loadShifts}
+            disabled={isLoading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0 14px',
+              background: '#57695b',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '12px',
+              cursor: 'pointer',
+              height: '36px',
+              transition: 'background 0.12s ease',
+              whiteSpace: 'nowrap',
+            }}
+            title="Segarkan data sif"
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
+          >
+            <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
+            Perbarui
+          </button>
+        </div>
+      </div>
+
+      {/* 2. 4 KARTU METRIK UTAMA (Simpel & Minimalis) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+          gap: '14px',
+        }}
+      >
+        {/* Card 1: Total Sif */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Total Sif Kasir
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {shifts.length} Sif
+          </div>
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            {closedShifts.length} Selesai • {openShifts.length} Aktif Berjalan
+          </div>
+        </div>
+
+        {/* Card 2: Kas Seimbang */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Kas Seimbang
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#2e7d32' }}>
+            {balancedShifts.length} Sif
+          </div>
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            Rekonsiliasi akurat (Rp 0 selisih)
+          </div>
+        </div>
+
+        {/* Card 3: Selisih Kas Fisik */}
+        <div
+          style={{
+            background: diffShifts.length > 0 ? '#fff8f6' : '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: diffShifts.length > 0 ? '1px solid #ffccbc' : '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '11.5px',
+              fontWeight: 700,
+              color: diffShifts.length > 0 ? '#c62828' : '#71717a',
+              textTransform: 'uppercase',
+            }}
+          >
+            Selisih Kas Fisik
+          </span>
+          <div
+            style={{
+              fontSize: '22px',
+              fontWeight: 800,
+              color: totalNetDiff < 0 ? '#c62828' : totalNetDiff > 0 ? '#0284c7' : '#1c2826',
+            }}
+          >
+            {totalNetDiff < 0 ? `-Rp ${Math.abs(totalNetDiff).toLocaleString('id-ID')}` : `Rp ${totalNetDiff.toLocaleString('id-ID')}`}
+          </div>
+          <div style={{ fontSize: '12px', color: diffShifts.length > 0 ? '#c62828' : '#71717a' }}>
+            {diffShifts.length > 0 ? `${diffShifts.length} sif memiliki selisih` : 'Semua rekonsiliasi pas'}
+          </div>
+        </div>
+
+        {/* Card 4: Total Kas Masuk Sif */}
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Kas Tunai Sif
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            Rp {totalCashSales.toLocaleString('id-ID')}
+          </div>
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            Total omzet: Rp {totalAllSales.toLocaleString('id-ID')}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. BAR FILTER & PENCARIAN (Ramping & Responsif) */}
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '12px',
+          gap: '10px',
           background: '#ffffff',
           padding: '12px 18px',
-          borderRadius: '14px',
+          borderRadius: '12px',
           border: '1px solid #e7e8e3',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
-          {/* 1. Shadcn UI DateRangePicker */}
-          <DateRangePicker
-            value={dateRange}
-            onChange={(r) => setDateRange(r)}
-            placeholder="Rentang Tanggal Sif..."
-          />
-
-          {/* 2. Selisih Kas Filter Dropdown */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={diffFilter}
-              onChange={(e) => setDiffFilter(e.target.value as any)}
-              style={{
-                height: '34px',
-                padding: '0 28px 0 10px',
-                background: '#ffffff',
-                border: '1px solid #e2e4dc',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: diffFilter === 'ALL' ? '#52525b' : '#1c2826',
-                cursor: 'pointer',
-                outline: 'none',
-                appearance: 'none',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              }}
-            >
-              <option value="ALL">Semua Status Selisih ({shifts.length})</option>
-              <option value="BALANCED">✓ Seimbang (Rp 0)</option>
-              <option value="OVER">+ Selisih Lebih (Kas Surplus)</option>
-              <option value="SHORT">- Selisih Kurang (Kas Defisit)</option>
-              <option value="OPEN">⏱ Sif Aktif (Berjalan)</option>
-            </select>
-            <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-              <ChevronDown size={14} color="#71717a" />
-            </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Status Tabs */}
+          <div
+            style={{
+              display: 'flex',
+              background: '#f4f5f1',
+              padding: '2px',
+              borderRadius: '8px',
+              border: '1px solid #e5e7e0',
+            }}
+          >
+            {(
+              [
+                { id: 'ALL', label: `Semua (${shifts.length})` },
+                { id: 'BALANCED', label: `Seimbang (${balancedShifts.length})` },
+                { id: 'DIFF', label: `Selisih (${diffShifts.length})` },
+                { id: 'OPEN', label: `Aktif (${openShifts.length})` },
+              ] as const
+            ).map((s) => {
+              const active = diffFilter === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setDiffFilter(s.id)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: active ? '#57695b' : 'transparent',
+                    color: active ? '#ffffff' : '#4b5563',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
+                  }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* 3. Search Kasir / Catatan */}
+          {/* Cashier Filter Dropdown (Shadcn UI) */}
+          <div style={{ width: '180px' }}>
+            <Select value={cashierFilter} onValueChange={setCashierFilter}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5' }}>
+                <SelectValue placeholder="Semua Kasir" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Kasir ({cashierList.length})</SelectItem>
+                {cashierList.map((cName) => (
+                  <SelectItem key={cName} value={cName}>
+                    Kasir: {cName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Search Box */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              height: '34px',
-              padding: '0 10px',
-              background: '#ffffff',
-              border: '1px solid #e2e4dc',
+              background: '#f7f7f5',
+              padding: '0 12px',
               borderRadius: '8px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              border: '1px solid #e2e4dc',
+              height: '34px',
+              flex: '1 1 180px',
+              minWidth: '160px',
             }}
           >
             <Search size={13} color="#71717a" />
             <input
               type="text"
-              placeholder="Cari kasir / catatan..."
+              placeholder="Cari kasir / catatan sif..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -259,120 +583,107 @@ export function AdminShiftsView() {
                 outline: 'none',
                 fontSize: '12px',
                 color: '#1c2826',
-                width: '185px',
-                fontFamily: 'inherit',
+                width: '100%',
               }}
             />
             {searchQuery && (
               <span
                 onClick={() => setSearchQuery('')}
                 style={{ cursor: 'pointer', color: '#9ca3af', display: 'flex' }}
+                title="Hapus pencarian"
               >
                 <X size={12} />
               </span>
             )}
           </div>
 
-          {/* Counter & Reset */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span
+          {/* Reset Filter Button */}
+          {(searchQuery || diffFilter !== 'ALL' || cashierFilter !== 'ALL') && (
+            <button
+              onClick={() => {
+                setDiffFilter('ALL');
+                setCashierFilter('ALL');
+                setSearchQuery('');
+              }}
               style={{
-                fontSize: '11.5px',
-                padding: '3px 8px',
+                fontSize: '11px',
+                padding: '4px 10px',
                 borderRadius: '6px',
-                background: '#f4f5f1',
-                color: '#57695b',
+                background: '#fee2e2',
+                border: 'none',
+                color: '#b91c1c',
                 fontWeight: 600,
+                cursor: 'pointer',
+                height: '32px',
               }}
             >
-              Ditampilkan: {filteredShifts.length}
-            </span>
-            {(dateRange.from || diffFilter !== 'ALL' || searchQuery) && (
-              <button
-                onClick={() => {
-                  setDateRange({ from: '', to: '' });
-                  setDiffFilter('ALL');
-                  setSearchQuery('');
-                }}
-                style={{
-                  fontSize: '11px',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: '#fee2e2',
-                  border: 'none',
-                  color: '#b91c1c',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Reset Filter
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={loadShifts}
-            disabled={isLoading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 14px',
-              background: '#57695b',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-          >
-            <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
-            Segarkan
-          </button>
+              Reset Filter
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Shifts History Table */}
+      {/* 4. TABEL RIWAYAT SIF (Bersih, Presisi & Informatif) */}
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '16px',
+          borderRadius: '12px',
           border: '1px solid #e7e8e3',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
           overflow: 'hidden',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', whiteSpace: 'nowrap' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '12px',
+              whiteSpace: 'nowrap',
+            }}
+          >
             <thead>
-              <tr style={{ background: '#fbfbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Kasir</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Waktu Sif</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Modal Awal</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Ekspektasi</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Hitung Fisik</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Selisih</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Penjualan</th>
-                <th style={{ padding: '9px 6px', fontWeight: 600, fontSize: '11.5px' }}>Status</th>
-                <th style={{ padding: '9px 8px', fontWeight: 600, fontSize: '11.5px', textAlign: 'right' }}>Aksi</th>
+              <tr style={{ background: '#fafbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Kasir
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Waktu Sif
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Modal Awal
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Ekspektasi Kas
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Hitung Fisik
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Selisih Kas
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Penjualan Kasir
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Status
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', textAlign: 'right' }}>
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#71717a' }}>
                     Memuat riwayat sif kasir...
                   </td>
                 </tr>
               ) : filteredShifts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#8b968f', fontStyle: 'italic' }}>
-                    {shifts.length === 0
-                      ? 'Belum ada riwayat sif kasir yang tercatat.'
-                      : 'Tidak ada riwayat sif yang cocok dengan filter tanggal/selisih terpilih.'}
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#9ca3af' }}>
+                    Tidak ada riwayat sif pada periode atau filter yang dipilih.
                   </td>
                 </tr>
               ) : (
@@ -382,18 +693,26 @@ export function AdminShiftsView() {
                   const openDate = new Date(s.opened_at);
                   const closeDate = s.closed_at ? new Date(s.closed_at) : null;
 
-                  // Perhitungan Durasi Kerja
-                  const durationMs = closeDate ? Math.max(0, closeDate.getTime() - openDate.getTime()) : Math.max(0, Date.now() - openDate.getTime());
+                  // Durasi Kerja
+                  const durationMs = closeDate
+                    ? Math.max(0, closeDate.getTime() - openDate.getTime())
+                    : Math.max(0, Date.now() - openDate.getTime());
                   const totalMinutes = Math.floor(durationMs / 60000);
                   const durationHours = Math.floor(totalMinutes / 60);
                   const durationMins = totalMinutes % 60;
-                  const durationLabel = durationHours > 0 ? `${durationHours}j ${durationMins}m` : totalMinutes >= 1 ? `${totalMinutes}m` : '< 1 mnt';
+                  const durationLabel =
+                    durationHours > 0
+                      ? `${durationHours}j ${durationMins}m`
+                      : totalMinutes >= 1
+                      ? `${totalMinutes}m`
+                      : '< 1 mnt';
 
                   const openTimeStr = openDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-                  const closeTimeStr = closeDate ? closeDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : null;
+                  const closeTimeStr = closeDate
+                    ? closeDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                    : null;
                   const dateStr = openDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 
-                  // Tampilan waktu cerdas: cegah kerancuan jam mulai == jam selesai (misal 10.45 - 10.45)
                   let timeDisplay = '';
                   if (isOpen) {
                     timeDisplay = `${dateStr} ${openTimeStr}`;
@@ -414,19 +733,18 @@ export function AdminShiftsView() {
                   const cashOutNum = Number(s.total_cash_out || 0);
                   const totalSalesNum = Number(s.total_sales || 0);
 
-                  // Real-time or recorded system expected physical cash
                   const calculatedExpected = openingCashNum + cashSalesNum + cashInNum - cashOutNum;
                   const displayExpected = isOpen ? calculatedExpected : Number(s.system_expected_cash ?? calculatedExpected);
 
                   return (
-                    <tr key={s.id} style={{ borderBottom: '1px solid #f0f0eb', height: '46px' }}>
+                    <tr key={s.id} style={{ borderBottom: '1px solid #f2f4ef', height: '46px' }}>
                       {/* 1. Kasir */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826' }}>
                         {s.cashier_name}
                       </td>
 
-                      {/* 2. Waktu Sif (Jelas, durasi akurat, tanpa '...' ambigu) */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 2. Waktu Sif */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                             <span
@@ -454,7 +772,7 @@ export function AdminShiftsView() {
                                   `Kasir: ${s.cashier_name}`
                                 )
                               }
-                              title="Klik untuk rincian audit waktu & catatan penutupan"
+                              title="Klik untuk rincian waktu & catatan penutupan"
                               style={{
                                 background: 'transparent',
                                 border: 'none',
@@ -471,7 +789,7 @@ export function AdminShiftsView() {
                           </div>
                           {isOpen ? (
                             <span style={{ fontSize: '10px', color: '#b45309', fontWeight: 600 }}>
-                              ⏱ Berjalan ({durationLabel})
+                              Berjalan ({durationLabel})
                             </span>
                           ) : s.closing_notes ? (
                             <span
@@ -497,12 +815,12 @@ export function AdminShiftsView() {
                       </td>
 
                       {/* 3. Modal Awal */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', color: '#4b5563', fontSize: '12px' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#4b5563', fontSize: '12px' }}>
                         Rp {openingCashNum.toLocaleString('id-ID')}
                       </td>
 
-                      {/* 4. Ekspektasi Sistem (Klik nominal untuk rumus kas laci, tanpa '...' ambigu) */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 4. Ekspektasi Kas */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <button
                           onClick={(e) =>
                             openShiftPopover(
@@ -519,7 +837,7 @@ export function AdminShiftsView() {
                               `Kasir: ${s.cashier_name}`
                             )
                           }
-                          title="Klik untuk melihat rumus & rincian ekspektasi laci kas"
+                          title="Klik untuk melihat rincian rumus kas laci"
                           style={{
                             background: 'transparent',
                             border: 'none',
@@ -530,29 +848,10 @@ export function AdminShiftsView() {
                             alignItems: 'center',
                             gap: '4px',
                             textAlign: 'left',
-                            transition: 'background 0.15s ease',
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f4ef'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                         >
-                          <span style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: '3px' }}>
+                          <span style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
                             Rp {displayExpected.toLocaleString('id-ID')}
-                          </span>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '15px',
-                              height: '15px',
-                              borderRadius: '50%',
-                              background: '#f2f4ef',
-                              color: '#57695b',
-                              fontSize: '9.5px',
-                              fontWeight: 700,
-                            }}
-                          >
-                            ⓘ
                           </span>
                           {isOpen && (
                             <span style={{ fontSize: '9px', color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
@@ -562,8 +861,8 @@ export function AdminShiftsView() {
                         </button>
                       </td>
 
-                      {/* 5. Hitung Fisik */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', fontWeight: 600, color: '#1c2826', fontSize: '12px' }}>
+                      {/* 5. Hitung Fisik (Blind Count) */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 600, color: '#1c2826', fontSize: '12px' }}>
                         {isOpen ? (
                           <span style={{ color: '#8b968f', fontStyle: 'italic' }}>-</span>
                         ) : (
@@ -571,19 +870,19 @@ export function AdminShiftsView() {
                         )}
                       </td>
 
-                      {/* 6. Selisih */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 6. Selisih Kas */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         {isOpen ? (
                           <span style={{ color: '#8b968f', fontStyle: 'italic' }}>-</span>
                         ) : diff === 0 ? (
                           <span
                             style={{
-                              padding: '2px 7px',
-                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
                               background: '#dcfce7',
                               color: '#15803d',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
                             Seimbang (Rp 0)
@@ -591,34 +890,34 @@ export function AdminShiftsView() {
                         ) : diff > 0 ? (
                           <span
                             style={{
-                              padding: '2px 7px',
-                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
                               background: '#e0f2fe',
                               color: '#0369a1',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
-                            Lebih (+Rp {diff.toLocaleString('id-ID')})
+                            +Rp {diff.toLocaleString('id-ID')}
                           </span>
                         ) : (
                           <span
                             style={{
-                              padding: '2px 7px',
-                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
                               background: '#fee2e2',
                               color: '#b91c1c',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
-                            Kurang (-Rp {Math.abs(diff).toLocaleString('id-ID')})
+                            -Rp {Math.abs(diff).toLocaleString('id-ID')}
                           </span>
                         )}
                       </td>
 
-                      {/* 7. Penjualan (Tampil jelas total & rasio tunai/non-tunai langsung di tabel) */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 7. Penjualan */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <button
                           onClick={(e) =>
                             openShiftPopover(
@@ -634,7 +933,7 @@ export function AdminShiftsView() {
                               `Kasir: ${s.cashier_name}`
                             )
                           }
-                          title="Klik untuk melihat rincian penjualan Tunai vs QRIS & order"
+                          title="Klik untuk rincian penjualan Tunai vs QRIS"
                           style={{
                             background: 'transparent',
                             border: 'none',
@@ -645,65 +944,44 @@ export function AdminShiftsView() {
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '1px',
-                            transition: 'background 0.15s ease',
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f4ef'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                         >
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
-                              Rp {totalSalesNum.toLocaleString('id-ID')}
-                            </span>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '14px',
-                                height: '14px',
-                                borderRadius: '50%',
-                                background: '#f2f4ef',
-                                color: '#57695b',
-                                fontSize: '9px',
-                                fontWeight: 700,
-                              }}
-                            >
-                              ⓘ
-                            </span>
-                          </div>
+                          <span style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
+                            Rp {totalSalesNum.toLocaleString('id-ID')}
+                          </span>
                           <span style={{ fontSize: '10px', color: '#71717a', whiteSpace: 'nowrap' }}>
                             Tunai: Rp {cashSalesNum.toLocaleString('id-ID')} · QRIS: Rp {nonCashSalesNum.toLocaleString('id-ID')}
                           </span>
                         </button>
                       </td>
 
-                      {/* 8. Status */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 8. Status Sif */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span
                           style={{
-                            padding: '2px 7px',
-                            borderRadius: '5px',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
                             background: isOpen ? '#fef3c7' : '#f1f5f9',
                             color: isOpen ? '#b45309' : '#475569',
                             fontWeight: 700,
-                            fontSize: '10.5px',
+                            fontSize: '11px',
                           }}
                         >
                           {isOpen ? 'Aktif' : 'Selesai'}
                         </span>
                       </td>
 
-                      {/* 9. Aksi (Jurnal Kas & Tutup Paksa dengan pemisah jelas & dialog aman) */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', textAlign: 'right' }}>
+                      {/* 9. Aksi */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                           <button
                             onClick={() => handleOpenMovements(s)}
                             style={{
-                              padding: '3px 8px',
+                              padding: '4px 8px',
                               background: '#f2f4ef',
                               color: '#57695b',
                               border: '1px solid #dcdfd5',
-                              borderRadius: '5px',
+                              borderRadius: '6px',
                               fontWeight: 600,
                               fontSize: '11px',
                               cursor: 'pointer',
@@ -712,37 +990,34 @@ export function AdminShiftsView() {
                               alignItems: 'center',
                               gap: '4px',
                             }}
-                            title="Buka jurnal mutasi kas masuk / keluar"
+                            title="Buka jurnal mutasi kas"
                           >
                             <BookOpen size={12} />
                             Jurnal Kas
                           </button>
+
                           {isOpen && (
-                            <>
-                              <div style={{ width: '1px', height: '16px', background: '#e5e7eb' }} />
-                              <button
-                                onClick={() => handleOpenForceClose(s)}
-                                title="Tutup sif ini secara paksa oleh Owner (penutupan administratif)"
-                                style={{
-                                  padding: '3px 8px',
-                                  background: '#fff1f2',
-                                  color: '#be123c',
-                                  border: '1px solid #fecdd3',
-                                  borderRadius: '5px',
-                                  fontWeight: 700,
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  transition: 'all 0.15s ease',
-                                }}
-                              >
-                                <ShieldAlert size={12} color="#be123c" />
-                                Tutup Paksa
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleOpenForceClose(s)}
+                              title="Tutup sif ini secara paksa oleh Owner"
+                              style={{
+                                padding: '4px 8px',
+                                background: '#fff1f2',
+                                color: '#be123c',
+                                border: '1px solid #fecdd3',
+                                borderRadius: '6px',
+                                fontWeight: 700,
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <ShieldAlert size={12} color="#be123c" />
+                              Tutup Paksa
+                            </button>
                           )}
                         </div>
                       </td>
@@ -755,7 +1030,7 @@ export function AdminShiftsView() {
         </div>
       </div>
 
-      {/* CASH MOVEMENTS MODAL */}
+      {/* 5. CASH MOVEMENTS MODAL */}
       {selectedShift && (
         <div
           style={{
@@ -769,85 +1044,99 @@ export function AdminShiftsView() {
             zIndex: 9999,
             padding: '16px',
           }}
+          onClick={() => setSelectedShift(null)}
         >
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '620px',
+              borderRadius: '16px',
+              maxWidth: '580px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 24px',
+                padding: '16px 20px',
                 borderBottom: '1px solid #e7e8e3',
+                background: '#fafaf8',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  Jurnal Mutasi Kas Sif: {selectedShift.cashier_name}
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
+                  Jurnal Mutasi Kas: {selectedShift.cashier_name}
                 </h3>
-                <div style={{ fontSize: '12px', color: '#64746b', marginTop: '2px' }}>
+                <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
                   Modal Awal: Rp {Number(selectedShift.opening_cash).toLocaleString('id-ID')}
                 </div>
               </div>
               <button
                 onClick={() => setSelectedShift(null)}
                 style={{
-                  background: '#f7f7f5',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e4dc',
+                  borderRadius: '6px',
+                  padding: '5px',
                   cursor: 'pointer',
                   color: '#64746b',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {selectedShift.closing_notes && (
                 <div
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
                     background: '#f8fafc',
                     border: '1px solid #e2e8f0',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     color: '#334155',
                   }}
                 >
-                  <strong>Catatan Penutupan Sif:</strong> {selectedShift.closing_notes}
+                  <strong>Catatan Penutupan:</strong> {selectedShift.closing_notes}
                 </div>
               )}
 
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', whiteSpace: 'nowrap' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e7e8e3', color: '#64746b', height: '36px' }}>
-                    <th style={{ textAlign: 'left', padding: '0 8px', fontWeight: 600 }}>Tipe</th>
-                    <th style={{ textAlign: 'left', padding: '0 8px', fontWeight: 600 }}>Kategori</th>
-                    <th style={{ textAlign: 'left', padding: '0 8px', fontWeight: 600 }}>Keterangan</th>
-                    <th style={{ textAlign: 'right', padding: '0 8px', fontWeight: 600 }}>Nominal</th>
+                  <tr style={{ borderBottom: '1px solid #e7e8e3', color: '#71717a', height: '34px' }}>
+                    <th style={{ textAlign: 'left', padding: '0 8px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                      Tipe
+                    </th>
+                    <th style={{ textAlign: 'left', padding: '0 8px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                      Kategori
+                    </th>
+                    <th style={{ textAlign: 'left', padding: '0 8px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                      Keterangan
+                    </th>
+                    <th style={{ textAlign: 'center', padding: '0 8px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                      Bukti Nota
+                    </th>
+                    <th style={{ textAlign: 'right', padding: '0 8px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                      Nominal
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoadingMovements ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: '#64746b' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#71717a' }}>
                         Memuat data mutasi kas...
                       </td>
                     </tr>
                   ) : movements.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: '#8b968f', fontStyle: 'italic' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#8b968f' }}>
                         Tidak ada transaksi kas masuk / kas keluar (petty cash) pada sif ini.
                       </td>
                     </tr>
@@ -855,7 +1144,7 @@ export function AdminShiftsView() {
                     movements.map((m) => {
                       const isCashIn = m.type === 'CASH_IN';
                       return (
-                        <tr key={m.id} style={{ borderBottom: '1px solid #f0f0eb', height: '38px', whiteSpace: 'nowrap' }}>
+                        <tr key={m.id} style={{ borderBottom: '1px solid #f0f0eb', height: '38px' }}>
                           <td style={{ padding: '0 8px', verticalAlign: 'middle' }}>
                             <span
                               style={{
@@ -878,9 +1167,36 @@ export function AdminShiftsView() {
                             {m.category}
                           </td>
                           <td style={{ padding: '0 8px', verticalAlign: 'middle', color: '#64746b' }}>
-                            <div style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={m.description || '-'}>
+                            <div style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={m.description || '-'}>
                               {m.description || '-'}
                             </div>
+                          </td>
+                          <td style={{ padding: '0 8px', verticalAlign: 'middle', textAlign: 'center' }}>
+                            {m.receipt_url ? (
+                              <button
+                                type="button"
+                                onClick={() => setViewingReceipt(m.receipt_url!)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: '#edf3ee',
+                                  border: '1px solid #cbd5e1',
+                                  color: '#57695b',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                                title="Klik untuk melihat foto bukti nota fisik"
+                              >
+                                <Camera size={12} />
+                                <span>Lihat Nota</span>
+                              </button>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
+                            )}
                           </td>
                           <td
                             style={{
@@ -905,20 +1221,20 @@ export function AdminShiftsView() {
               style={{
                 display: 'flex',
                 justifyContent: 'flex-end',
-                padding: '16px 24px',
+                padding: '14px 20px',
                 borderTop: '1px solid #e7e8e3',
-                background: '#fbfbf9',
+                background: '#fafaf8',
               }}
             >
               <button
                 onClick={() => setSelectedShift(null)}
                 style={{
-                  padding: '9px 18px',
+                  padding: '7px 16px',
                   background: '#57695b',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '13px',
+                  borderRadius: '7px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -930,7 +1246,104 @@ export function AdminShiftsView() {
         </div>
       )}
 
-      {/* FORCE CLOSE MODAL (OWNER ONLY) */}
+      {/* Lightbox Modal Foto Bukti Nota Fisik */}
+      {viewingReceipt && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setViewingReceipt(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              maxWidth: '560px',
+              width: '100%',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px',
+                borderBottom: '1px solid #f1f5f9',
+              }}
+            >
+              <b style={{ fontSize: '14px', color: '#1e293b' }}>Foto Bukti Nota / Kwitansi Fisik</b>
+              <button
+                onClick={() => setViewingReceipt(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div style={{ padding: '16px', textAlign: 'center', background: '#0f172a', maxHeight: '70vh', overflowY: 'auto' }}>
+              <img
+                src={viewingReceipt}
+                alt="Bukti Nota Pengeluaran"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '60vh',
+                  objectFit: 'contain',
+                  borderRadius: '8px',
+                  margin: '0 auto',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <div style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafaf8' }}>
+              <a
+                href={viewingReceipt}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: '12px', color: '#57695b', fontWeight: 600, textDecoration: 'underline' }}
+              >
+                Buka di Tab Baru ↗
+              </a>
+              <button
+                onClick={() => setViewingReceipt(null)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#57695b',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. FORCE CLOSE MODAL (OWNER ONLY) */}
       {forceCloseTarget && (
         <div
           style={{
@@ -944,16 +1357,18 @@ export function AdminShiftsView() {
             zIndex: 9999,
             padding: '16px',
           }}
+          onClick={() => setForceCloseTarget(null)}
         >
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '540px',
+              borderRadius: '16px',
+              maxWidth: '500px',
               width: '100%',
               boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
               overflow: 'hidden',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div
@@ -961,86 +1376,48 @@ export function AdminShiftsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 24px',
+                padding: '16px 20px',
                 borderBottom: '1px solid #fee2e2',
-                background: '#fff7f7',
+                background: '#fff5f5',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    background: '#fee2e2',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#b91c1c',
-                  }}
-                >
-                  <ShieldAlert size={20} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#991b1b', margin: 0 }}>
-                    Tutup Sif Paksa (Otoritas Owner)
-                  </h3>
-                  <div style={{ fontSize: '12px', color: '#b91c1c', marginTop: '2px' }}>
-                    Kasir: <strong>{forceCloseTarget.cashier_name}</strong>
-                  </div>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b' }}>
+                <ShieldAlert size={18} />
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Tutup Sif Paksa (Otoritas Owner)
+                </h3>
               </div>
               <button
                 onClick={() => setForceCloseTarget(null)}
                 disabled={isSubmittingForceClose}
                 style={{
-                  background: '#fef2f2',
+                  background: 'transparent',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
+                  borderRadius: '6px',
+                  padding: '4px',
                   cursor: 'pointer',
-                  color: '#991b1b',
+                  color: '#64746b',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             {/* Content */}
-            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {(() => {
-                const openTime = new Date(forceCloseTarget.opened_at);
-                const durationMs = Math.max(0, Date.now() - openTime.getTime());
-                const totalMinutes = Math.floor(durationMs / 60000);
-                const hours = Math.floor(totalMinutes / 60);
-                const mins = totalMinutes % 60;
-                const activeDuration = hours > 0 ? `${hours} jam ${mins} menit` : totalMinutes >= 1 ? `${totalMinutes} menit` : '< 1 menit';
-
-                return (
-                  <div
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: '10px',
-                      background: '#fff1f2',
-                      border: '1px solid #fecdd3',
-                      fontSize: '12px',
-                      color: '#9f1239',
-                      lineHeight: '1.5',
-                      display: 'flex',
-                      gap: '10px',
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    <ShieldAlert size={18} color="#be123c" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <strong style={{ color: '#881337' }}>Peringatan Penghentian Sif Aktif:</strong>
-                      <div style={{ marginTop: '2px', color: '#9f1239' }}>
-                        Menutup paksa sif kasir <strong>{forceCloseTarget.cashier_name}</strong> (berjalan selama {activeDuration}) akan langsung mengakhiri sesi kasir ini secara administratif. Kasir di terminal POS akan keluar dari sesi saat ini.
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  background: '#fff1f2',
+                  border: '1px solid #fecdd3',
+                  fontSize: '12px',
+                  color: '#9f1239',
+                  lineHeight: '1.5',
+                }}
+              >
+                Menutup paksa sesi kasir <strong>{forceCloseTarget.cashier_name}</strong> secara administratif. Terminal kasir akan otomatis keluar dari sesi saat ini.
+              </div>
 
               {/* Sif Breakdown Summary */}
               {(() => {
@@ -1052,29 +1429,35 @@ export function AdminShiftsView() {
                 const exp = op + cs + cin - cout;
 
                 return (
-                  <div style={{ background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '14px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
-                      Ringkasan Kas Sif Kasir (Real-time):
+                  <div style={{ background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                      Ringkasan Kas Laci Real-time:
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                      <div style={{ color: '#475569', fontWeight: 600 }}>Modal Awal Kasir:</div>
-                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>Rp {op.toLocaleString('id-ID')}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '12px' }}>
+                      <div style={{ color: '#64748b' }}>Modal Awal:</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>
+                        Rp {op.toLocaleString('id-ID')}
+                      </div>
 
-                      <div style={{ color: '#475569', fontWeight: 600 }}>Penjualan Tunai:</div>
-                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>+Rp {cs.toLocaleString('id-ID')}</div>
+                      <div style={{ color: '#64748b' }}>Penjualan Tunai:</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
+                        +Rp {cs.toLocaleString('id-ID')}
+                      </div>
 
-                      <div style={{ color: '#475569', fontWeight: 600 }}>QRIS / Non-Tunai:</div>
-                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#0369a1' }}>Rp {ncs.toLocaleString('id-ID')}</div>
+                      <div style={{ color: '#64748b' }}>QRIS / Non-Tunai:</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#0369a1' }}>
+                        Rp {ncs.toLocaleString('id-ID')}
+                      </div>
 
-                      <div style={{ color: '#475569', fontWeight: 600 }}>Mutasi Kas Operasional:</div>
-                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#475569' }}>
+                      <div style={{ color: '#64748b' }}>Mutasi Kas:</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#64748b' }}>
                         +{cin.toLocaleString('id-ID')} / -{cout.toLocaleString('id-ID')}
                       </div>
 
                       <div style={{ color: '#0f172a', fontWeight: 800, borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>
                         Ekspektasi Uang Fisik:
                       </div>
-                      <div style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a', borderTop: '1px solid #cbd5e1', paddingTop: '6px', fontSize: '13px' }}>
+                      <div style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a', borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>
                         Rp {exp.toLocaleString('id-ID')}
                       </div>
                     </div>
@@ -1084,19 +1467,19 @@ export function AdminShiftsView() {
 
               {/* Input Actual Cash */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c2826', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c2826', marginBottom: '4px' }}>
                   Hitung Uang Fisik di Laci Kas (Rp):
                 </label>
                 <input
                   type="number"
                   value={forceCloseActualCash}
                   onChange={(e) => setForceCloseActualCash(e.target.value)}
-                  placeholder="Masukkan nominal uang di laci kas..."
+                  placeholder="Masukkan nominal fisik di laci kas..."
                   style={{
                     width: '100%',
-                    height: '38px',
+                    height: '36px',
                     padding: '0 12px',
-                    borderRadius: '8px',
+                    borderRadius: '7px',
                     border: '1px solid #cbd5e1',
                     fontSize: '13px',
                     fontWeight: 700,
@@ -1104,42 +1487,12 @@ export function AdminShiftsView() {
                     boxSizing: 'border-box',
                   }}
                 />
-                {(() => {
-                  const op = Number(forceCloseTarget.opening_cash || 0);
-                  const cs = Number(forceCloseTarget.cash_sales || 0);
-                  const cin = Number(forceCloseTarget.total_cash_in || 0);
-                  const cout = Number(forceCloseTarget.total_cash_out || 0);
-                  const exp = op + cs + cin - cout;
-                  const actualNum = forceCloseActualCash !== '' ? Number(forceCloseActualCash) : exp;
-                  const diffNum = actualNum - exp;
-
-                  return (
-                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '11px', color: '#64748b' }}>
-                        Default diisi otomatis sesuai ekspektasi kas.
-                      </span>
-                      {diffNum === 0 ? (
-                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '5px' }}>
-                          ✓ Seimbang (Rp 0)
-                        </span>
-                      ) : diffNum > 0 ? (
-                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '5px' }}>
-                          + Lebih (+Rp {diffNum.toLocaleString('id-ID')})
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#b91c1c', background: '#fee2e2', padding: '2px 8px', borderRadius: '5px' }}>
-                          - Kurang (-Rp {Math.abs(diffNum).toLocaleString('id-ID')})
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
 
               {/* Input Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c2826', marginBottom: '6px' }}>
-                  Catatan Alasan Penutupan Paksa:
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c2826', marginBottom: '4px' }}>
+                  Alasan Penutupan Paksa:
                 </label>
                 <input
                   type="text"
@@ -1148,9 +1501,9 @@ export function AdminShiftsView() {
                   placeholder="Contoh: Kasir lupa tutup sif sebelum pulang"
                   style={{
                     width: '100%',
-                    height: '38px',
+                    height: '36px',
                     padding: '0 12px',
-                    borderRadius: '8px',
+                    borderRadius: '7px',
                     border: '1px solid #cbd5e1',
                     fontSize: '12px',
                     outline: 'none',
@@ -1172,10 +1525,10 @@ export function AdminShiftsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'flex-end',
-                gap: '10px',
-                padding: '16px 24px',
+                gap: '8px',
+                padding: '14px 20px',
                 borderTop: '1px solid #e7e8e3',
-                background: '#fbfbf9',
+                background: '#fafaf8',
               }}
             >
               <button
@@ -1183,11 +1536,11 @@ export function AdminShiftsView() {
                 onClick={() => setForceCloseTarget(null)}
                 disabled={isSubmittingForceClose}
                 style={{
-                  padding: '9px 16px',
+                  padding: '8px 16px',
                   background: '#f1f5f9',
                   color: '#475569',
                   border: '1px solid #cbd5e1',
-                  borderRadius: '8px',
+                  borderRadius: '7px',
                   fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -1200,11 +1553,11 @@ export function AdminShiftsView() {
                 onClick={handleConfirmForceClose}
                 disabled={isSubmittingForceClose}
                 style={{
-                  padding: '9px 18px',
+                  padding: '8px 18px',
                   background: '#dc2626',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '7px',
                   fontSize: '12px',
                   fontWeight: 700,
                   cursor: isSubmittingForceClose ? 'not-allowed' : 'pointer',
@@ -1215,14 +1568,14 @@ export function AdminShiftsView() {
                 }}
               >
                 <ShieldAlert size={14} />
-                {isSubmittingForceClose ? 'Memproses...' : 'Konfirmasi Tutup Sif Paksa'}
+                {isSubmittingForceClose ? 'Memproses...' : 'Tutup Sif Paksa'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* QUICK DETAILS POPOVER FOR SHIFT & CASH DETAILS */}
+      {/* 7. QUICK DETAILS POPOVER */}
       {shiftPopover && (
         <div
           style={{

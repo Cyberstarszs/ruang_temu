@@ -6398,8 +6398,8 @@ body {
 }
 .new-product-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 11px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
 }
 .new-product-grid > button {
   background: var(--surface-raised);
@@ -7425,11 +7425,10 @@ body {
   gap: 8px;
 }
 .pos-shift {
-  min-width: 286px;
+  min-width: auto;
   height: 48px;
   padding: 0 10px;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   color: var(--surface-raised);
@@ -7502,17 +7501,19 @@ body {
   border-radius: 12px;
   box-shadow: 0 20px 50px color-mix(in srgb, var(--green) 22%, transparent);
 }
-.shift-popover button {
+.shift-popover > button,
+.shift-popover .shift-action-btn {
   width: 100%;
-  min-height: 42px;
-  padding: 0 10px;
+  min-height: 40px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   text-align: left;
 }
-.shift-popover button:hover {
+.shift-popover > button:hover,
+.shift-popover .shift-action-btn:hover {
   background: var(--surface);
 }
 .new-pos > main {
@@ -10413,17 +10414,18 @@ textarea:focus-visible {
   user-select: none;
 }
 .pos-shift {
-  width: fit-content;
-  max-width: calc(50vw - 110px);
-  height: 48px;
-  padding: 0 12px 0 6px;
-  display: flex;
+  width: fit-content !important;
+  min-width: auto !important;
+  max-width: fit-content !important;
+  height: 42px;
+  padding: 0 12px 0 5px;
+  display: inline-flex !important;
   align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 24px;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
   color: var(--surface-raised);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 20;
@@ -10468,6 +10470,14 @@ textarea:focus-visible {
   opacity: 0.8;
   margin-left: 2px;
 }
+.pos-navbar-left {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+  max-width: calc(50vw - 110px);
+}
 .pos-brand-center {
   position: absolute;
   left: 50%;
@@ -10481,12 +10491,12 @@ textarea:focus-visible {
 }
 .pos-brand-center img.brand-wordmark,
 .pos-brand-center .brand-wordmark {
-  height: 32px;
-  max-height: 32px;
+  height: 42px;
+  max-height: 44px;
   width: auto;
   object-fit: contain;
   display: block;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.22));
   flex-shrink: 0;
 }
 .pos-navbar-actions {
@@ -10503,33 +10513,37 @@ textarea:focus-visible {
   align-items: center;
   gap: 6px;
   height: 38px;
-  padding: 0 11px;
-  background: #ffffff;
-  color: #374151;
-  border: 1px solid #dcdfd5;
-  border-radius: 9px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
   touch-action: manipulation;
   user-select: none;
 }
 .pos-nav-btn:hover {
-  background: #f8faf8;
-  border-color: #bcc4be;
-  color: #1f2937;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
 }
 .pos-nav-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  background: rgba(255, 255, 255, 0.28);
 }
 .pos-nav-btn-active {
-  background: #edf3ee !important;
-  border-color: #57695b !important;
-  color: #334437 !important;
+  background: rgba(255, 255, 255, 0.26) !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  color: #ffffff !important;
 }
 .pos-nav-icon-btn {
   width: 38px;
@@ -10538,8 +10552,9 @@ textarea:focus-visible {
   justify-content: center;
 }
 .pos-nav-badge {
-  background: #57695b;
+  background: rgba(255, 255, 255, 0.25);
   color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 700;
@@ -10547,16 +10562,16 @@ textarea:focus-visible {
   line-height: 1.2;
 }
 .pos-nav-cart-btn {
-  border-color: #57695b;
+  border-color: rgba(255, 255, 255, 0.25);
 }
 .pos-nav-cart-open {
-  background: #edf3ee;
-  border-color: #57695b;
-  color: #334437;
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  color: #ffffff !important;
 }
 .pos-nav-badge-accent {
-  background: #57695b;
-  color: #ffffff;
+  background: #d4a373;
+  color: #1e2422;
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 800;
@@ -10719,23 +10734,28 @@ textarea:focus-visible {
   margin-top: 1px;
 }
 .shift-popover-close {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  flex-shrink: 0 !important;
 }
 .shift-popover-close:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #991b1b;
+  background: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #991b1b !important;
 }
 .pos-shift-chevron {
   display: inline-flex;
@@ -10758,14 +10778,23 @@ textarea:focus-visible {
   border-bottom: 1px dashed var(--pos-line);
 }
 .shift-summary span {
-  color: var(--pos-muted);
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  background: #f8faf8;
+  border: 1px solid #eef2ec;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
 }
 .shift-summary b {
   display: block;
-  margin-top: 3px;
-  color: var(--pos-ink);
-  font-size: 13px;
+  margin-top: 4px;
+  color: #1e293b;
+  font-size: 13.5px;
+  font-weight: 700;
 }
 .shift-popover > button {
   min-height: 42px;
@@ -10844,7 +10873,7 @@ textarea:focus-visible {
   gap: 12px;
 }
 .new-product-grid > article {
-  min-height: 292px;
+  min-height: auto;
   position: relative;
   overflow: hidden;
   background: var(--pos-card);
@@ -10865,7 +10894,7 @@ textarea:focus-visible {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.new-product-grid > article > div {
+.new-product-grid > article > div:first-child {
   height: 184px;
   position: relative;
   overflow: hidden;
@@ -11935,9 +11964,9 @@ textarea:focus-visible {
     gap: 8px;
   }
   .new-product-grid > article {
-    min-height: 230px;
+    min-height: auto;
   }
-  .new-product-grid > article > div {
+  .new-product-grid > article > div:first-child {
     height: 132px;
   }
   .pos-type-tabs button span {
@@ -18332,8 +18361,49 @@ textarea:focus-visible {
 }
 .new-pos .new-product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (min-width: 1024px) {
+  .new-pos .new-product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+}
+.new-pos .new-product-grid > article {
+  min-height: auto !important;
+  height: fit-content !important;
+  align-self: start !important;
+}
+
+/* POS CATALOG SNUG COMPACT CARDS (ELIMINATE EMPTY BOTTOM SPACE) */
+.new-pos .new-product-grid,
+.new-product-grid {
+  align-items: start !important;
+}
+.new-pos .new-product-grid > article,
+.new-product-grid > article {
+  min-height: auto !important;
+  height: fit-content !important;
+  align-self: start !important;
+}
+.new-pos .new-product-grid > article > .pos-card-body,
+.new-product-grid > article > .pos-card-body {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  padding: 8px 12px 10px 12px !important;
+}
+
+/* POS CASHIER PROFILE SNUG FIT PILL */
+.new-pos .pos-shift,
+.pos-shift {
+  width: fit-content !important;
+  min-width: unset !important;
+  max-width: fit-content !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 .new-pos .new-product-grid > article {
   min-width: 0;
@@ -18999,8 +19069,8 @@ textarea:focus-visible {
   }
   .new-pos .new-product-grid {
     display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 14px !important;
   }
   .new-pos .new-pos-cart {
     position: static !important;
@@ -19064,7 +19134,7 @@ textarea:focus-visible {
     padding: 0 14px !important;
   }
   .new-pos .pos-brand-center img {
-    max-height: 28px !important;
+    max-height: 38px !important;
   }
   .new-pos .pos-shift span b {
     font-size: 13px !important;
@@ -20342,44 +20412,75 @@ textarea:focus-visible {
   color: var(--green);
 }
 .staff-login-form input {
-  height: 52px;
-  padding-left: 48px;
-  border-radius: 12px;
+  height: 48px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 15px;
+  outline: none;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
 }
+.staff-login-form input:focus {
+  border-color: var(--green);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 20%, transparent);
+}
 .staff-password-field input {
-  padding-right: 52px;
+  padding-right: 46px;
 }
 .staff-password-field button {
-  top: 4px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.staff-password-field button:hover {
+  color: var(--ink);
 }
 .staff-login-submit {
-  height: 52px !important;
-  min-height: 52px;
-  border-radius: 12px;
+  width: 100%;
+  height: 48px !important;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--green);
+  color: var(--on-green);
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
   transition:
     background-color 150ms ease,
     transform 100ms ease;
 }
 .staff-login-submit span {
-  flex: 1;
   text-align: center;
 }
 .staff-login-submit svg {
-  transition: transform 150ms ease;
+  display: none;
 }
 .staff-login-submit:hover:not(:disabled) {
   background: var(--green-hover);
 }
-.staff-login-submit:hover:not(:disabled) svg {
-  transform: translateX(4px);
-}
 .staff-login-submit:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: scale(0.99);
 }
-.staff-login :is(input, button):focus-visible,
+.staff-login button:focus-visible,
 .new-pos :is(input, button, select, textarea):focus-visible,
 .admin-v2 :is(input, button, select, textarea):focus-visible {
   outline: 2px solid var(--green);
@@ -20802,22 +20903,7 @@ textarea:focus-visible {
   background: var(--green-hover);
 }
 .new-pos .new-product-grid > article {
-  min-height: 292px;
-}
-.new-pos .new-product-grid > article > span {
-  min-height: 102px;
-  padding: 10px 60px 10px 14px;
-}
-.new-pos .new-product-grid > article > span b {
-  line-height: 1.28;
-}
-.new-pos .new-product-grid > article > span > strong,
-.new-pos .pos-card-price {
-  margin-top: 4px;
-}
-.new-pos .pos-card-add {
-  right: 12px;
-  bottom: 12px;
+  min-height: auto;
 }
 
 .promo-stat-grid {
@@ -21224,26 +21310,14 @@ textarea:focus-visible {
   }
 }
 
-/* Custom Sleek Scrollbar - Eliminates Clunky OS Scrollbars */
+/* Sembunyikan scrollbar bawaan di seluruh halaman agar tampilan bersih, konsisten, dan rapi */
+html,
+body,
 * {
-  scrollbar-width: thin;
-  scrollbar-color: #d1cfc7 transparent;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  background: #d1cfc7;
-  border-radius: 999px;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: #a8a69e;
-}
-*::-webkit-scrollbar-button {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
@@ -21493,20 +21567,83 @@ textarea:focus-visible {
 }
 
 /* Admin / Backoffice Responsive Shell Rules */
+.admin-main-content {
+  padding: 14px 12px 60px 12px !important;
+}
+
 @media (min-width: 768px) {
   .admin-mobile-header {
     display: none !important;
   }
-  .admin-desktop-sidebar {
+  .admin-desktop-sidebar,
+  .admin-desktop-header {
     display: flex !important;
+  }
+  .admin-main-content {
+    padding: 24px 28px 84px 28px !important;
   }
 }
 
 @media (max-width: 767px) {
-  .admin-desktop-sidebar {
+  .admin-desktop-sidebar,
+  .admin-desktop-header {
     display: none !important;
   }
   .admin-mobile-header {
     display: flex !important;
   }
+}
+
+@keyframes slideDrawerRight {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* ============================================================
+   POS CASHIER CATALOG: 4-COLUMN DESKTOP GRID (RUANG TEMU)
+   ============================================================ */
+@media (min-width: 1024px) {
+  .new-pos .new-product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+}
+.new-pos .new-product-grid > article {
+  min-height: auto !important;
+  height: fit-content !important;
+  align-self: start !important;
+}
+
+/* POS CATALOG SNUG COMPACT CARDS (ELIMINATE EMPTY BOTTOM SPACE) */
+.new-pos .new-product-grid,
+.new-product-grid {
+  align-items: start !important;
+}
+.new-pos .new-product-grid > article,
+.new-product-grid > article {
+  min-height: auto !important;
+  height: fit-content !important;
+  align-self: start !important;
+}
+.new-pos .new-product-grid > article > .pos-card-body,
+.new-product-grid > article > .pos-card-body {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  padding: 8px 12px 10px 12px !important;
+}
+
+/* POS CASHIER PROFILE SNUG FIT PILL */
+.new-pos .pos-shift,
+.pos-shift {
+  width: fit-content !important;
+  min-width: unset !important;
+  max-width: fit-content !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }

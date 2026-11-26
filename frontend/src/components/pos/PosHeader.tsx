@@ -91,22 +91,65 @@ export function PosHeader({
   return (
     <>
       <header className="pos-navbar">
-        {/* Left: Cashier Profile & Shift Trigger */}
-        <div ref={shiftRef} style={{ position: 'relative' }}>
-          <button
-            className={`pos-shift ${shiftDropdownOpen ? 'pos-shift-open' : ''}`}
+        {/* Left: Cashier Profile & Shift Trigger + Fitur Pengeluaran */}
+        <div className="pos-navbar-left">
+          <div ref={shiftRef} style={{ position: 'relative' }}>
+            <button
+              className={`pos-shift ${shiftDropdownOpen ? 'pos-shift-open' : ''}`}
             onClick={() => setShiftDropdownOpen((prev) => !prev)}
             title={shiftDropdownOpen ? 'Tutup Menu Sif Kasir (Esc)' : 'Buka Menu Sif & Profil Kasir'}
             aria-expanded={shiftDropdownOpen}
+            style={{
+              height: '42px',
+              width: 'fit-content',
+              minWidth: 'unset',
+              maxWidth: 'fit-content',
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0 12px 0 5px',
+              gap: '8px',
+              borderRadius: '9999px',
+              background: 'rgba(255, 255, 255, 0.12)',
+              border: '1px solid rgba(255, 255, 255, 0.22)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+            }}
           >
-            <img
-              className="shift-photo"
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
-              alt={user?.name || 'Kasir'}
-            />
-            <span>
-              <b>{user?.name || 'Kasir RUANG TEMU'}</b>
-              <small>
+            <div style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0 }}>
+              <img
+                className="shift-photo"
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
+                alt={user?.name || 'Kasir'}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '1.5px solid #d4a373',
+                  display: 'block',
+                }}
+              />
+              {hasActiveShift && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '-1px',
+                    right: '-1px',
+                    width: '8px',
+                    height: '8px',
+                    backgroundColor: '#22c55e',
+                    borderRadius: '50%',
+                    border: '1.5px solid #324036',
+                  }}
+                  title="Sif Aktif"
+                />
+              )}
+            </div>
+            <span style={{ textAlign: 'left', lineHeight: '1.2' }}>
+              <b style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', display: 'block' }}>
+                {user?.name || 'Kasir RUANG TEMU'}
+              </b>
+              <small style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.82)', display: 'block' }}>
                 {hasActiveShift ? (
                   <>Sif Aktif · {hours > 0 ? `${hours}j ` : ''}{mins}m</>
                 ) : (
@@ -114,158 +157,437 @@ export function PosHeader({
                 )}
               </small>
             </span>
-            <span className={`pos-shift-chevron ${shiftDropdownOpen ? 'is-open' : ''}`} aria-hidden="true">
-              <Icon name="chevronDown" size={15} />
+            <span className={`pos-shift-chevron ${shiftDropdownOpen ? 'is-open' : ''}`} aria-hidden="true" style={{ color: '#ffffff' }}>
+              <Icon name="chevronDown" size={14} />
             </span>
           </button>
 
-          {/* Shift Popover Dropdown */}
+          {/* Shift Popover Dropdown - Modern, Professional, Clean Presentation */}
           {shiftDropdownOpen && (
-            <aside className="shift-popover">
-              <header>
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
-                  alt={user?.name || 'Kasir'}
-                />
-                <div className="shift-popover-user-info">
-                  <b>{user?.name}</b>
-                  <em>{user?.role === 'OWNER' ? 'Owner / Pengelola' : 'Kasir Operasional'}</em>
+            <aside
+              className="shift-popover"
+              style={{
+                width: '320px',
+                padding: '16px',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                border: '1px solid #e2e8f0',
+                background: '#ffffff',
+              }}
+            >
+              {/* Header: User Profile Info + Close Button */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingBottom: '12px',
+                  borderBottom: '1px solid #f1f5f9',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <img
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
+                    alt={user?.name || 'Kasir'}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      border: '2px solid #57695b',
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <b
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: '#1e293b',
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {user?.name || 'Kasir'}
+                    </b>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: '#57695b',
+                        backgroundColor: '#edf3ee',
+                        padding: '1.5px 7px',
+                        borderRadius: '999px',
+                        marginTop: '2px',
+                      }}
+                    >
+                      {user?.role === 'OWNER' ? 'Owner / Pengelola' : 'Kasir Operasional'}
+                    </span>
+                  </div>
                 </div>
+
+                {/* Circular Clean Close Button */}
                 <button
                   type="button"
                   className="shift-popover-close"
                   onClick={() => setShiftDropdownOpen(false)}
                   title="Tutup Menu Sif (Esc)"
                   aria-label="Tutup Menu Sif"
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    minWidth: '28px',
+                    maxWidth: '28px',
+                    minHeight: '28px',
+                    maxHeight: '28px',
+                    padding: 0,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
                 >
-                  <Icon name="close" size={16} />
+                  <Icon name="close" size={14} />
                 </button>
-              </header>
+              </div>
 
+              {/* Shift Metrics 2x2 Grid */}
               {hasActiveShift && shift ? (
-                <div className="shift-summary">
-                  <span>
-                    Mulai Sif<b>{formatTime(shift.opened_at)}</b>
-                  </span>
-                  <span>
-                    Durasi Sif
-                    <b>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '8px',
+                    padding: '12px 0',
+                    borderBottom: '1px dashed #e2e8f0',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      backgroundColor: '#f8faf9',
+                      borderRadius: '10px',
+                      border: '1px solid #edf2ee',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Mulai Sif</span>
+                    <b style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', marginTop: '2px', display: 'block' }}>
+                      {formatTime(shift.opened_at)}
+                    </b>
+                  </div>
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      backgroundColor: '#f8faf9',
+                      borderRadius: '10px',
+                      border: '1px solid #edf2ee',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Durasi Sif</span>
+                    <b style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', marginTop: '2px', display: 'block' }}>
                       {hours}j {mins}m
                     </b>
-                  </span>
-                  <span>
-                    Modal Awal<b>{rupiah(shift.opening_cash)}</b>
-                  </span>
-                  <span>
-                    Transaksi Sif<b>{summary?.orderCount || 0} struk</b>
-                  </span>
+                  </div>
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      backgroundColor: '#f8faf9',
+                      borderRadius: '10px',
+                      border: '1px solid #edf2ee',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Modal Awal</span>
+                    <b style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', marginTop: '2px', display: 'block' }}>
+                      {rupiah(shift.opening_cash)}
+                    </b>
+                  </div>
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      backgroundColor: '#f8faf9',
+                      borderRadius: '10px',
+                      border: '1px solid #edf2ee',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Transaksi</span>
+                    <b style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', marginTop: '2px', display: 'block' }}>
+                      {summary?.orderCount || 0} struk
+                    </b>
+                  </div>
                 </div>
               ) : (
                 <div
                   style={{
-                    padding: '12px 14px',
-                    background: '#fff4d6',
-                    color: '#7a4e00',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    margin: '8px 12px',
+                    padding: '10px 12px',
+                    background: '#fffbeb',
+                    color: '#92400e',
+                    border: '1px solid #fef3c7',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    margin: '10px 0',
+                    lineHeight: '1.4',
                   }}
                 >
                   Kasir belum membuka sif hari ini. Silakan buka sif untuk mulai melayani transaksi.
                 </div>
               )}
 
-              {!hasActiveShift ? (
-                <button
-                  onClick={() => {
-                    setShiftDropdownOpen(false);
-                    onOpenShiftModal('open');
-                  }}
-                  style={{ color: '#57695b', fontWeight: 600 }}
-                >
-                  <Icon name="wallet" size={18} />
-                  Buka Sif Kasir Baru
-                </button>
-              ) : (
-                <>
+              {/* Action Buttons List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '8px' }}>
+                {!hasActiveShift ? (
                   <button
+                    type="button"
+                    className="shift-action-btn"
                     onClick={() => {
                       setShiftDropdownOpen(false);
-                      onOpenShiftModal('recap');
+                      onOpenShiftModal('open');
+                    }}
+                    style={{
+                      color: '#57695b',
+                      fontWeight: 600,
+                      backgroundColor: '#edf3ee',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      width: '100%',
                     }}
                   >
-                    <Icon name="receipt" size={18} />
-                    Rekap Sif Kasir
+                    <Icon name="wallet" size={17} />
+                    Buka Sif Kasir Baru
                   </button>
-                  <button
-                    onClick={() => {
-                      setShiftDropdownOpen(false);
-                      onOpenShiftModal('cash');
-                    }}
-                  >
-                    <Icon name="wallet" size={18} />
-                    Kas Masuk / Kas Keluar Operasional
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShiftDropdownOpen(false);
-                      onOpenShiftModal('close');
-                    }}
-                    style={{ color: '#a32424' }}
-                  >
-                    <Icon name="calculator" size={18} />
-                    Tutup Sif Kasir (Blind Cash Close)
-                  </button>
-                </>
-              )}
-
-              {/* Quick links to Management Tools */}
-              <div style={{ padding: '6px 0', borderTop: '1px solid #e5e7eb', marginTop: '6px' }}>
-                <button
-                  onClick={() => {
-                    setShiftDropdownOpen(false);
-                    onOpenMatrix();
-                  }}
-                  style={{ fontSize: '13px', width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  <Icon name="trendingUp" size={16} />
-                  Matriks Keputusan Menu (BCG)
-                </button>
-
-                {user?.role === 'OWNER' && onSwitchToAdmin && (
-                  <button
-                    onClick={() => {
-                      setShiftDropdownOpen(false);
-                      onSwitchToAdmin();
-                    }}
-                    style={{ fontSize: '13px', color: '#57695b', fontWeight: 600, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}
-                  >
-                    <Icon name="dashboard" size={16} />
-                    Masuk Mode Backoffice
-                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="shift-action-btn"
+                      onClick={() => {
+                        setShiftDropdownOpen(false);
+                        onOpenShiftModal('recap');
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        border: 'none',
+                        background: 'transparent',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        color: '#334155',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Icon name="receipt" size={17} className="text-slate-500" />
+                      Rekap Sif Kasir
+                    </button>
+                    <button
+                      type="button"
+                      className="shift-action-btn"
+                      onClick={() => {
+                        setShiftDropdownOpen(false);
+                        onOpenShiftModal('cash');
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        border: 'none',
+                        background: 'transparent',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        color: '#334155',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Icon name="wallet" size={17} className="text-slate-500" />
+                      Kas Masuk / Kas Keluar Operasional
+                    </button>
+                    <button
+                      type="button"
+                      className="shift-action-btn"
+                      onClick={() => {
+                        setShiftDropdownOpen(false);
+                        onOpenShiftModal('close');
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        border: 'none',
+                        background: 'transparent',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        color: '#dc2626',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fef2f2')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Icon name="calculator" size={17} className="text-red-600" />
+                      Tutup Sif Kasir (Blind Cash Close)
+                    </button>
+                  </>
                 )}
-              </div>
 
-              <button
-                onClick={() => {
-                  setShiftDropdownOpen(false);
-                  setLogoutConfirmOpen(true);
-                }}
-                style={{ color: '#a32424', borderTop: '1px solid #e5e7eb', marginTop: '4px' }}
-              >
-                <Icon name="logout" size={16} />
-                Keluar Sesi Kasir
-              </button>
+                {/* Secondary tools & shortcuts */}
+                <div style={{ padding: '6px 0 2px 0', borderTop: '1px solid #f1f5f9', marginTop: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShiftDropdownOpen(false);
+                      onOpenMatrix();
+                    }}
+                    style={{
+                      padding: '7px 10px',
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      color: '#475569',
+                      width: '100%',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <Icon name="trendingUp" size={15} />
+                    Matriks Keputusan Menu (BCG)
+                  </button>
+
+                  {user?.role === 'OWNER' && onSwitchToAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShiftDropdownOpen(false);
+                        onSwitchToAdmin();
+                      }}
+                      style={{
+                        padding: '7px 10px',
+                        border: 'none',
+                        background: 'transparent',
+                        borderRadius: '8px',
+                        fontSize: '12.5px',
+                        color: '#57695b',
+                        fontWeight: 600,
+                        width: '100%',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: 'pointer',
+                        marginTop: '2px',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#edf3ee')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Icon name="dashboard" size={15} />
+                      Masuk Mode Backoffice
+                    </button>
+                  )}
+                </div>
+
+                {/* Logout Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShiftDropdownOpen(false);
+                    setLogoutConfirmOpen(true);
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    border: 'none',
+                    borderTop: '1px solid #f1f5f9',
+                    background: 'transparent',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    color: '#dc2626',
+                    fontWeight: 600,
+                    width: '100%',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    marginTop: '4px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fef2f2')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <Icon name="logout" size={15} />
+                  Keluar Sesi Kasir
+                </button>
+              </div>
             </aside>
           )}
         </div>
 
-        {/* Center: Brand Wordmark (Mathematically Centered, Safe Zone Protected) */}
+        {/* Fitur Pengeluaran Kas Operasional (Beli Es Batu, Gas LPG, dll) */}
+        <button
+          type="button"
+          onClick={() => {
+            if (!hasActiveShift) {
+              onOpenShiftModal('open');
+            } else {
+              onOpenShiftModal('cash');
+            }
+          }}
+          className="pos-nav-btn pos-nav-expense-btn"
+          title="Catat Pengeluaran Kas Operasional (Beli Es Batu, Gas LPG, Bahan Baku, dll)"
+          aria-label="Catat Pengeluaran Kas Operasional"
+        >
+          <Icon name="wallet" size={14} />
+          <span className="pos-nav-text">Pengeluaran</span>
+        </button>
+      </div>
+
+      {/* Center: Brand Wordmark (Mathematically Centered, Safe Zone Protected) */}
         <div className="pos-brand-center" aria-label="Ruang Temu Brand">
           <img
             src="/brand/ruang-temu-navbar.png"
             alt="ruang temu."
             className="brand-wordmark"
+            style={{
+              height: '42px',
+              maxHeight: '44px',
+              width: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+              filter: 'drop-shadow(0 1px 3px rgba(0, 0, 0, 0.22))',
+              transition: 'all 0.2s ease',
+            }}
           />
         </div>
 

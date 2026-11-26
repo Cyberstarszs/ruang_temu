@@ -44,6 +44,7 @@ export async function getDailySummary(req: Request, res: Response, next: NextFun
     const totalTransactions = Number(s.total_transactions);
     const netSales = Number(s.net_sales);
     const totalCogs = Number(s.total_cogs);
+    const totalDiscounts = Number(s.total_discounts || 0);
     const grossProfit = netSales - totalCogs;
     const avgBasket = totalTransactions > 0 ? Math.round(netSales / totalTransactions) : 0;
 
@@ -56,6 +57,7 @@ export async function getDailySummary(req: Request, res: Response, next: NextFun
         totalTransactions,
         netSales,
         totalCogs,
+        totalDiscounts,
         grossProfit,
         grossMarginPercentage: netSales > 0 ? ((grossProfit / netSales) * 100).toFixed(1) : '0',
         averageBasketSize: avgBasket,

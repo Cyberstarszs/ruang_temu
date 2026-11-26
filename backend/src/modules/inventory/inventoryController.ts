@@ -124,20 +124,22 @@ export async function submitStocktake(req: Request, res: Response, next: NextFun
           [actual, ing.id]
         );
 
-        await client.query(
-          `INSERT INTO stock_movements (
-            ingredient_id, movement_type, quantity_change, resulting_balance, reference_id
-          ) VALUES ($1, 'STOCKTAKE', $2, $3, $4)`,
-          [ing.id, delta, actual, `OPNAME: ${item.notes || 'Penyesuaian Fisik'}`]
-        );
+        if (delta !== 0) {
+          await client.query(
+            `INSERT INTO stock_movements (
+              ingredient_id, movement_type, quantity_change, resulting_balance, reference_id
+            ) VALUES ($1, 'STOCKTAKE', $2, $3, $4)`,
+            [ing.id, delta, actual, `OPNAME: ${item.notes || 'Penyesuaian Fisik'}`]
+          );
 
-        adjustments.push({
-          name: ing.name,
-          previousStock: prev,
-          physicalStock: actual,
-          difference: delta,
-          unit: ing.usage_unit,
-        });
+          adjustments.push({
+            name: ing.name,
+            previousStock: prev,
+            physicalStock: actual,
+            difference: delta,
+            unit: ing.usage_unit,
+          });
+        }
       }
     }
 
@@ -244,6 +246,56 @@ export async function updateIngredient(req: Request, res: Response, next: NextFu
       res.status(409).json({ success: false, message: 'Kode bahan baku sudah digunakan oleh bahan lain.' });
       return;
     }
+    next(err);
+  }
+}
+
+export async function deleteIngredient(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    const checkRes = await pool.query(`SELECT id, name FROM ingredients WHERE id = $1`, [id]);
+    if (checkRes.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Bahan baku tidak ditemukan.' });
+      return;
+    }
+    const ingName = checkRes.rows[0].name;
+
+    // Cek apakah bahan digunakan di resep menu aktif
+    const recipeUsage = await pool.query(
+      `SELECT p.name FROM product_recipes pr JOIN products p ON pr.product_id = p.id WHERE pr.ingredient_id = $1 LIMIT 5`,
+      [id]
+    );
+    if (recipeUsage.rows.length > 0) {
+      const names = recipeUsage.rows.map((r: any) => r.name).join(', ');
+      res.status(400).json({
+        success: false,
+        message: `Bahan "${ingName}" tidak dapat dihapus karena masih digunakan pada resep menu: ${names}. Hapus bahan dari resep menu terkait terlebih dahulu.`,
+      });
+      return;
+    }
+
+    // Cek riwayat mutasi stok atau purchase orders
+    const movementCheck = await pool.query(`SELECT COUNT(*) FROM stock_movements WHERE ingredient_id = $1`, [id]);
+    const poCheck = await pool.query(`SELECT COUNT(*) FROM purchase_order_items WHERE ingredient_id = $1`, [id]);
+    const hasMovements = parseInt(movementCheck.rows[0].count) > 0;
+    const hasPOs = parseInt(poCheck.rows[0].count) > 0;
+
+    if (hasMovements || hasPOs) {
+      res.status(400).json({
+        success: false,
+        message: `Bahan "${ingName}" memiliki riwayat mutasi stok / pesanan pembelian untuk pembukuan. Tidak dapat dihapus permanen demi audit trail. Anda dapat menonaktifkan atau mengatur stoknya menjadi 0.`,
+      });
+      return;
+    }
+
+    await pool.query(`DELETE FROM ingredients WHERE id = $1`, [id]);
+
+    res.json({
+      success: true,
+      message: `Bahan baku "${ingName}" berhasil dihapus.`,
+    });
+  } catch (err) {
     next(err);
   }
 }

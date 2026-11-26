@@ -43,6 +43,7 @@ interface CartSidebarProps {
   onOpenPayment: () => void;
   onOpenSplitBill: () => void;
   onValidatePromo: (code: string) => Promise<void>;
+  onClearPromo?: () => void;
   promoError?: string;
   promoSuccess?: string;
   mobileOpen: boolean;
@@ -72,6 +73,7 @@ export function CartSidebar({
   onOpenPayment,
   onOpenSplitBill,
   onValidatePromo,
+  onClearPromo,
   promoError,
   promoSuccess,
   mobileOpen,
@@ -95,6 +97,13 @@ export function CartSidebar({
       await onValidatePromo(promoInput.trim());
     } finally {
       setValidatingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoInput('');
+    if (onClearPromo) {
+      onClearPromo();
     }
   };
 
@@ -639,59 +648,124 @@ export function CartSidebar({
             flexShrink: 0,
           }}
         >
-          {/* Quick Actions for Promo & Notes */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowPromoBox(!showPromoBox)}
+          {/* Quick Actions for Promo & Notes - 1 Baris Full Boxed Style Matching No Meja & Member */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '6px',
+              width: '100%',
+            }}
+          >
+            {/* Box 1: Promo Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowPromoBox(!showPromoBox);
+                if (showNoteBox) setShowNoteBox(false);
+              }}
+              style={{
+                height: '34px',
+                padding: '0 10px',
+                borderRadius: '7px',
+                border: promoCode
+                  ? '1.5px solid #2e7d32'
+                  : showPromoBox
+                  ? '1.5px solid #57695b'
+                  : '1px solid #d1cfc7',
+                backgroundColor: promoCode ? '#edf7ed' : showPromoBox ? '#f3f6f3' : '#ffffff',
+                color: promoCode ? '#1e4620' : '#374151',
+                fontSize: '12px',
+                fontWeight: promoCode || showPromoBox ? 700 : 500,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                overflow: 'hidden',
+              }}
+              title={promoCode ? `Promo Aktif: ${promoCode}` : 'Masukkan Kode Promo Diskon'}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Percent size={14} color={promoCode ? '#2e7d32' : '#57695b'} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {promoCode ? `Promo: ${promoCode}` : '+ Promo'}
+                </span>
+              </span>
+              <ChevronRight
+                size={12}
+                color={promoCode ? '#2e7d32' : '#9ca3af'}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: promoCode ? '#2e7d32' : '#6b7280',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  padding: 0,
+                  transform: showPromoBox ? 'rotate(90deg)' : 'none',
+                  transition: 'transform 0.15s ease',
+                  flexShrink: 0,
                 }}
-              >
-                <Percent size={12} />
-                {promoCode ? `Promo: ${promoCode}` : '+ Promo'}
-              </button>
+              />
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setShowNoteBox(!showNoteBox)}
+            {/* Box 2: Catatan Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowNoteBox(!showNoteBox);
+                if (showPromoBox) setShowPromoBox(false);
+              }}
+              style={{
+                height: '34px',
+                padding: '0 10px',
+                borderRadius: '7px',
+                border: orderNote
+                  ? '1.5px solid #57695b'
+                  : showNoteBox
+                  ? '1.5px solid #57695b'
+                  : '1px solid #d1cfc7',
+                backgroundColor: orderNote ? '#f3f6f3' : showNoteBox ? '#f3f6f3' : '#ffffff',
+                color: orderNote ? '#1c2826' : '#374151',
+                fontSize: '12px',
+                fontWeight: orderNote || showNoteBox ? 700 : 500,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                overflow: 'hidden',
+              }}
+              title={orderNote ? `Catatan: ${orderNote}` : 'Tambahkan Catatan Pesanan'}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <StickyNote size={14} color={orderNote ? '#57695b' : '#6b7280'} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {orderNote ? 'Catatan Aktif' : '+ Catatan'}
+                </span>
+              </span>
+              <ChevronRight
+                size={12}
+                color={orderNote ? '#57695b' : '#9ca3af'}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: orderNote ? '#57695b' : '#6b7280',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  padding: 0,
+                  transform: showNoteBox ? 'rotate(90deg)' : 'none',
+                  transition: 'transform 0.15s ease',
+                  flexShrink: 0,
                 }}
-              >
-                <StickyNote size={12} />
-                {orderNote ? 'Catatan Aktif' : '+ Catatan'}
-              </button>
-            </div>
-
-            <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-              {totalItemCount} item
-            </span>
+              />
+            </button>
           </div>
 
-          {/* Collapsible Promo Input */}
+          {/* Collapsible Promo Input Box */}
           {showPromoBox && (
-            <div style={{ background: '#f9fafb', padding: '6px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', gap: '4px' }}>
+            <div
+              style={{
+                background: '#f8faf9',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: '1.5px solid #57695b',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <input
                   type="text"
                   value={promoInput}
@@ -699,12 +773,22 @@ export function CartSidebar({
                   placeholder="KODE PROMO..."
                   style={{
                     flex: 1,
-                    padding: '4px 8px',
-                    borderRadius: '5px',
+                    height: '32px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
                     border: '1px solid #d1d5db',
-                    fontSize: '11.5px',
+                    fontSize: '12px',
+                    fontWeight: 600,
                     textTransform: 'uppercase',
                     fontFamily: 'monospace',
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleApplyPromo();
+                    }
                   }}
                 />
                 <button
@@ -712,47 +796,104 @@ export function CartSidebar({
                   disabled={validatingPromo || !promoInput.trim()}
                   onClick={handleApplyPromo}
                   style={{
-                    padding: '4px 10px',
+                    height: '32px',
+                    padding: '0 12px',
                     backgroundColor: '#57695b',
                     color: '#fff',
-                    borderRadius: '5px',
+                    borderRadius: '6px',
                     border: 'none',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: validatingPromo || !promoInput.trim() ? 'not-allowed' : 'pointer',
+                    opacity: validatingPromo || !promoInput.trim() ? 0.6 : 1,
                   }}
                 >
                   {validatingPromo ? '...' : 'Terapkan'}
                 </button>
+                {promoCode && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePromo}
+                    style={{
+                      height: '32px',
+                      padding: '0 10px',
+                      backgroundColor: '#fee2e2',
+                      color: '#b91c1c',
+                      borderRadius: '6px',
+                      border: '1px solid #fecaca',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    title="Hapus Promo"
+                  >
+                    Hapus
+                  </button>
+                )}
               </div>
-              {promoError && <small style={{ color: '#b91c1c', fontSize: '10px', display: 'block', marginTop: '2px' }}>{promoError}</small>}
-              {promoSuccess && <small style={{ color: '#2e7d32', fontSize: '10px', display: 'block', marginTop: '2px' }}>{promoSuccess}</small>}
+              {promoError && <small style={{ color: '#b91c1c', fontSize: '11px', fontWeight: 600 }}>{promoError}</small>}
+              {promoSuccess && <small style={{ color: '#2e7d32', fontSize: '11px', fontWeight: 600 }}>{promoSuccess}</small>}
             </div>
           )}
 
-          {/* Collapsible Note Input */}
+          {/* Collapsible Note Input Box */}
           {showNoteBox && (
-            <div style={{ background: '#f9fafb', padding: '6px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-              <input
-                type="text"
-                value={orderNote}
-                onChange={(e) => onSetOrderNote(e.target.value)}
-                placeholder="Catatan ke koki / barista..."
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  borderRadius: '5px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '11.5px',
-                }}
-              />
+            <div
+              style={{
+                background: '#f8faf9',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: '1.5px solid #57695b',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="text"
+                  value={orderNote}
+                  onChange={(e) => onSetOrderNote(e.target.value)}
+                  placeholder="Catatan ke koki / barista..."
+                  style={{
+                    flex: 1,
+                    height: '32px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '12px',
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                  }}
+                />
+                {orderNote && (
+                  <button
+                    type="button"
+                    onClick={() => onSetOrderNote('')}
+                    style={{
+                      height: '32px',
+                      padding: '0 10px',
+                      backgroundColor: '#fee2e2',
+                      color: '#b91c1c',
+                      borderRadius: '6px',
+                      border: '1px solid #fecaca',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    title="Hapus Catatan"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
           {/* Price Breakdown */}
           <div style={{ fontSize: '11.5px', color: '#6b7280', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Subtotal:</span>
+              <span>Subtotal ({totalItemCount} item):</span>
               <b style={{ color: '#1f2937' }}>{rupiah(subtotal)}</b>
             </div>
 

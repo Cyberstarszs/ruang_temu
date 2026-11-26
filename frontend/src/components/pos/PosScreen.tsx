@@ -414,9 +414,34 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     });
   };
 
+  // Toggle product favorite status
+  const handleToggleFavorite = async (product: Product) => {
+    const newStatus = !product.is_favorite;
+    // Optimistic UI update
+    setProducts((prev) =>
+      prev.map((p) => (p.id === product.id ? { ...p, is_favorite: newStatus } : p))
+    );
+    showToast(newStatus ? `"${product.name}" ditandai favorit ⭐` : `"${product.name}" dihapus dari favorit`);
+
+    try {
+      await api.products.update(product.id, { is_favorite: newStatus });
+    } catch {
+      // Revert on error
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, is_favorite: !newStatus } : p))
+      );
+      showToast('Gagal memperbarui status favorit.');
+    }
+  };
+
   // Filter products by category & search query
   const filteredProducts = products.filter((p) => {
-    const matchesCategory = activeCategory === 'Semua' || p.category === activeCategory;
+    const matchesCategory =
+      activeCategory === 'Semua'
+        ? true
+        : activeCategory === 'Favorit'
+        ? Boolean(p.is_favorite)
+        : p.category === activeCategory;
     const matchesSearch =
       !searchQuery.trim() ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -424,7 +449,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     return matchesCategory && matchesSearch;
   });
 
-  const categories = ['Semua', 'Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'];
+  const categories = ['Semua', 'Favorit', 'Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'];
 
   return (
     <div className="new-pos">
@@ -532,7 +557,9 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
                 >
                   <Icon
                     name={
-                      cat === 'Kopi'
+                      cat === 'Favorit'
+                        ? 'star'
+                        : cat === 'Kopi'
                         ? 'coffee'
                         : cat === 'Non-Kopi'
                         ? 'cupSoda'
@@ -551,7 +578,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
           </div>
 
           {/* Product Grid */}
-          <div className="new-product-grid" style={{ marginTop: '16px' }}>
+          <div className="new-product-grid" style={{ marginTop: '16px', alignItems: 'start' }}>
             {loadingData ? (
               <p style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#888' }}>
                 Memuat daftar menu RUANG TEMU...
@@ -592,6 +619,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
                       }
                     }}
                     onQuickAdd={handleQuickAdd}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 );
               })
@@ -630,6 +658,12 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
             }}
             onOpenSplitBill={() => setSplitBillOpen(true)}
             onValidatePromo={handleValidatePromo}
+            onClearPromo={() => {
+              setPromoCode('');
+              setDiscountAmount(0);
+              setPromoSuccess('');
+              setPromoError('');
+            }}
             promoError={promoError}
             promoSuccess={promoSuccess}
             mobileOpen={mobileCartOpen}

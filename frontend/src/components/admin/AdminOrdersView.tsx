@@ -1,26 +1,25 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { Order } from '@/types';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
-  ReceiptText,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Search,
-  CheckCircle2,
-  XCircle,
   RotateCcw,
-  Eye,
   Printer,
   Download,
-  AlertTriangle,
   X,
-  Calendar,
-  CreditCard,
-  ShoppingBag,
-  TrendingUp,
-  Tag,
   ChevronDown,
+  Eye,
+  AlertTriangle,
 } from 'lucide-react';
 
 // Helper to safely format modifiers (can be array of objects or strings)
@@ -46,7 +45,9 @@ export function AdminOrdersView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'CANCELLED'>('ALL');
   const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
-  // Filter States: Default tanggal adalah hari ini (menyerupai halaman sif)
+  const [cashierFilter, setCashierFilter] = useState<string>('ALL');
+
+  // Filter States: Default tanggal adalah hari ini (Asia/Jakarta)
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     return { from: today, to: today };
@@ -71,6 +72,47 @@ export function AdminOrdersView() {
     order: Order;
     rect: { top: number; left: number };
   } | null>(null);
+
+  const setQuickRange = (type: 'today' | '7days' | '30days') => {
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+
+    if (type === 'today') {
+      const t = formatDate(today);
+      setDateRange({ from: t, to: t });
+    } else if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      setDateRange({ from: formatDate(past), to: formatDate(today) });
+    } else if (type === '30days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 29);
+      setDateRange({ from: formatDate(past), to: formatDate(today) });
+    }
+  };
+
+  const isCurrentPreset = (type: 'today' | '7days' | '30days') => {
+    if (!dateRange.from || !dateRange.to) return false;
+    const today = new Date();
+    const formatDate = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
+
+    if (type === 'today') {
+      return dateRange.from === dateRange.to && dateRange.from === formatDate(today);
+    }
+    if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      return dateRange.from === formatDate(past) && dateRange.to === formatDate(today);
+    }
+    if (type === '30days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 29);
+      return dateRange.from === formatDate(past) && dateRange.to === formatDate(today);
+    }
+    return false;
+  };
 
   const handleOpenMenuPopover = (e: React.MouseEvent, o: Order) => {
     e.stopPropagation();
@@ -99,7 +141,7 @@ export function AdminOrdersView() {
   const loadOrders = async () => {
     setIsLoading(true);
     try {
-      const params: { limit?: number; from?: string; to?: string } = { limit: 200 };
+      const params: { limit?: number; from?: string; to?: string } = { limit: 300 };
       if (dateRange.from) params.from = dateRange.from;
       if (dateRange.to) params.to = dateRange.to;
 
@@ -134,7 +176,7 @@ export function AdminOrdersView() {
       });
 
       if (res.success) {
-        alert(res.message || (restockStock ? 'Transaksi berhasil dibatalkan (void) dan stok bahan baku telah dikembalikan ke inventori.' : 'Transaksi berhasil dibatalkan (void). Bahan baku dicatat sebagai limbah/rusak.'));
+        alert(res.message || 'Transaksi berhasil dibatalkan (void).');
         setVoidingOrder(null);
         setSelectedOrder(null);
         setManagerPin('');
@@ -147,47 +189,77 @@ export function AdminOrdersView() {
     }
   };
 
-  // Filtered Orders logic
-  const filteredOrders = orders.filter((o) => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      o.order_number.toLowerCase().includes(q) ||
-      (o.table_number && o.table_number.toLowerCase().includes(q)) ||
-      (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
-      (o.cashier_name && o.cashier_name.toLowerCase().includes(q)) ||
-      (o.items && o.items.some((item) => item.productName?.toLowerCase().includes(q)));
-
-    const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
-
-    let matchesPayment = true;
-    if (paymentFilter !== 'ALL') {
-      matchesPayment = Boolean(
-        o.payments &&
-          o.payments.some((p) => {
-            const m = p.method as string;
-            if (paymentFilter === 'DEBIT_CARD') {
-              return m === 'DEBIT_CARD' || m === 'DEBIT';
-            }
-            if (paymentFilter === 'BANK_TRANSFER') {
-              return m === 'BANK_TRANSFER' || m === 'TRANSFER';
-            }
-            return m === paymentFilter;
-          })
-      );
+  // Unique Cashier List
+  const cashierList = useMemo(() => {
+    const names = new Set<string>();
+    for (const o of orders) {
+      if (o.cashier_name) names.add(o.cashier_name);
     }
+    return Array.from(names).sort();
+  }, [orders]);
 
-    return matchesSearch && matchesStatus && matchesPayment;
-  });
+  // Filtered Orders logic
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (cashierFilter !== 'ALL' && o.cashier_name !== cashierFilter) {
+        return false;
+      }
 
-  // KPI Calculations (Computed on the loaded orders for the date)
-  const paidOrders = orders.filter((o) => o.status === 'PAID');
-  const voidOrders = orders.filter((o) => o.status === 'CANCELLED');
-  const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-  const totalVoidAmount = voidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-  const dineInCount = paidOrders.filter((o) => o.order_type === 'DINE_IN').length;
-  const takeawayCount = paidOrders.filter((o) => o.order_type === 'TAKEAWAY').length;
-  const aov = paidOrders.length > 0 ? Math.round(totalRevenue / paidOrders.length) : 0;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        o.order_number.toLowerCase().includes(q) ||
+        (o.table_number && o.table_number.toLowerCase().includes(q)) ||
+        (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
+        (o.cashier_name && o.cashier_name.toLowerCase().includes(q)) ||
+        (o.items && o.items.some((item) => item.productName?.toLowerCase().includes(q)));
+
+      const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+
+      let matchesPayment = true;
+      if (paymentFilter !== 'ALL') {
+        matchesPayment = Boolean(
+          o.payments &&
+            o.payments.some((p) => {
+              const m = String(p.method || '').toUpperCase();
+              if (paymentFilter === 'DEBIT_CARD') {
+                return m === 'DEBIT_CARD' || m === 'DEBIT';
+              }
+              if (paymentFilter === 'BANK_TRANSFER') {
+                return m === 'BANK_TRANSFER' || m === 'TRANSFER';
+              }
+              return m === paymentFilter;
+            })
+        );
+      }
+
+      return matchesSearch && matchesStatus && matchesPayment;
+    });
+  }, [orders, cashierFilter, searchQuery, statusFilter, paymentFilter]);
+
+  // KPI Calculations
+  const paidOrders = useMemo(() => orders.filter((o) => o.status === 'PAID'), [orders]);
+  const voidOrders = useMemo(() => orders.filter((o) => o.status === 'CANCELLED'), [orders]);
+  const totalRevenue = useMemo(
+    () => paidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+    [paidOrders]
+  );
+  const totalVoidAmount = useMemo(
+    () => voidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+    [voidOrders]
+  );
+  const dineInCount = useMemo(
+    () => paidOrders.filter((o) => o.order_type === 'DINE_IN').length,
+    [paidOrders]
+  );
+  const takeawayCount = useMemo(
+    () => paidOrders.filter((o) => o.order_type === 'TAKEAWAY').length,
+    [paidOrders]
+  );
+  const aov = useMemo(
+    () => (paidOrders.length > 0 ? Math.round(totalRevenue / paidOrders.length) : 0),
+    [paidOrders, totalRevenue]
+  );
 
   // Export to CSV
   const handleExportCsv = () => {
@@ -211,7 +283,7 @@ export function AdminOrdersView() {
     ];
 
     const rows = filteredOrders.map((o) => {
-      const d = new Date(o.created_at);
+      const d = new Date(o.paid_at || o.created_at);
       const dateStr = d.toLocaleDateString('id-ID');
       const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       const itemsSummary = o.items
@@ -222,9 +294,10 @@ export function AdminOrdersView() {
             })
             .join('; ')
         : '-';
-      const methods = o.payments && o.payments.length > 0
-        ? Array.from(new Set(o.payments.map((p) => p.method))).join(' + ')
-        : '-';
+      const methods =
+        o.payments && o.payments.length > 0
+          ? Array.from(new Set(o.payments.map((p) => p.method))).join(' + ')
+          : '-';
 
       return [
         `"${o.order_number}"`,
@@ -246,7 +319,9 @@ export function AdminOrdersView() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    const dateSuffix = dateRange.from ? `${dateRange.from}${dateRange.to && dateRange.to !== dateRange.from ? `_sd_${dateRange.to}` : ''}` : 'Semua';
+    const dateSuffix = dateRange.from
+      ? `${dateRange.from}${dateRange.to && dateRange.to !== dateRange.from ? `_sd_${dateRange.to}` : ''}`
+      : 'Semua';
     link.setAttribute('download', `Ruang_Temu_Transaksi_${dateSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -259,19 +334,167 @@ export function AdminOrdersView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* 1. Minimal KPI Cards */}
+      {/* 1. TOP BAR KONTROL: Rentang Tanggal & Tombol Aksi */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+          background: '#ffffff',
+          padding: '12px 18px',
+          borderRadius: '12px',
+          border: '1px solid #e7e8e3',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
+            Riwayat Transaksi
+          </span>
+          <span
+            style={{
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: '#f2f4ef',
+              color: '#57695b',
+              fontWeight: 700,
+            }}
+          >
+            {filteredOrders.length} Struk
+          </span>
+        </div>
+
+        {/* Presets & Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setQuickRange('today')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: isCurrentPreset('today') ? '1px solid #57695b' : '1px solid #e2e4dc',
+              background: isCurrentPreset('today') ? '#57695b' : '#f7f7f5',
+              color: isCurrentPreset('today') ? '#ffffff' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            Hari Ini
+          </button>
+
+          <button
+            onClick={() => setQuickRange('7days')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: isCurrentPreset('7days') ? '1px solid #57695b' : '1px solid #e2e4dc',
+              background: isCurrentPreset('7days') ? '#57695b' : '#f7f7f5',
+              color: isCurrentPreset('7days') ? '#ffffff' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            7 Hari
+          </button>
+
+          <button
+            onClick={() => setQuickRange('30days')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: isCurrentPreset('30days') ? '1px solid #57695b' : '1px solid #e2e4dc',
+              background: isCurrentPreset('30days') ? '#57695b' : '#f7f7f5',
+              color: isCurrentPreset('30days') ? '#ffffff' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+          >
+            30 Hari
+          </button>
+
+          <div style={{ width: '1px', height: '20px', background: '#e5e7eb', margin: '0 2px' }} />
+
+          <DateRangePicker
+            value={dateRange}
+            onChange={(r) => setDateRange(r)}
+            placeholder="Pilih Tanggal..."
+            align="right"
+            showApplyButton={false}
+          />
+
+          <button
+            onClick={handleExportCsv}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0 12px',
+              background: '#f7f7f5',
+              color: '#374151',
+              border: '1px solid #dcdfd5',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '12px',
+              cursor: 'pointer',
+              height: '36px',
+              transition: 'all 0.12s ease',
+              whiteSpace: 'nowrap',
+            }}
+            title="Ekspor laporan transaksi ke CSV"
+          >
+            <Download size={13} />
+            Ekspor CSV
+          </button>
+
+          <button
+            onClick={loadOrders}
+            disabled={isLoading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0 14px',
+              background: '#57695b',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '12px',
+              cursor: 'pointer',
+              height: '36px',
+              transition: 'background 0.12s ease',
+              whiteSpace: 'nowrap',
+            }}
+            title="Segarkan data transaksi"
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
+          >
+            <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
+            Perbarui
+          </button>
+        </div>
+      </div>
+
+      {/* 2. 4 KARTU METRIK UTAMA (Simpel, Minimalis & Elegan Sama Seperti Dasbor) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+          gap: '14px',
         }}
       >
-        {/* Card 1: Omset */}
+        {/* Card 1: Total Omzet Lunas */}
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '16px 18px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
@@ -279,27 +502,22 @@ export function AdminOrdersView() {
             gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-              Omset Lunas
-            </span>
-            <div style={{ padding: '6px', background: 'rgba(46, 125, 50, 0.08)', borderRadius: '6px' }}>
-              <TrendingUp size={14} color="#2e7d32" />
-            </div>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#2e7d32' }}>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Penjualan Lunas
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#2e7d32' }}>
             Rp {totalRevenue.toLocaleString('id-ID')}
           </div>
-          <div style={{ fontSize: '11.5px', color: '#71717a' }}>
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
             {paidOrders.length} transaksi berhasil
           </div>
         </div>
 
-        {/* Card 2: Total Transaksi */}
+        {/* Card 2: Total Struk */}
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '16px 18px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
@@ -307,27 +525,22 @@ export function AdminOrdersView() {
             gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-              Total Struk
-            </span>
-            <div style={{ padding: '6px', background: 'rgba(87, 105, 91, 0.08)', borderRadius: '6px' }}>
-              <ReceiptText size={14} color="#57695b" />
-            </div>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1c2826' }}>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Total Struk
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             {paidOrders.length} Struk
           </div>
-          <div style={{ fontSize: '11.5px', color: '#71717a' }}>
-            {dineInCount} Dine In · {takeawayCount} Takeaway
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            {dineInCount} Dine In • {takeawayCount} Takeaway
           </div>
         </div>
 
-        {/* Card 3: Rata-rata Keranjang (AOV) */}
+        {/* Card 3: Nilai Rata-rata Keranjang (AOV) */}
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '16px 18px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
@@ -335,27 +548,22 @@ export function AdminOrdersView() {
             gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-              Rata-rata (AOV)
-            </span>
-            <div style={{ padding: '6px', background: 'rgba(21, 101, 192, 0.08)', borderRadius: '6px' }}>
-              <ShoppingBag size={14} color="#1565c0" />
-            </div>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1c2826' }}>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+            Rata-rata Keranjang
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             Rp {aov.toLocaleString('id-ID')}
           </div>
-          <div style={{ fontSize: '11.5px', color: '#71717a' }}>
-            Per struk belanja pelanggan
+          <div style={{ fontSize: '12px', color: '#71717a' }}>
+            Rata-rata per struk belanja
           </div>
         </div>
 
-        {/* Card 4: Void */}
+        {/* Card 4: Transaksi Void */}
         <div
           style={{
             background: voidOrders.length > 0 ? '#fff8f6' : '#ffffff',
-            padding: '14px 18px',
+            padding: '16px 18px',
             borderRadius: '12px',
             border: voidOrders.length > 0 ? '1px solid #ffccbc' : '1px solid #e7e8e3',
             display: 'flex',
@@ -363,24 +571,19 @@ export function AdminOrdersView() {
             gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: voidOrders.length > 0 ? '#c62828' : '#71717a', textTransform: 'uppercase' }}>
-              Dibatalkan (Void)
-            </span>
-            <div style={{ padding: '6px', background: 'rgba(198, 40, 40, 0.08)', borderRadius: '6px' }}>
-              <AlertTriangle size={14} color="#c62828" />
-            </div>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: voidOrders.length > 0 ? '#c62828' : '#1c2826' }}>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: voidOrders.length > 0 ? '#c62828' : '#71717a', textTransform: 'uppercase' }}>
+            Dibatalkan (Void)
+          </span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: voidOrders.length > 0 ? '#c62828' : '#1c2826' }}>
             {voidOrders.length} Order
           </div>
-          <div style={{ fontSize: '11.5px', color: voidOrders.length > 0 ? '#c62828' : '#71717a' }}>
+          <div style={{ fontSize: '12px', color: voidOrders.length > 0 ? '#c62828' : '#71717a' }}>
             {voidOrders.length > 0 ? `Total Rp ${totalVoidAmount.toLocaleString('id-ID')}` : 'Nol pembatalan'}
           </div>
         </div>
       </div>
 
-      {/* 2. Minimal Action & Filter Bar */}
+      {/* 3. BAR FILTER & PENCARIAN (Ramping, Responsif & To-The-Point) */}
       <div
         style={{
           display: 'flex',
@@ -389,67 +592,84 @@ export function AdminOrdersView() {
           justifyContent: 'space-between',
           gap: '10px',
           background: '#ffffff',
-          padding: '12px 16px',
+          padding: '12px 18px',
           borderRadius: '12px',
           border: '1px solid #e7e8e3',
         }}
       >
-        {/* Left: Filters */}
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Status Tabs */}
-          {(['ALL', 'PAID', 'CANCELLED'] as const).map((s) => {
-            const active = statusFilter === s;
-            const label = s === 'ALL' ? `Semua (${orders.length})` : s === 'PAID' ? `Lunas (${paidOrders.length})` : `Void (${voidOrders.length})`;
-            return (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '7px',
-                  border: active ? '1px solid #57695b' : '1px solid #e2e4dc',
-                  background: active ? '#57695b' : '#f7f7f5',
-                  color: active ? '#ffffff' : '#4b5563',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-
-          {/* Payment Method Filter */}
-          <select
-            value={paymentFilter}
-            onChange={(e) => setPaymentFilter(e.target.value)}
+          <div
             style={{
-              padding: '5px 10px',
-              borderRadius: '7px',
-              border: '1px solid #e2e4dc',
-              background: '#f7f7f5',
-              color: '#374151',
-              fontSize: '12px',
-              fontWeight: 600,
-              outline: 'none',
-              cursor: 'pointer',
+              display: 'flex',
+              background: '#f4f5f1',
+              padding: '2px',
+              borderRadius: '8px',
+              border: '1px solid #e5e7e0',
             }}
           >
-            <option value="ALL">Semua Pembayaran</option>
-            <option value="CASH">Tunai (CASH)</option>
-            <option value="QRIS">QRIS</option>
-            <option value="DEBIT_CARD">Debit / EDC</option>
-            <option value="BANK_TRANSFER">Transfer Bank</option>
-          </select>
+            {(['ALL', 'PAID', 'CANCELLED'] as const).map((s) => {
+              const active = statusFilter === s;
+              const label =
+                s === 'ALL'
+                  ? `Semua (${orders.length})`
+                  : s === 'PAID'
+                  ? `Lunas (${paidOrders.length})`
+                  : `Void (${voidOrders.length})`;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: active ? '#57695b' : 'transparent',
+                    color: active ? '#ffffff' : '#4b5563',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-          {/* DateRangePicker (Menyerupai Halaman Sif) */}
-          <DateRangePicker
-            value={dateRange}
-            onChange={(r) => setDateRange(r)}
-            placeholder="Rentang Tanggal..."
-          />
+          {/* Payment Method Select (Shadcn UI) */}
+          <div style={{ width: '180px' }}>
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5' }}>
+                <SelectValue placeholder="Metode Pembayaran" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Pembayaran</SelectItem>
+                <SelectItem value="CASH">Tunai (CASH)</SelectItem>
+                <SelectItem value="QRIS">QRIS</SelectItem>
+                <SelectItem value="DEBIT_CARD">Debit / EDC</SelectItem>
+                <SelectItem value="BANK_TRANSFER">Transfer Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Cashier Filter Dropdown (Shadcn UI) */}
+          <div style={{ width: '180px' }}>
+            <Select value={cashierFilter} onValueChange={setCashierFilter}>
+              <SelectTrigger style={{ height: '34px', background: '#f7f7f5' }}>
+                <SelectValue placeholder="Semua Kasir" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Kasir ({cashierList.length})</SelectItem>
+                {cashierList.map((cName) => (
+                  <SelectItem key={cName} value={cName}>
+                    Kasir: {cName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Search Box */}
           <div
@@ -458,16 +678,18 @@ export function AdminOrdersView() {
               alignItems: 'center',
               gap: '6px',
               background: '#f7f7f5',
-              padding: '5px 12px',
-              borderRadius: '7px',
+              padding: '0 12px',
+              borderRadius: '8px',
               border: '1px solid #e2e4dc',
-              minWidth: '180px',
+              height: '34px',
+              flex: '1 1 180px',
+              minWidth: '160px',
             }}
           >
             <Search size={13} color="#71717a" />
             <input
               type="text"
-              placeholder="Cari order, meja, nama..."
+              placeholder="Cari order, meja, kasir..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -483,120 +705,88 @@ export function AdminOrdersView() {
               <span
                 onClick={() => setSearchQuery('')}
                 style={{ cursor: 'pointer', color: '#9ca3af', display: 'flex' }}
+                title="Hapus pencarian"
               >
                 <X size={12} />
               </span>
             )}
           </div>
 
-          {/* Counter & Reset Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span
+          {/* Reset Filter Button */}
+          {(searchQuery || statusFilter !== 'ALL' || paymentFilter !== 'ALL' || cashierFilter !== 'ALL') && (
+            <button
+              onClick={() => {
+                setStatusFilter('ALL');
+                setPaymentFilter('ALL');
+                setCashierFilter('ALL');
+                setSearchQuery('');
+              }}
               style={{
-                fontSize: '11.5px',
-                padding: '3px 8px',
+                fontSize: '11px',
+                padding: '4px 10px',
                 borderRadius: '6px',
-                background: '#f4f5f1',
-                color: '#57695b',
+                background: '#fee2e2',
+                border: 'none',
+                color: '#b91c1c',
                 fontWeight: 600,
+                cursor: 'pointer',
+                height: '32px',
               }}
             >
-              Ditampilkan: {filteredOrders.length}
-            </span>
-            {(dateRange.from || statusFilter !== 'ALL' || paymentFilter !== 'ALL' || searchQuery) && (
-              <button
-                onClick={() => {
-                  setDateRange({ from: '', to: '' });
-                  setStatusFilter('ALL');
-                  setPaymentFilter('ALL');
-                  setSearchQuery('');
-                }}
-                style={{
-                  fontSize: '11px',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: '#fee2e2',
-                  border: 'none',
-                  color: '#b91c1c',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Reset Filter
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={handleExportCsv}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '6px 12px',
-              background: '#f2f4ef',
-              color: '#57695b',
-              border: '1px solid #dcdfd5',
-              borderRadius: '7px',
-              fontWeight: 600,
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-            title="Unduh laporan transaksi dalam format CSV"
-          >
-            <Download size={13} />
-            Ekspor CSV
-          </button>
-
-          <button
-            onClick={loadOrders}
-            disabled={isLoading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '6px 12px',
-              background: '#57695b',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '7px',
-              fontWeight: 600,
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-          >
-            <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
-            Segarkan
-          </button>
+              Reset Filter
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 3. Orders Table */}
+      {/* 4. TABEL TRANSAKSI KASIR (Bersih, Rapi & Responsif) */}
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '14px',
+          borderRadius: '12px',
           border: '1px solid #e7e8e3',
           overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', whiteSpace: 'nowrap' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '12px',
+              whiteSpace: 'nowrap',
+            }}
+          >
             <thead>
-              <tr style={{ background: '#fbfbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>No. Order</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Waktu</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Layanan</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Pelanggan</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Rincian Menu</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Metode</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Total</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px' }}>Status</th>
-                <th style={{ padding: '9px 10px', fontWeight: 600, fontSize: '11.5px', textAlign: 'right' }}>Aksi</th>
+              <tr style={{ background: '#fafbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a' }}>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  No. Order
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Waktu
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Layanan
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Pelanggan / Kasir
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Menu Dipesan
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Metode
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', textAlign: 'right' }}>
+                  Total
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                  Status
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', textAlign: 'right' }}>
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -608,8 +798,8 @@ export function AdminOrdersView() {
                 </tr>
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>
-                    Tidak ada transaksi yang cocok dengan filter.
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#9ca3af' }}>
+                    Tidak ada transaksi pada periode atau filter yang dipilih.
                   </td>
                 </tr>
               ) : (
@@ -621,8 +811,11 @@ export function AdminOrdersView() {
                       ? Array.from(new Set(o.payments.map((p) => p.method))).join(' + ')
                       : '-';
 
-                  const d = new Date(o.created_at);
-                  const timeFormatted = `${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}, ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+                  const d = new Date(o.paid_at || o.created_at);
+                  const timeFormatted = `${d.toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'short',
+                  })}, ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
                   const orderItems = o.items || [];
                   const firstItem = orderItems[0];
                   const hasMultipleItems = orderItems.length > 1;
@@ -630,42 +823,42 @@ export function AdminOrdersView() {
                   const fullMenuSummary = orderItems.map((i) => `${i.quantity}x ${i.productName}`).join(', ');
 
                   return (
-                    <tr key={o.id} style={{ borderBottom: '1px solid #f0f0eb', height: '42px' }}>
+                    <tr key={o.id} style={{ borderBottom: '1px solid #f2f4ef', height: '44px' }}>
                       {/* 1. No. Order */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span style={{ fontWeight: 700, color: '#1c2826', fontFamily: 'monospace', fontSize: '12px' }}>
                           {o.order_number}
                         </span>
                       </td>
 
                       {/* 2. Waktu */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', color: '#6b7280', fontSize: '11.5px' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#6b7280', fontSize: '11.5px' }}>
                         {timeFormatted}
                       </td>
 
                       {/* 3. Layanan */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span style={{ fontWeight: 600, color: '#1c2826', fontSize: '11.5px' }}>
-                          {o.order_type === 'DINE_IN' ? `Meja ${o.table_number || '-'}` : 'Takeaway'}
+                          {o.order_type === 'DINE_IN' ? `Dine In • ${o.table_number || '-'}` : 'Takeaway'}
                         </span>
                       </td>
 
-                      {/* 4. Pelanggan & Kasir (Tampil utuh, tanpa '...' yang ambigu) */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 4. Pelanggan & Kasir */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                           <span
                             style={{
                               fontSize: '11.5px',
                               fontWeight: 600,
                               color: '#1c2826',
-                              maxWidth: '160px',
+                              maxWidth: '150px',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                             }}
                             title={o.customer_name || 'Pelanggan Umum'}
                           >
-                            {o.customer_name || 'Pelanggan Umum'}
+                            {o.customer_name || 'Umum'}
                           </span>
                           <span
                             style={{
@@ -673,15 +866,15 @@ export function AdminOrdersView() {
                               color: '#71717a',
                               whiteSpace: 'nowrap',
                             }}
-                            title={`Diproses oleh kasir: ${o.cashier_name || 'Kasir'}`}
+                            title={`Kasir: ${o.cashier_name || 'Kasir'}`}
                           >
                             Kasir: {o.cashier_name || 'Kasir'}
                           </span>
                         </div>
                       </td>
 
-                      {/* 5. Rincian Menu (Pemicu interaktif jelas saat >1 item) */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      {/* 5. Rincian Menu */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         {orderItems.length === 0 ? (
                           <span style={{ fontSize: '11px', color: '#9ca3af' }}>-</span>
                         ) : !hasMultipleItems ? (
@@ -723,7 +916,7 @@ export function AdminOrdersView() {
                                 fontSize: '11.5px',
                                 fontWeight: 600,
                                 color: '#1c2826',
-                                maxWidth: '125px',
+                                maxWidth: '120px',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
@@ -735,7 +928,7 @@ export function AdminOrdersView() {
 
                             <button
                               onClick={(e) => handleOpenMenuPopover(e, o)}
-                              title={`Klik untuk melihat total ${orderItems.length} menu yang dipesan`}
+                              title={`Total ${orderItems.length} menu dipesan`}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -750,18 +943,9 @@ export function AdminOrdersView() {
                                 cursor: 'pointer',
                                 lineHeight: '13px',
                                 whiteSpace: 'nowrap',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#e5eae1';
-                                e.currentTarget.style.borderColor = '#b8c4b2';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#f2f4ef';
-                                e.currentTarget.style.borderColor = '#dcdfd5';
                               }}
                             >
-                              <span>+{remainingCount} lainnya</span>
+                              <span>+{remainingCount}</span>
                               <ChevronDown size={10} color="#57695b" />
                             </button>
                           </div>
@@ -769,17 +953,27 @@ export function AdminOrdersView() {
                       </td>
 
                       {/* 6. Metode Bayar */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         {paymentMethods !== '-' ? (
                           <span
                             style={{
                               display: 'inline-block',
-                              padding: '2px 6px',
-                              borderRadius: '5px',
-                              background: '#f0f3ee',
-                              color: '#57695b',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              background:
+                                paymentMethods === 'CASH'
+                                  ? '#f0f5f1'
+                                  : paymentMethods.includes('QRIS')
+                                  ? '#eff6ff'
+                                  : '#faf5ff',
+                              color:
+                                paymentMethods === 'CASH'
+                                  ? '#57695b'
+                                  : paymentMethods.includes('QRIS')
+                                  ? '#2563eb'
+                                  : '#7c3aed',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
                             {paymentMethods}
@@ -789,22 +983,31 @@ export function AdminOrdersView() {
                         )}
                       </td>
 
-                      {/* 7. Total */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', fontWeight: 800, color: '#1c2826', fontSize: '12.5px' }}>
+                      {/* 7. Total Tagihan */}
+                      <td
+                        style={{
+                          padding: '8px 12px',
+                          verticalAlign: 'middle',
+                          fontWeight: 800,
+                          color: '#1c2826',
+                          fontSize: '12.5px',
+                          textAlign: 'right',
+                        }}
+                      >
                         Rp {Number(o.total_amount).toLocaleString('id-ID')}
                       </td>
 
                       {/* 8. Status */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         {isPaid ? (
                           <span
                             style={{
-                              padding: '2px 6px',
-                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
                               background: '#dcfce7',
                               color: '#15803d',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
                             Lunas
@@ -812,12 +1015,12 @@ export function AdminOrdersView() {
                         ) : isVoid ? (
                           <span
                             style={{
-                              padding: '2px 6px',
-                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
                               background: '#fee2e2',
                               color: '#b91c1c',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
                             Void
@@ -825,12 +1028,12 @@ export function AdminOrdersView() {
                         ) : (
                           <span
                             style={{
-                              padding: '2px 6px',
-                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
                               background: '#fef3c7',
                               color: '#b45309',
                               fontWeight: 700,
-                              fontSize: '10.5px',
+                              fontSize: '11px',
                             }}
                           >
                             Pending
@@ -839,21 +1042,22 @@ export function AdminOrdersView() {
                       </td>
 
                       {/* 9. Aksi */}
-                      <td style={{ padding: '8px 10px', verticalAlign: 'middle', textAlign: 'right' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <button
                             onClick={() => setSelectedOrder(o)}
                             style={{
-                              padding: '3px 8px',
+                              padding: '4px 8px',
                               background: '#f2f4ef',
                               color: '#57695b',
                               border: '1px solid #dcdfd5',
-                              borderRadius: '5px',
+                              borderRadius: '6px',
                               fontWeight: 600,
                               fontSize: '11px',
                               cursor: 'pointer',
+                              transition: 'all 0.12s ease',
                             }}
-                            title="Lihat rincian lengkap transaksi"
+                            title="Lihat detail transaksi"
                           >
                             Detail
                           </button>
@@ -861,11 +1065,11 @@ export function AdminOrdersView() {
                           <button
                             onClick={() => setReceiptOrder(o)}
                             style={{
-                              padding: '3px 6px',
+                              padding: '4px 6px',
                               background: '#ffffff',
                               color: '#374151',
                               border: '1px solid #d1d5db',
-                              borderRadius: '5px',
+                              borderRadius: '6px',
                               fontSize: '11px',
                               cursor: 'pointer',
                               display: 'flex',
@@ -884,16 +1088,16 @@ export function AdminOrdersView() {
                                 setVoidError('');
                               }}
                               style={{
-                                padding: '3px 7px',
+                                padding: '4px 8px',
                                 background: '#fff1f0',
                                 color: '#cf1322',
                                 border: '1px solid #ffa39e',
-                                borderRadius: '5px',
+                                borderRadius: '6px',
                                 fontWeight: 600,
                                 fontSize: '11px',
                                 cursor: 'pointer',
                               }}
-                              title="Batalkan pesanan dan kembalikan stok bahan"
+                              title="Batalkan pesanan (Void)"
                             >
                               Void
                             </button>
@@ -909,7 +1113,7 @@ export function AdminOrdersView() {
         </div>
       </div>
 
-      {/* 4. ORDER DETAIL MODAL */}
+      {/* 5. ORDER DETAIL MODAL */}
       {selectedOrder && (
         <div
           style={{
@@ -967,7 +1171,8 @@ export function AdminOrdersView() {
                   </span>
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
-                  {new Date(selectedOrder.created_at).toLocaleString('id-ID')} · {selectedOrder.order_type === 'DINE_IN' ? `Meja ${selectedOrder.table_number || '-'}` : 'Takeaway'}
+                  {new Date(selectedOrder.paid_at || selectedOrder.created_at).toLocaleString('id-ID')} ·{' '}
+                  {selectedOrder.order_type === 'DINE_IN' ? `Meja ${selectedOrder.table_number || '-'}` : 'Takeaway'}
                 </div>
               </div>
 
@@ -1205,7 +1410,7 @@ export function AdminOrdersView() {
         </div>
       )}
 
-      {/* 5. RECEIPT PRINT MODAL */}
+      {/* 6. RECEIPT PRINT MODAL */}
       {receiptOrder && (
         <div
           style={{
@@ -1277,7 +1482,7 @@ export function AdminOrdersView() {
                   RUANG TEMU
                 </div>
                 <div style={{ fontSize: '11px', color: '#4b5563' }}>
-                  Integrated Cafe & Roastery
+                  Integrated Cafe &amp; Roastery
                 </div>
                 <div style={{ fontSize: '10.5px', color: '#6b7280' }}>
                   Jl. Cempaka Putih No. 18, Jakarta
@@ -1293,8 +1498,11 @@ export function AdminOrdersView() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>
-                    {new Date(receiptOrder.created_at).toLocaleDateString('id-ID')}{' '}
-                    {new Date(receiptOrder.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(receiptOrder.paid_at || receiptOrder.created_at).toLocaleDateString('id-ID')}{' '}
+                    {new Date(receiptOrder.paid_at || receiptOrder.created_at).toLocaleTimeString('id-ID', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                   <span>Meja: {receiptOrder.table_number || '-'}</span>
                 </div>
@@ -1447,7 +1655,7 @@ export function AdminOrdersView() {
         </div>
       )}
 
-      {/* 6. VOID CONFIRMATION MODAL */}
+      {/* 7. VOID CONFIRMATION MODAL */}
       {voidingOrder && (
         <div
           style={{
@@ -1508,7 +1716,10 @@ export function AdminOrdersView() {
             <form onSubmit={handleExecuteVoid} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ fontSize: '12.5px', color: '#4b5563', lineHeight: 1.5 }}>
                 Membatalkan pesanan <strong>{voidingOrder.order_number}</strong> senilai{' '}
-                <strong style={{ color: '#1c2826' }}>Rp {Number(voidingOrder.total_amount).toLocaleString('id-ID')}</strong>. Stok bahan baku akan otomatis dikembalikan.
+                <strong style={{ color: '#1c2826' }}>
+                  Rp {Number(voidingOrder.total_amount).toLocaleString('id-ID')}
+                </strong>
+                . Stok bahan baku akan otomatis dikembalikan jika opsi restock dicentang.
               </div>
 
               {voidError && (
@@ -1555,25 +1766,19 @@ export function AdminOrdersView() {
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                   Alasan Pembatalan
                 </label>
-                <select
-                  value={voidReason}
-                  onChange={(e) => setVoidReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    borderRadius: '7px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '12.5px',
-                    background: '#ffffff',
-                  }}
-                >
-                  <option value="Kesalahan Pesanan Pelanggan">Kesalahan Pesanan Pelanggan</option>
-                  <option value="Salah Input Meja / Menu Kasir">Salah Input Meja / Menu Kasir</option>
-                  <option value="Pelanggan Batal Beli / Pergi">Pelanggan Batal Beli / Pergi</option>
-                  <option value="Menu Dapur / Bar Habis Mendadak">Menu Dapur / Bar Habis Mendadak</option>
-                  <option value="Transaksi Ganda (Double Payment)">Transaksi Ganda (Double Payment)</option>
-                  <option value="Uji Coba Sistem">Uji Coba Sistem</option>
-                </select>
+                <Select value={voidReason} onValueChange={setVoidReason}>
+                  <SelectTrigger style={{ width: '100%', height: '38px', background: '#ffffff', borderRadius: '7px', border: '1px solid #d1d5db' }}>
+                    <SelectValue placeholder="Pilih Alasan Pembatalan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Kesalahan Pesanan Pelanggan">Kesalahan Pesanan Pelanggan</SelectItem>
+                    <SelectItem value="Salah Input Meja / Menu Kasir">Salah Input Meja / Menu Kasir</SelectItem>
+                    <SelectItem value="Pelanggan Batal Beli / Pergi">Pelanggan Batal Beli / Pergi</SelectItem>
+                    <SelectItem value="Menu Dapur / Bar Habis Mendadak">Menu Dapur / Bar Habis Mendadak</SelectItem>
+                    <SelectItem value="Transaksi Ganda (Double Payment)">Transaksi Ganda (Double Payment)</SelectItem>
+                    <SelectItem value="Uji Coba Sistem">Uji Coba Sistem</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0' }}>
@@ -1584,7 +1789,10 @@ export function AdminOrdersView() {
                   onChange={(e) => setRestockStock(e.target.checked)}
                   style={{ width: '16px', height: '16px', accentColor: '#1b4332', cursor: 'pointer' }}
                 />
-                <label htmlFor="admin-void-restock" style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', cursor: 'pointer', userSelect: 'none' }}>
+                <label
+                  htmlFor="admin-void-restock"
+                  style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', cursor: 'pointer', userSelect: 'none' }}
+                >
                   Kembalikan bahan baku ke stok (Restock)
                 </label>
               </div>
@@ -1635,7 +1843,7 @@ export function AdminOrdersView() {
         </div>
       )}
 
-      {/* 7. QUICK DETAILS POPOVER FOR MULTI-ITEM ORDERS */}
+      {/* 8. QUICK DETAILS POPOVER FOR MULTI-ITEM ORDERS */}
       {popover && (
         <div
           style={{
@@ -1780,7 +1988,7 @@ export function AdminOrdersView() {
                 }}
               >
                 <Eye size={13} />
-                Buka Detail Struk & Bayar
+                Buka Detail Struk &amp; Bayar
               </button>
             )}
           </div>

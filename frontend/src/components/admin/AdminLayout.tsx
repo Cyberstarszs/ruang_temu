@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -15,12 +15,12 @@ import {
   Users,
   ShieldAlert,
   Settings,
-  ShoppingCart,
   LogOut,
   Menu,
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
 } from 'lucide-react';
 
 import { AdminDashboardView } from './AdminDashboardView';
@@ -107,7 +107,7 @@ const SLUG_TAB_MAP: Record<string, AdminTab> = {
   settings: 'settings',
 };
 
-export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
+export function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -116,12 +116,33 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
   const activeTab: AdminTab = SLUG_TAB_MAP[currentSlug] || 'dashboard';
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('ruang_temu_sidebar_collapsed') === 'true';
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    if (isProfileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
-    return false;
-  });
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileOpen]);
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ruang_temu_sidebar_collapsed');
+      if (saved === 'true') {
+        setIsSidebarCollapsed(true);
+      }
+    }
+  }, []);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed((prev) => {
@@ -180,12 +201,12 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
         color: '#1c2826',
       }}
     >
-      {/* SIDEBAR NAVIGATION (Desktop & Tablet) */}
+      {/* SIDEBAR NAVIGATION - Warna Hijau Default Sistem (#57695b) */}
       <aside
         style={{
           width: isSidebarCollapsed ? '68px' : '230px',
-          background: '#ffffff',
-          borderRight: '1px solid #e8e8e4',
+          background: '#57695b',
+          borderRight: '1px solid rgba(0, 0, 0, 0.1)',
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
@@ -195,54 +216,37 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
           zIndex: 40,
           transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           overflow: 'hidden',
+          boxShadow: '1px 0 10px rgba(0,0,0,0.05)',
         }}
         className="admin-desktop-sidebar"
       >
-        {/* Brand Header */}
+        {/* Brand Header Sidebar */}
         <div
           style={{
-            padding: isSidebarCollapsed ? '16px 10px' : '18px 16px 14px',
+            height: '60px',
+            minHeight: '60px',
+            maxHeight: '60px',
+            flexShrink: 0,
+            padding: isSidebarCollapsed ? '0 10px' : '0 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-            borderBottom: '1px solid #f0f0eb',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+            boxSizing: 'border-box',
           }}
         >
           {!isSidebarCollapsed ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: '#57695b',
-                    display: 'inline-block',
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: '14.5px',
-                    fontWeight: 800,
-                    color: '#1c2826',
-                    letterSpacing: '-0.3px',
-                  }}
-                >
-                  RUANG TEMU
-                </span>
-                <span
-                  style={{
-                    fontSize: '10.5px',
-                    fontWeight: 600,
-                    color: '#57695b',
-                    background: '#f0f3ee',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  Owner
-                </span>
-              </div>
+              <span
+                style={{
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  color: '#ffffff',
+                  letterSpacing: '-0.2px',
+                }}
+              >
+                RUANG TEMU
+              </span>
               <button
                 onClick={toggleSidebar}
                 title="Tutup / Ciutkan Sidebar"
@@ -255,16 +259,16 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#71717a',
+                  color: 'rgba(255, 255, 255, 0.75)',
                   transition: 'all 0.12s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f4f5f1';
-                  e.currentTarget.style.color = '#18181b';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.color = '#ffffff';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#71717a';
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
                 }}
               >
                 <PanelLeftClose size={17} />
@@ -275,22 +279,22 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
               onClick={toggleSidebar}
               title="Buka Sidebar"
               style={{
-                background: '#f4f5f1',
-                border: '1px solid #e1e4dc',
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
                 borderRadius: '8px',
                 padding: '7px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#57695b',
+                color: '#ffffff',
                 transition: 'all 0.12s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#ebece6';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#f4f5f1';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
               }}
             >
               <PanelLeftOpen size={17} />
@@ -298,12 +302,12 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
           )}
         </div>
 
-        {/* Navigation Items */}
+        {/* Navigation Items (Khusus Fungsi Owner) */}
         <nav
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: isSidebarCollapsed ? '10px 8px' : '8px 12px',
+            padding: isSidebarCollapsed ? '10px 8px' : '10px 12px',
             display: 'flex',
             flexDirection: 'column',
             gap: '3px',
@@ -322,14 +326,14 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-                  gap: isSidebarCollapsed ? 0 : '10px',
-                  padding: isSidebarCollapsed ? '9px 0' : '8px 12px',
+                  gap: isSidebarCollapsed ? 0 : '11px',
+                  padding: isSidebarCollapsed ? '10px 0' : '9px 12px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: isActive ? '#57695b' : 'transparent',
-                  color: isActive ? '#ffffff' : '#52525b',
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: '13px',
+                  background: isActive ? 'rgba(0, 0, 0, 0.22)' : 'transparent',
+                  color: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.85)',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: '13.5px',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'all 0.12s ease',
@@ -339,108 +343,23 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.background = '#f4f5f1';
-                    e.currentTarget.style.color = '#18181b';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                    e.currentTarget.style.color = '#ffffff';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#52525b';
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)';
                   }
                 }}
               >
-                <Icon size={17} color={isActive ? '#ffffff' : '#71717a'} />
+                <Icon size={18} color={isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.75)'} />
                 {!isSidebarCollapsed && <span>{item.label}</span>}
               </Link>
             );
           })}
         </nav>
-
-        {/* User Footer */}
-        <div
-          style={{
-            padding: isSidebarCollapsed ? '12px 8px' : '12px 14px',
-            borderTop: '1px solid #f0f0eb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1 }}>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: '#57695b',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '13px',
-                flexShrink: 0,
-              }}
-              title={user?.name || 'Owner'}
-            >
-              {(user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim().charAt(0) : 'O').toUpperCase()}
-            </div>
-            {!isSidebarCollapsed && (
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, lineHeight: 1.25 }}>
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    color: '#1c2826',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                  title={user?.name || 'Owner'}
-                >
-                  {user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim() : 'Budi Santoso'}
-                </div>
-                <div
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#71717a',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {user?.role === 'OWNER' ? 'Owner / Pemilik' : 'Kasir Operasional'}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!isSidebarCollapsed && (
-            <button
-              onClick={logout}
-              style={{
-                padding: '6px',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '6px',
-                color: '#888888',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              title="Keluar"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#dc2626';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#888888';
-              }}
-            >
-              <LogOut size={16} />
-            </button>
-          )}
-        </div>
       </aside>
 
       {/* MAIN CONTENT WRAPPER */}
@@ -452,143 +371,262 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
           minWidth: 0,
           height: '100vh',
           overflowY: 'auto',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
       >
-        {/* DESKTOP TOPBAR */}
+        {/* DESKTOP TOPBAR - Presisi Pas, Minimalis, Tinggi 60px Sama Persis di Semua Halaman */}
         <header
           style={{
-            height: '56px',
+            height: '60px',
+            minHeight: '60px',
+            maxHeight: '60px',
+            flexShrink: 0,
             background: '#ffffff',
             borderBottom: '1px solid #e8e8e4',
-            padding: '0 24px',
+            padding: '0 28px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'sticky',
             top: 0,
             zIndex: 30,
+            boxSizing: 'border-box',
           }}
-          className="admin-desktop-sidebar"
+          className="admin-desktop-header"
         >
-          {/* Active Title & Sidebar Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Judul Halaman Saja (Bersih, Fokus & Elegan) */}
+          <h1 style={{ fontSize: '17px', fontWeight: 700, color: '#1c2826', margin: 0, letterSpacing: '-0.2px' }}>
+            {getActiveTabTitle()}
+          </h1>
+
+          {/* Profil Pengguna di Kanan Atas - Desain Kapsul / Pill Permanen */}
+          <div ref={profileRef} style={{ position: 'relative' }}>
             <button
-              onClick={toggleSidebar}
-              title={isSidebarCollapsed ? 'Buka Sidebar' : 'Tutup Sidebar'}
+              onClick={() => setIsProfileOpen((prev) => !prev)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                padding: '6px',
-                background: '#f4f5f1',
-                border: '1px solid #e1e4dc',
-                borderRadius: '7px',
+                gap: '8px',
+                padding: '4px 12px 4px 5px',
+                background: isProfileOpen ? '#e8ebe2' : '#f2f4ef',
+                border: '1px solid #dce0d6',
+                borderRadius: '9999px',
                 cursor: 'pointer',
-                color: '#57695b',
-                transition: 'all 0.12s ease',
+                transition: 'all 0.15s ease',
+                boxShadow: isProfileOpen ? '0 0 0 2px rgba(87, 105, 91, 0.15)' : 'none',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#ebece6';
+                e.currentTarget.style.background = isProfileOpen ? '#e3e7dc' : '#e8ebe2';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#f4f5f1';
+                e.currentTarget.style.background = isProfileOpen ? '#e8ebe2' : '#f2f4ef';
               }}
+              title="Profil Pengguna"
             >
-              {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            </button>
-            <div style={{ fontSize: '15.5px', fontWeight: 700, color: '#1c2826' }}>
-              {getActiveTabTitle()}
-            </div>
-          </div>
+              {/* Avatar Inisial Bulat */}
+              <div
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  background: '#57695b',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  flexShrink: 0,
+                }}
+              >
+                {(user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim().charAt(0) : 'O').toUpperCase()}
+              </div>
 
-          {/* Quick Switch Button */}
-          {onSwitchToPos && (
-            <button
-              onClick={onSwitchToPos}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: '#f2f4ef',
-                border: '1px solid #e1e5dc',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#57695b',
-                cursor: 'pointer',
-              }}
-            >
-              <ShoppingCart size={14} />
-              <span>Kasir</span>
+              {/* Tulisan Profil */}
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#1c2826', letterSpacing: '-0.1px' }}>
+                Profil
+              </span>
+
+              <ChevronDown
+                size={14}
+                color="#57695b"
+                style={{
+                  transition: 'transform 0.18s ease',
+                  transform: isProfileOpen ? 'rotate(180deg)' : 'none',
+                }}
+              />
             </button>
-          )}
+
+            {/* Dropdown Menu Saat Avatar Di-klik */}
+            {isProfileOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: '220px',
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  border: '1px solid #e8e8e4',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)',
+                  padding: '12px',
+                  zIndex: 50,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                {/* Info Detail User */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      background: '#57695b',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim().charAt(0) : 'O').toUpperCase()}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, lineHeight: 1.25 }}>
+                    <span
+                      style={{
+                        fontSize: '13.5px',
+                        fontWeight: 700,
+                        color: '#1c2826',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      title={user?.name}
+                    >
+                      {user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim() : 'Owner'}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#71717a', fontWeight: 500 }}>
+                      {user?.username ? `@${user.username}` : ''} • Owner
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ height: '1px', background: '#f0f0eb', margin: '2px 0' }} />
+
+                {/* Tombol Logout */}
+                <button
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    logout();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'background 0.12s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fef2f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <LogOut size={15} color="#dc2626" />
+                  <span>Keluar</span>
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* MOBILE / TABLET HEADER */}
         <header
           style={{
+            height: '56px',
+            minHeight: '56px',
+            maxHeight: '56px',
+            flexShrink: 0,
             background: '#ffffff',
             borderBottom: '1px solid #e8e8e4',
-            padding: '10px 16px',
+            padding: '0 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'sticky',
             top: 0,
             zIndex: 30,
+            boxSizing: 'border-box',
           }}
           className="admin-mobile-header"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => setIsMobileMenuOpen(true)}
               style={{
-                padding: '6px',
-                background: '#f7f7f5',
-                border: '1px solid #e2e4dc',
-                borderRadius: '6px',
+                width: '38px',
+                height: '38px',
+                background: '#f4f5f1',
+                border: '1px solid #e1e4dc',
+                borderRadius: '8px',
                 cursor: 'pointer',
+                color: '#57695b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
+              aria-label="Buka Menu Navigasi"
             >
-              {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
+              <Menu size={18} />
             </button>
-            <span style={{ fontWeight: 700, fontSize: '14px' }}>{getActiveTabTitle()}</span>
+            <span style={{ fontWeight: 800, fontSize: '15px', color: '#1c2826', letterSpacing: '-0.2px' }}>
+              {getActiveTabTitle()}
+            </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Link
-              href="/pos"
-              onClick={() => {
-                localStorage.setItem('ruang_temu_view_mode', 'POS');
-                if (onSwitchToPos) onSwitchToPos();
-              }}
+            {/* Initial Avatar */}
+            <div
               style={{
-                padding: '5px 10px',
-                background: '#f2f4ef',
-                color: '#57695b',
-                border: '1px solid #dcdfd5',
-                borderRadius: '6px',
-                fontWeight: 600,
-                fontSize: '12px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: '#57695b',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                textDecoration: 'none',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '13px',
               }}
             >
-              <ShoppingCart size={13} /> Kasir
-            </Link>
+              {(user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim().charAt(0) : 'O').toUpperCase()}
+            </div>
             <button
               onClick={logout}
               style={{
-                padding: '5px 8px',
+                padding: '6px 10px',
                 background: '#fee2e2',
                 color: '#b91c1c',
                 border: 'none',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
+                borderRadius: '7px',
+                fontSize: '11.5px',
+                fontWeight: 700,
                 cursor: 'pointer',
               }}
             >
@@ -597,59 +635,198 @@ export function AdminLayout({ onSwitchToPos, children }: AdminLayoutProps) {
           </div>
         </header>
 
-        {/* Mobile Dropdown Menu */}
+        {/* Mobile Slide-Over Drawer with Backdrop */}
         {isMobileMenuOpen && (
-          <div
-            style={{
-              background: '#ffffff',
-              borderBottom: '1px solid #e8e8e4',
-              padding: '10px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px',
-            }}
-            className="admin-mobile-header"
-          >
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              const slug = TAB_SLUG_MAP[item.id] || item.id;
-              return (
-                <Link
-                  key={item.id}
-                  href={`/${slug}`}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 99999 }}>
+            {/* Backdrop */}
+            <div
+              onClick={() => setIsMobileMenuOpen(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.55)',
+                backdropFilter: 'blur(3px)',
+                transition: 'opacity 0.2s ease',
+              }}
+            />
+
+            {/* Drawer */}
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: '82%',
+                maxWidth: '290px',
+                background: '#57695b',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '4px 0 24px rgba(0, 0, 0, 0.3)',
+                animation: 'slideDrawerRight 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                zIndex: 100000,
+              }}
+            >
+              {/* Drawer Header */}
+              <div
+                style={{
+                  height: '60px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0 18px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.2px' }}>
+                    RUANG TEMU
+                  </span>
+                  <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 500 }}>
+                    Panel Pemilik (Owner)
+                  </span>
+                </div>
+                <button
                   onClick={() => setIsMobileMenuOpen(false)}
                   style={{
+                    width: '34px',
+                    height: '34px',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Tutup Menu"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Drawer Navigation Links */}
+              <nav
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '12px 10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}
+              >
+                {NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  const slug = TAB_SLUG_MAP[item.id] || item.id;
+                  return (
+                    <Link
+                      key={item.id}
+                      href={`/${slug}`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        background: isActive ? 'rgba(0, 0, 0, 0.25)' : 'transparent',
+                        color: '#ffffff',
+                        fontWeight: isActive ? 800 : 500,
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        transition: 'background 0.12s ease',
+                      }}
+                    >
+                      <Icon size={18} color={isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.8)'} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* Drawer Footer User Profile & Logout */}
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+                  background: 'rgba(0, 0, 0, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      color: '#57695b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim().charAt(0) : 'O').toUpperCase()}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.2 }}>
+                    <span
+                      style={{
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        color: '#ffffff',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {user?.name ? user.name.replace(/\s*\((owner|kasir|admin)\)/gi, '').trim() : 'Owner'}
+                    </span>
+                    <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                      Pemilik Kafe
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    logout();
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    background: '#dc2626',
+                    color: '#ffffff',
                     border: 'none',
-                    background: isActive ? '#57695b' : 'transparent',
-                    color: isActive ? '#ffffff' : '#374151',
-                    fontWeight: isActive ? 600 : 500,
-                    fontSize: '13px',
-                    textAlign: 'left',
-                    textDecoration: 'none',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
                   }}
                 >
-                  <Icon size={15} color={isActive ? '#ffffff' : '#64746b'} />
-                  {item.label}
-                </Link>
-              );
-            })}
+                  Keluar
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* View Main Content Area (Extra bottom padding to ensure floating elements never cover bottom table rows) */}
+        {/* View Main Content Area */}
         <main
+          className="admin-main-content"
           style={{
             flex: 1,
-            padding: '24px 28px 84px 28px',
             maxWidth: '1440px',
             width: '100%',
             margin: '0 auto',
+            boxSizing: 'border-box',
           }}
         >
           {children || renderActiveView()}

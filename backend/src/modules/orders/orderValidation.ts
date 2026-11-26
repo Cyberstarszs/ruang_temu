@@ -31,6 +31,8 @@ export const directCheckoutSchema = z.object({
   referenceNumber: z.string().optional(),
   discountAmount: z.number().nonnegative().default(0),
   claimedDownPayment: z.number().nonnegative().default(0),
+  promoId: z.string().uuid().nullable().optional(),
+  promoCode: z.string().nullable().optional(),
   notes: z.string().optional(),
 });
 

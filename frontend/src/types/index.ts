@@ -40,6 +40,7 @@ export interface CashMovement {
   category: string;
   description?: string;
   amount: number | string;
+  receipt_url?: string | null;
   created_at: string;
 }
 
@@ -50,12 +51,29 @@ export interface ModifierOption {
   actionType: 'NONE' | 'REPLACE' | 'ADD' | 'REMOVE';
 }
 
+export interface ProductRecipeSummary {
+  ingredient_id: string;
+  name: string;
+  code: string;
+  quantity: number;
+  unit: string;
+  unit_cost: number;
+  item_hpp: number;
+  is_packaging_only: boolean;
+}
+
 export interface Product {
   id: string;
   sku: string;
   name: string;
   category: 'Kopi' | 'Non-Kopi' | 'Makanan' | 'Camilan' | 'Add-on';
   price: number;
+  original_price?: number;
+  has_promo?: boolean;
+  promo_badge?: string;
+  recipe_hpp?: number;
+  recipe_count?: number;
+  recipes?: ProductRecipeSummary[];
   image_url?: string | null;
   print_target: 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE';
   is_active: boolean;
@@ -108,6 +126,7 @@ export interface Promo {
   quota?: number | null;
   used_count: number;
   is_active: boolean;
+  created_at?: string;
 }
 
 export interface CartCustomization {
@@ -267,6 +286,7 @@ export interface DailySummary {
   totalTransactions: number;
   netSales: number;
   totalCogs: number;
+  totalDiscounts?: number;
   grossProfit: number;
   grossMarginPercentage: string;
   averageBasketSize: number;
@@ -365,6 +385,18 @@ export interface StoreSettings {
   phone?: string;
   receipt_footer?: string;
   rounding_rule: number;
+  paper_size?: '58mm' | '80mm';
+  tax_rate?: number;
+  service_charge_rate?: number;
+  auto_print_receipt?: boolean;
+  auto_print_bar?: boolean;
+  auto_print_kitchen?: boolean;
+  cashier_printer_name?: string;
+  bar_printer_name?: string;
+  kitchen_printer_name?: string;
+  wifi_ssid?: string;
+  wifi_password?: string;
+  instagram?: string;
   updated_at?: string;
 }
 

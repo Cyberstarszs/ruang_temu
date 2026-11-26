@@ -27,6 +27,7 @@ interface ShiftContextType {
     category: string;
     description?: string;
     amount: number;
+    receipt_url?: string | null;
   }) => Promise<{ success: boolean; message?: string }>;
 }
 
@@ -119,6 +120,7 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
     category: string;
     description?: string;
     amount: number;
+    receipt_url?: string | null;
   }) => {
     if (!shift) return { success: false, message: 'Tidak ada sif aktif.' };
     try {

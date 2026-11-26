@@ -5,6 +5,13 @@ import { api } from '@/lib/api';
 import { StaffUser, UserRole } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Users,
   Plus,
   Shield,
@@ -159,6 +166,11 @@ export function AdminUsersView() {
       return;
     }
 
+    if (pinCode.trim() && !/^\d{4,6}$/.test(pinCode.trim())) {
+      setModalError('PIN otorisasi harus berupa 4 hingga 6 digit angka.');
+      return;
+    }
+
     try {
       const res = await api.users.create({
         name: name.trim(),
@@ -222,8 +234,8 @@ export function AdminUsersView() {
 
       // PIN logic
       if (editPinMode === 'change') {
-        if (!editPinCode.trim()) {
-          setEditError('Masukkan PIN baru yang valid (4-6 digit angka).');
+        if (!editPinCode.trim() || !/^\d{4,6}$/.test(editPinCode.trim())) {
+          setEditError('Masukkan PIN baru yang valid (4 hingga 6 digit angka).');
           setIsSubmittingEdit(false);
           return;
         }
@@ -331,6 +343,151 @@ export function AdminUsersView() {
           <Plus size={16} />
           Tambah Staf Baru
         </button>
+      </div>
+
+      {/* 4 KPI METRIC CARDS */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
+          gap: '12px',
+        }}
+      >
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '14px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#edf3ee',
+              color: '#57695b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Users size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Total Seluruh Staf</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
+              {totalCount}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '14px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#e0f2fe',
+              color: '#0369a1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <UserCheck size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Kasir Aktif</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
+              {users.filter((u) => u.role === 'CASHIER' && u.is_active).length}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '14px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#fef3c7',
+              color: '#92400e',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Shield size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Owner / Manajer</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
+              {users.filter((u) => u.role === 'OWNER' && u.is_active).length}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#ffffff',
+            padding: '14px 18px',
+            borderRadius: '12px',
+            border: '1px solid #e7e8e3',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#fee2e2',
+              color: '#b91c1c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <UserX size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Akun Nonaktif</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
+              {inactiveCount}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* FILTER & SEARCH TOOLBAR */}
@@ -457,25 +614,19 @@ export function AdminUsersView() {
             </button>
           </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            style={{
-              padding: '6px 10px',
-              borderRadius: '8px',
-              border: '1px solid #dcdfd5',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#374151',
-              background: '#ffffff',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="ALL">Semua Status ({totalCount})</option>
-            <option value="ACTIVE">Aktif Saja ({activeCount})</option>
-            <option value="INACTIVE">Nonaktif Saja ({inactiveCount})</option>
-          </select>
+          {/* Status Filter (Shadcn UI) */}
+          <div style={{ width: '170px' }}>
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)}>
+              <SelectTrigger style={{ height: '34px', background: '#ffffff', fontSize: '12px' }}>
+                <SelectValue placeholder="Semua Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Status ({totalCount})</SelectItem>
+                <SelectItem value="ACTIVE">Aktif Saja ({activeCount})</SelectItem>
+                <SelectItem value="INACTIVE">Nonaktif Saja ({inactiveCount})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Reset button if filter is active */}
           {(searchQuery || roleFilter !== 'ALL' || statusFilter !== 'ALL') && (
@@ -807,8 +958,11 @@ export function AdminUsersView() {
               borderRadius: '20px',
               maxWidth: '480px',
               width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              overflow: 'hidden',
               animation: 'fadeIn 0.15s ease-out',
             }}
           >
@@ -912,23 +1066,15 @@ export function AdminUsersView() {
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                     Peran (Role)
                   </label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '13px',
-                      background: '#ffffff',
-                      color: '#1f2937',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <option value="CASHIER">Kasir (POS Kasir)</option>
-                    <option value="OWNER">Owner (Akses Penuh)</option>
-                  </select>
+                  <Select value={editRole} onValueChange={(val) => setEditRole(val as any)}>
+                    <SelectTrigger style={{ width: '100%', height: '38px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                      <SelectValue placeholder="Pilih Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASHIER">Kasir (POS Kasir)</SelectItem>
+                      <SelectItem value="OWNER">Owner (Akses Penuh)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1242,22 +1388,15 @@ export function AdminUsersView() {
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
                     Peran (Role)
                   </label>
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '13px',
-                      background: '#ffffff',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <option value="CASHIER">Kasir (POS Only)</option>
-                    <option value="OWNER">Owner / Manajer</option>
-                  </select>
+                  <Select value={role} onValueChange={(val) => setRole(val as any)}>
+                    <SelectTrigger style={{ width: '100%', height: '38px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                      <SelectValue placeholder="Pilih Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASHIER">Kasir (POS Only)</SelectItem>
+                      <SelectItem value="OWNER">Owner / Manajer</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

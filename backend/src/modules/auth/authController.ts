@@ -127,6 +127,13 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       return;
     }
 
+    if (pin_code && typeof pin_code === 'string' && pin_code.trim().length > 0) {
+      if (!/^\d{4,6}$/.test(pin_code.trim())) {
+        res.status(400).json({ success: false, message: 'PIN otorisasi harus berupa 4 hingga 6 digit angka.' });
+        return;
+      }
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
@@ -210,8 +217,13 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       if (pin_code === null || (typeof pin_code === 'string' && pin_code.trim() === '')) {
         updates.push(`pin_code = NULL`);
       } else {
+        const cleanPin = String(pin_code).trim();
+        if (!/^\d{4,6}$/.test(cleanPin)) {
+          res.status(400).json({ success: false, message: 'PIN otorisasi harus berupa 4 hingga 6 digit angka.' });
+          return;
+        }
         updates.push(`pin_code = $${idx++}`);
-        values.push(String(pin_code).trim());
+        values.push(cleanPin);
       }
     }
 

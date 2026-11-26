@@ -37,6 +37,8 @@ export interface DirectCheckoutInput {
   referenceNumber?: string;
   discountAmount?: number;
   claimedDownPayment?: number;
+  promoId?: string | null;
+  promoCode?: string | null;
   notes?: string;
 }
 
@@ -59,6 +61,8 @@ export class OrderService {
         referenceNumber,
         discountAmount = 0,
         claimedDownPayment = 0,
+        promoId,
+        promoCode,
         notes,
       } = input;
 
@@ -211,8 +215,104 @@ export class OrderService {
         });
       }
 
-      // 3. Final amounts
-      const totalAmount = Math.max(0, subtotal - Number(discountAmount) - Number(claimedDownPayment));
+      // 3. Verify Down Payment and Promo Discounts Server-Side
+      let verifiedDownPayment = 0;
+      if (reservationId) {
+        const resvRes = await client.query(
+          `SELECT id, down_payment_amount, is_dp_claimed, status 
+           FROM reservations 
+           WHERE id = $1 FOR UPDATE`,
+          [reservationId]
+        );
+
+        if (resvRes.rows.length === 0) {
+          throw { statusCode: 404, message: 'Data reservasi tidak ditemukan.' };
+        }
+
+        const resv = resvRes.rows[0];
+        if (resv.status !== 'CONFIRMED') {
+          throw { statusCode: 400, message: `Reservasi ini berstatus "${resv.status}" dan tidak dapat digunakan untuk klaim DP.` };
+        }
+
+        if (resv.is_dp_claimed) {
+          throw { statusCode: 400, message: 'Uang muka (DP) untuk reservasi ini sudah pernah diklaim sebelumnya.' };
+        }
+
+        const maxDp = Number(resv.down_payment_amount);
+        const reqDp = Number(claimedDownPayment || 0);
+
+        if (reqDp > maxDp) {
+          throw {
+            statusCode: 400,
+            message: `Klaim uang muka (Rp ${reqDp.toLocaleString('id-ID')}) melebihi DP tercatat reservasi (Rp ${maxDp.toLocaleString('id-ID')}).`,
+          };
+        }
+
+        verifiedDownPayment = reqDp > 0 ? reqDp : maxDp;
+      } else if (Number(claimedDownPayment) > 0) {
+        throw {
+          statusCode: 400,
+          message: 'Klaim uang muka (DP) hanya dapat dilakukan dengan menyertakan ID Reservasi yang valid.',
+        };
+      }
+
+      let verifiedDiscountAmount = 0;
+      if (promoId || promoCode) {
+        const promoRes = await client.query(
+          `SELECT * FROM promos 
+           WHERE (id = $1 OR UPPER(code) = UPPER($2))
+           FOR UPDATE`,
+          [promoId || null, promoCode ? String(promoCode).trim() : null]
+        );
+
+        if (promoRes.rows.length > 0) {
+          const promo = promoRes.rows[0];
+          const todayJakarta = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+
+          if (!promo.is_active) {
+            throw { statusCode: 422, message: `Promo "${promo.code}" sedang tidak aktif.` };
+          }
+          if (promo.start_date && todayJakarta < promo.start_date) {
+            throw { statusCode: 422, message: `Promo "${promo.code}" belum mulai berlaku.` };
+          }
+          if (promo.end_date && todayJakarta > promo.end_date) {
+            throw { statusCode: 422, message: `Promo "${promo.code}" sudah kedaluwarsa.` };
+          }
+          if (promo.quota !== null && promo.used_count >= promo.quota) {
+            throw { statusCode: 422, message: `Kuota penggunaan promo "${promo.code}" telah habis.` };
+          }
+          if (subtotal < Number(promo.min_spend || 0)) {
+            throw {
+              statusCode: 422,
+              message: `Subtotal pesanan (Rp ${subtotal.toLocaleString('id-ID')}) belum mencapai minimal belanja promo (Rp ${Number(promo.min_spend).toLocaleString('id-ID')}).`,
+            };
+          }
+
+          let calculatedDiscount = 0;
+          if (promo.discount_type === 'PERCENT') {
+            calculatedDiscount = (Number(promo.discount_value) / 100) * subtotal;
+            if (promo.max_discount && calculatedDiscount > Number(promo.max_discount)) {
+              calculatedDiscount = Number(promo.max_discount);
+            }
+          } else if (promo.discount_type === 'FIXED_AMOUNT') {
+            calculatedDiscount = Math.min(Number(promo.discount_value), subtotal);
+          }
+
+          verifiedDiscountAmount = Math.round(calculatedDiscount);
+
+          // Atomically increment promo usage counter
+          await client.query(
+            `UPDATE promos SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1`,
+            [promo.id]
+          );
+        }
+      } else if (Number(discountAmount) > 0) {
+        // Direct manual discount (capped at subtotal)
+        verifiedDiscountAmount = Math.min(Number(discountAmount), subtotal);
+      }
+
+      // Final amounts
+      const totalAmount = Math.max(0, subtotal - verifiedDiscountAmount - verifiedDownPayment);
 
       // 4. Verify payments
       if ((!paymentsList || paymentsList.length === 0) && paymentMethod) {
@@ -274,8 +374,8 @@ export class OrderService {
           reservationId || null,
           orderType,
           subtotal,
-          discountAmount,
-          claimedDownPayment,
+          verifiedDiscountAmount,
+          verifiedDownPayment,
           totalAmount,
           totalHpp,
           notes || null,
@@ -407,8 +507,8 @@ export class OrderService {
           date: order.created_at,
           cashierName: user?.name || 'Kasir',
           subtotal,
-          discountAmount,
-          claimedDownPayment,
+          discountAmount: verifiedDiscountAmount,
+          claimedDownPayment: verifiedDownPayment,
           totalAmount,
           payments: paymentsList,
         },
@@ -603,18 +703,18 @@ export class OrderService {
     const conditions: string[] = [];
 
     if (from && to) {
-      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') >= $${params.length + 1}`);
+      conditions.push(`DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') >= $${params.length + 1}`);
       params.push(from);
-      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') <= $${params.length + 1}`);
+      conditions.push(`DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') <= $${params.length + 1}`);
       params.push(to);
     } else if (from) {
-      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') >= $${params.length + 1}`);
+      conditions.push(`DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') >= $${params.length + 1}`);
       params.push(from);
     } else if (to) {
-      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') <= $${params.length + 1}`);
+      conditions.push(`DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') <= $${params.length + 1}`);
       params.push(to);
     } else if (date) {
-      conditions.push(`DATE(o.created_at AT TIME ZONE 'Asia/Jakarta') = $${params.length + 1}`);
+      conditions.push(`DATE(COALESCE(o.paid_at, o.created_at) AT TIME ZONE 'Asia/Jakarta') = $${params.length + 1}`);
       params.push(date);
     }
 

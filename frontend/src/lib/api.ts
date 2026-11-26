@@ -113,6 +113,10 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(payload),
       }),
+    delete: (id: string) =>
+      request<{ success: boolean; data?: any; message: string }>(`/inventory/${id}`, {
+        method: 'DELETE',
+      }),
     recordWastage: (payload: { ingredientId: string; quantity: number; reason: string }) =>
       request<{ success: boolean; data: any; message: string }>('/inventory/wastage', {
         method: 'POST',
@@ -133,6 +137,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+    updateSupplier: (id: string, payload: { name: string; phone: string; email?: string; address?: string; payment_terms?: string }) =>
+      request<{ success: boolean; data: any; message: string }>(`/purchasing/suppliers/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    deleteSupplier: (id: string) =>
+      request<{ success: boolean; data?: any; message: string }>(`/purchasing/suppliers/${id}`, {
+        method: 'DELETE',
+      }),
     getOrders: (status?: string) =>
       request<{ success: boolean; data: any[] }>(`/purchasing/orders${status ? `?status=${status}` : ''}`),
     getOrderById: (id: string) =>
@@ -144,6 +157,10 @@ export const api = {
       }),
     receiveOrder: (id: string) =>
       request<{ success: boolean; data: any; message: string }>(`/purchasing/orders/${id}/receive`, {
+        method: 'POST',
+      }),
+    cancelOrder: (id: string) =>
+      request<{ success: boolean; data?: any; message: string }>(`/purchasing/orders/${id}/cancel`, {
         method: 'POST',
       }),
   },
@@ -181,12 +198,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+    uploadReceipt: (payload: { image: string; filename?: string }) =>
+      request<{ success: boolean; data: { url: string; filename: string; size: number }; message: string }>('/shifts/upload-receipt', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
     recordMovement: (payload: {
       shiftId: string;
       type: 'CASH_IN' | 'CASH_OUT';
       category: string;
       description?: string;
       amount: number;
+      receipt_url?: string | null;
     }) =>
       request<{ success: boolean; data: any; message: string }>('/shifts/cash-movements', {
         method: 'POST',
@@ -229,10 +252,19 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+    update: (id: string, payload: any) =>
+      request<{ success: boolean; data: any; message: string }>(`/promos/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
     toggle: (id: string, is_active: boolean) =>
       request<{ success: boolean; data: any; message: string }>(`/promos/${id}/toggle`, {
         method: 'PATCH',
         body: JSON.stringify({ is_active }),
+      }),
+    delete: (id: string, force = false) =>
+      request<{ success: boolean; message: string; canForce?: boolean }>(`/promos/${id}${force ? '?force=true' : ''}`, {
+        method: 'DELETE',
       }),
   },
 
