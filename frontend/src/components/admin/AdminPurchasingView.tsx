@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Truck,
   Plus,
@@ -53,6 +54,27 @@ export function AdminPurchasingView() {
   const [poItems, setPoItems] = useState<Array<{ ingredientId: string; quantity: number; unitCost: number }>>([]);
   const [poError, setPoError] = useState('');
   const [isSubmittingPo, setIsSubmittingPo] = useState(false);
+
+  // Memoized options for Combobox
+  const supplierOptions = useMemo(() => {
+    return suppliers.map((s) => ({
+      value: s.id,
+      label: s.name,
+      subLabel: `${s.phone ? s.phone + ' • ' : ''}${s.payment_terms || 'CASH'}`,
+      badge: s.payment_terms || 'CASH',
+      keywords: [s.name, s.phone || '', s.payment_terms || '', s.email || ''],
+    }));
+  }, [suppliers]);
+
+  const ingredientOptions = useMemo(() => {
+    return ingredients.map((ing) => ({
+      value: ing.id,
+      label: ing.name,
+      subLabel: `${ing.code ? ing.code + ' • ' : ''}Biaya: Rp ${Number(ing.unit_cost).toLocaleString('id-ID')} / ${ing.usage_unit}`,
+      badge: ing.usage_unit,
+      keywords: [ing.name, ing.code || '', ing.usage_unit || '', ing.purchase_unit || ''],
+    }));
+  }, [ingredients]);
 
   // Add / Edit Supplier Modal
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -1329,18 +1351,14 @@ export function AdminPurchasingView() {
                 <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                   Pilih Supplier <span style={{ color: '#b91c1c' }}>*</span>
                 </label>
-                <Select value={poSupplierId} onValueChange={setPoSupplierId}>
-                  <SelectTrigger style={{ width: '100%', height: '36px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
-                    <SelectValue placeholder="Pilih Supplier..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name} ({s.phone}) - {s.payment_terms || 'CASH'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={supplierOptions}
+                  value={poSupplierId}
+                  onChange={setPoSupplierId}
+                  placeholder="Pilih atau cari supplier..."
+                  searchPlaceholder="Ketik nama, telepon, atau syarat bayar supplier..."
+                  emptyMessage="Supplier tidak ditemukan."
+                />
               </div>
 
               {/* PO Items */}
@@ -1408,27 +1426,21 @@ export function AdminPurchasingView() {
                               alignItems: 'center',
                             }}
                           >
-                            <Select
+                            <Combobox
+                              options={ingredientOptions}
                               value={item.ingredientId}
-                              onValueChange={(val) => {
+                              size="sm"
+                              onChange={(val) => {
                                 const newItems = [...poItems];
                                 newItems[idx].ingredientId = val;
                                 const ing = ingredients.find((i) => i.id === val);
                                 if (ing) newItems[idx].unitCost = Number(ing.unit_cost);
                                 setPoItems(newItems);
                               }}
-                            >
-                              <SelectTrigger style={{ height: '32px', background: '#ffffff', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '12px' }}>
-                                <SelectValue placeholder="Pilih Bahan" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ingredients.map((ing) => (
-                                  <SelectItem key={ing.id} value={ing.id}>
-                                    {ing.name} ({ing.usage_unit})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              placeholder="Cari & pilih bahan..."
+                              searchPlaceholder="Ketik nama bahan atau kode..."
+                              emptyMessage="Bahan tidak ditemukan."
+                            />
 
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                               <input

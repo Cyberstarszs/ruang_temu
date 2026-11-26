@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Boxes,
   Plus,
@@ -80,6 +81,17 @@ export function AdminInventoryView() {
   const [deleteIngTarget, setDeleteIngTarget] = useState<Ingredient | null>(null);
   const [deleteError, setDeleteError] = useState('');
   const [isDeletingIng, setIsDeletingIng] = useState(false);
+
+  // Memoized options for Combobox
+  const ingredientOptions = useMemo(() => {
+    return ingredients.map((ing) => ({
+      value: ing.id,
+      label: ing.name,
+      subLabel: `${ing.code ? ing.code + ' • ' : ''}Saldo: ${Number(ing.stock_actual).toLocaleString('id-ID')} ${ing.usage_unit}`,
+      badge: ing.usage_unit,
+      keywords: [ing.name, ing.code || '', ing.usage_unit || '', ing.purchase_unit || ''],
+    }));
+  }, [ingredients]);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -1657,18 +1669,14 @@ export function AdminInventoryView() {
                 <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
                   Pilih Bahan Baku <span style={{ color: '#b91c1c' }}>*</span>
                 </label>
-                <Select value={wasteIngredientId} onValueChange={setWasteIngredientId}>
-                  <SelectTrigger style={{ width: '100%', height: '36px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
-                    <SelectValue placeholder="Pilih Bahan Baku..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ingredients.map((ing) => (
-                      <SelectItem key={ing.id} value={ing.id}>
-                        {ing.name} ({ing.code}) - Saldo: {Number(ing.stock_actual).toLocaleString('id-ID')} {ing.usage_unit}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={ingredientOptions}
+                  value={wasteIngredientId}
+                  onChange={setWasteIngredientId}
+                  placeholder="Pilih atau cari bahan baku..."
+                  searchPlaceholder="Ketik nama bahan atau kode..."
+                  emptyMessage="Bahan baku tidak ditemukan."
+                />
               </div>
 
               <div>
