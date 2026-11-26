@@ -40,12 +40,10 @@ export function PosHeader({
   const { shift, summary, hasActiveShift } = useShift();
   const { isOnline, pendingOfflineCount, isSyncing, triggerSync } = useOfflineSync();
   const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [shiftMinutes, setShiftMinutes] = useState(0);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   const shiftRef = useRef<HTMLDivElement>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!shift?.opened_at) return;
@@ -67,14 +65,10 @@ export function PosHeader({
       if (shiftRef.current && !shiftRef.current.contains(target)) {
         setShiftDropdownOpen(false);
       }
-      if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
-        setMoreMenuOpen(false);
-      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setShiftDropdownOpen(false);
-        setMoreMenuOpen(false);
       }
     };
     document.addEventListener('pointerdown', handleCloseOutside);
@@ -714,74 +708,6 @@ export function PosHeader({
               )}
             </button>
           )}
-
-          {/* Secondary Tools: More Menu (⋯) */}
-          <div ref={moreMenuRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-              className={`pos-nav-btn pos-nav-icon-btn ${moreMenuOpen ? 'pos-nav-btn-active' : ''}`}
-              title="Menu Lainnya & Alat Manajemen"
-              aria-label="Menu Lainnya"
-              aria-expanded={moreMenuOpen}
-            >
-              <Icon name="moreVertical" size={16} />
-            </button>
-
-            {moreMenuOpen && (
-              <div className="pos-nav-dropdown">
-                {/* Matriks Keputusan Menu BCG (Khusus Owner) */}
-                {user?.role === 'OWNER' && (
-                  <button
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      onOpenMatrix();
-                    }}
-                    className="pos-dropdown-item"
-                  >
-                    <Icon name="trendingUp" size={16} />
-                    <div>
-                      <strong>Matriks Menu (BCG)</strong>
-                      <small>Analisis kontribusi & strategi menu</small>
-                    </div>
-                  </button>
-                )}
-
-                {/* Backoffice (Khusus Owner) */}
-                {user?.role === 'OWNER' && onSwitchToAdmin && (
-                  <button
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      onSwitchToAdmin();
-                    }}
-                    className="pos-dropdown-item"
-                  >
-                    <Icon name="dashboard" size={16} />
-                    <div>
-                      <strong>Mode Backoffice</strong>
-                      <small>Dashboard manajemen & stok</small>
-                    </div>
-                  </button>
-                )}
-
-                <hr className="pos-dropdown-divider" />
-
-                {/* Logout */}
-                <button
-                  onClick={() => {
-                    setMoreMenuOpen(false);
-                    setLogoutConfirmOpen(true);
-                  }}
-                  className="pos-dropdown-item pos-dropdown-danger"
-                >
-                  <Icon name="logout" size={16} />
-                  <div>
-                    <strong>Keluar Kasir</strong>
-                    <small>Tutup sesi login terminal</small>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* Quick Logout Button */}
           <button
