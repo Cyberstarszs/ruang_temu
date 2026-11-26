@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { CartItem, CartCustomization, Customer, DiningTable, HeldOrder, Product } from '@/types';
+import { api } from '@/lib/api';
 
 interface CartContextValue {
   // State
@@ -21,7 +22,11 @@ interface CartContextValue {
 
   // Computations
   subtotal: number;
+  taxRate: number;
   taxAmount: number;
+  serviceChargeRate: number;
+  serviceChargeAmount: number;
+  roundingAmount: number;
   grandTotal: number;
   itemCount: number;
 
@@ -94,19 +99,57 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const [storeSettings, setStoreSettings] = useState<{ tax_rate?: number; service_charge_rate?: number; rounding_rule?: number } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.settings.get()
+      .then((res) => {
+        if (isMounted && res.success && res.data) {
+          setStoreSettings(res.data);
+          try {
+            localStorage.setItem('ruang_temu_store_settings_cache', JSON.stringify(res.data));
+          } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          const cached = localStorage.getItem('ruang_temu_store_settings_cache');
+          if (cached && isMounted) setStoreSettings(JSON.parse(cached));
+        } catch {}
+      });
+    return () => { isMounted = false; };
+  }, []);
+
+  const taxRate = Number(storeSettings?.tax_rate) || 0;
+  const serviceChargeRate = Number(storeSettings?.service_charge_rate) || 0;
+  const roundingRule = Number(storeSettings?.rounding_rule) || 1;
+
   // Price calculations
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.itemSubtotal, 0);
   }, [cart]);
 
-  const taxAmount = useMemo(() => {
-    const afterDiscount = Math.max(0, subtotal - discountAmount);
-    return Math.round(afterDiscount * 0.1);
-  }, [subtotal, discountAmount]);
-
-  const grandTotal = useMemo(() => {
+  const netSubtotal = useMemo(() => {
     return Math.max(0, subtotal - discountAmount - claimedDownPayment);
   }, [subtotal, discountAmount, claimedDownPayment]);
+
+  const serviceChargeAmount = useMemo(() => {
+    return serviceChargeRate > 0 ? Math.round((netSubtotal * serviceChargeRate) / 100) : 0;
+  }, [netSubtotal, serviceChargeRate]);
+
+  const taxAmount = useMemo(() => {
+    return taxRate > 0 ? Math.round(((netSubtotal + serviceChargeAmount) * taxRate) / 100) : 0;
+  }, [netSubtotal, serviceChargeAmount, taxRate]);
+
+  const { grandTotal, roundingAmount } = useMemo(() => {
+    const raw = netSubtotal + serviceChargeAmount + taxAmount;
+    if (roundingRule > 1 && raw > 0) {
+      const rounded = Math.round(raw / roundingRule) * roundingRule;
+      return { grandTotal: Math.max(0, rounded), roundingAmount: rounded - raw };
+    }
+    return { grandTotal: Math.max(0, raw), roundingAmount: 0 };
+  }, [netSubtotal, serviceChargeAmount, taxAmount, roundingRule]);
 
   const itemCount = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -287,7 +330,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         heldOrders,
 
         subtotal,
+        taxRate,
         taxAmount,
+        serviceChargeRate,
+        serviceChargeAmount,
+        roundingAmount,
         grandTotal,
         itemCount,
 

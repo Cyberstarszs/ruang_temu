@@ -411,6 +411,9 @@ export interface PurchaseOrderItem {
   ingredient_code?: string;
   usage_unit?: string;
   purchase_unit?: string;
+  unit_type?: string;
+  conversion_rate?: number;
+  ingredient_conversion_rate?: number;
   quantity: number;
   unit_cost: number;
   subtotal: number;

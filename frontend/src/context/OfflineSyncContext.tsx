@@ -2,18 +2,29 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import {
+  OfflineOrderRecord,
   getPendingOfflineCount,
   syncAllOfflineOrders,
+  getAllOfflineOrders,
+  retryOfflineOrder,
+  removePromoAndRetryOfflineOrder,
+  deleteOfflineOrder,
 } from '@/lib/offlineQueue';
 import { api } from '@/lib/api';
 
 interface OfflineSyncContextType {
   isOnline: boolean;
   pendingOfflineCount: number;
+  failedCount: number;
+  offlineOrders: OfflineOrderRecord[];
   isSyncing: boolean;
   lastSyncTime: Date | null;
   triggerSync: () => Promise<{ syncedCount: number; failedCount: number }>;
   refreshPendingCount: () => Promise<number>;
+  refreshOrders: () => Promise<void>;
+  retryOrder: (id: string) => Promise<{ success: boolean; message: string }>;
+  removePromoAndRetry: (id: string) => Promise<{ success: boolean; message: string }>;
+  deleteOrder: (id: string) => Promise<void>;
 }
 
 const OfflineSyncContext = createContext<OfflineSyncContextType | undefined>(undefined);
@@ -21,19 +32,34 @@ const OfflineSyncContext = createContext<OfflineSyncContextType | undefined>(und
 export function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
+  const [failedCount, setFailedCount] = useState<number>(0);
+  const [offlineOrders, setOfflineOrders] = useState<OfflineOrderRecord[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const isSyncingRef = useRef<boolean>(false);
+
+  const refreshOrders = useCallback(async (): Promise<void> => {
+    try {
+      const orders = await getAllOfflineOrders();
+      setOfflineOrders(orders);
+      const pending = orders.filter((o) => o.status === 'PENDING' || o.status === 'FAILED');
+      setPendingOfflineCount(pending.length);
+      setFailedCount(orders.filter((o) => o.status === 'FAILED').length);
+    } catch {
+      setOfflineOrders([]);
+    }
+  }, []);
 
   const refreshPendingCount = useCallback(async (): Promise<number> => {
     try {
       const count = await getPendingOfflineCount();
       setPendingOfflineCount(count);
+      await refreshOrders();
       return count;
     } catch {
       return 0;
     }
-  }, []);
+  }, [refreshOrders]);
 
   const triggerSync = useCallback(async (): Promise<{ syncedCount: number; failedCount: number }> => {
     if (isSyncingRef.current) {
@@ -48,7 +74,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
         return await api.orders.checkoutDirect(payload);
       });
 
-      await refreshPendingCount();
+      await refreshOrders();
       setLastSyncTime(new Date());
 
       return {
@@ -62,7 +88,24 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       isSyncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [refreshPendingCount]);
+  }, [refreshOrders]);
+
+  const retryOrder = useCallback(async (id: string) => {
+    const res = await retryOfflineOrder(id, (payload) => api.orders.checkoutDirect(payload));
+    await refreshOrders();
+    return res;
+  }, [refreshOrders]);
+
+  const removePromoAndRetry = useCallback(async (id: string) => {
+    const res = await removePromoAndRetryOfflineOrder(id, (payload) => api.orders.checkoutDirect(payload));
+    await refreshOrders();
+    return res;
+  }, [refreshOrders]);
+
+  const deleteOrder = useCallback(async (id: string) => {
+    await deleteOfflineOrder(id);
+    await refreshOrders();
+  }, [refreshOrders]);
 
   // Initial check & Listeners
   useEffect(() => {
@@ -138,10 +181,16 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       value={{
         isOnline,
         pendingOfflineCount,
+        failedCount,
+        offlineOrders,
         isSyncing,
         lastSyncTime,
         triggerSync,
         refreshPendingCount,
+        refreshOrders,
+        retryOrder,
+        removePromoAndRetry,
+        deleteOrder,
       }}
     >
       {children}

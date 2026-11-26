@@ -171,7 +171,7 @@ export function AdminInventoryView() {
     const initialCounts: { [id: string]: string } = {};
     const initialNotes: { [id: string]: string } = {};
     ingredients.forEach((ing) => {
-      initialCounts[ing.id] = ing.stock_actual.toString();
+      initialCounts[ing.id] = cleanNumStr(ing.stock_actual, '0');
       initialNotes[ing.id] = '';
     });
     setOpnameCounts(initialCounts);
@@ -185,7 +185,7 @@ export function AdminInventoryView() {
     try {
       const items = ingredients.map((ing) => ({
         ingredientId: ing.id,
-        actualCount: Number(opnameCounts[ing.id] ?? ing.stock_actual),
+        actualCount: parseCleanNumber(opnameCounts[ing.id] ?? ing.stock_actual),
         notes: opnameNotes[ing.id]?.trim() || 'Stok Opname Rutin',
       }));
 
@@ -1495,7 +1495,7 @@ export function AdminInventoryView() {
                     })
                     .map((ing) => {
                       const sysVal = Number(ing.stock_actual);
-                      const countVal = Number(opnameCounts[ing.id] ?? sysVal);
+                      const countVal = parseCleanNumber(opnameCounts[ing.id] ?? sysVal);
                       const diff = countVal - sysVal;
 
                       return (
@@ -1510,7 +1510,7 @@ export function AdminInventoryView() {
                           <td style={{ textAlign: 'center', padding: '8px' }}>
                             <NumberInput
                               allowDecimal
-                              value={opnameCounts[ing.id] ?? sysVal}
+                              value={opnameCounts[ing.id] ?? cleanNumStr(sysVal, '0')}
                               onChange={(e) => setOpnameCounts({ ...opnameCounts, [ing.id]: e.target.value })}
                               style={{
                                 width: '100%',

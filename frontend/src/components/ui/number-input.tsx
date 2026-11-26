@@ -10,19 +10,50 @@ export interface NumberInputProps
   allowDecimal?: boolean;
 }
 
-export function formatThousand(val: string | number | undefined | null, allowDecimal = false): string {
+export function formatThousand(
+  val: string | number | undefined | null,
+  allowDecimal = false,
+  isTyping = false
+): string {
   if (val === undefined || val === null || val === '') return '';
   let str = String(val);
 
-  // Strip trailing unnecessary .00 or ,00 (e.g. "30000.00" -> "30000", "15.00" -> "15")
-  str = str.replace(/[.,]00$/, '');
+  if (!allowDecimal) {
+    if (str.includes('.') || str.includes(',')) {
+      const parts = str.replace(',', '.').split('.');
+      const intDigits = parts[0].replace(/\D/g, '');
+      return intDigits ? Number(intDigits).toLocaleString('id-ID') : '0';
+    }
+    const digits = str.replace(/\D/g, '');
+    if (!digits) return '';
+    return Number(digits).toLocaleString('id-ID');
+  }
 
-  if (allowDecimal && (str.includes('.') || str.includes(','))) {
+  if (str.includes('.') || str.includes(',')) {
     const parts = str.replace(',', '.').split('.');
     const intPart = parts[0].replace(/\D/g, '');
     const formattedInt = intPart ? Number(intPart).toLocaleString('id-ID') : '0';
-    if (parts.length > 1 && parts[1] && parts[1] !== '00') {
-      return `${formattedInt},${parts[1]}`;
+
+    if (parts.length > 1) {
+      let decPart = parts[1];
+
+      // If user typed comma/dot at the end (e.g. "12." or "12,")
+      if (decPart === '') {
+        return `${formattedInt},`;
+      }
+
+      // If actively typing, preserve what the user types (even if ending in zero like "12,0")
+      if (isTyping) {
+        return `${formattedInt},${decPart}`;
+      }
+
+      // Otherwise (initial value, blur, or DB float like "700.000", "12.500"):
+      // Strip trailing zeros
+      decPart = decPart.replace(/0+$/, '');
+      if (!decPart) {
+        return formattedInt;
+      }
+      return `${formattedInt},${decPart}`;
     }
     return formattedInt;
   }
@@ -47,16 +78,17 @@ export function cleanNumberString(val: string, allowDecimal = false): string {
 }
 
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, onChange, onValueChange, allowDecimal = false, onKeyDown, ...props }, ref) => {
+  ({ value, onChange, onValueChange, allowDecimal = false, onKeyDown, onFocus, onBlur, ...props }, ref) => {
     const internalRef = React.useRef<HTMLInputElement | null>(null);
     const cursorRef = React.useRef<{ digitsBefore: number } | null>(null);
+    const [isFocused, setIsFocused] = React.useState(false);
 
     React.useImperativeHandle(ref, () => internalRef.current as HTMLInputElement);
 
     // Derived formatted display value
     const displayValue = React.useMemo(() => {
-      return formatThousand(value, allowDecimal);
-    }, [value, allowDecimal]);
+      return formatThousand(value, allowDecimal, isFocused);
+    }, [value, allowDecimal, isFocused]);
 
     // Preserve cursor position after format
     React.useLayoutEffect(() => {
@@ -152,6 +184,16 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       onKeyDown?.(e);
     };
 
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(true);
+      onFocus?.(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(false);
+      onBlur?.(e);
+    };
+
     return (
       <input
         {...props}
@@ -161,6 +203,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         value={displayValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
       />
     );
   }

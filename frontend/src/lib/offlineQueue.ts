@@ -300,6 +300,140 @@ export async function getCachedCatalogData<T>(key: string): Promise<T | null> {
 }
 
 /**
+ * Mengambil seluruh data pesanan offline (PENDING, SYNCING, FAILED, SYNCED)
+ */
+export async function getAllOfflineOrders(): Promise<OfflineOrderRecord[]> {
+  const db = await getDB();
+  if (!db) {
+    try {
+      const existingStr = localStorage.getItem('ruang_temu_offline_orders_fallback') || '[]';
+      return JSON.parse(existingStr);
+    } catch {
+      return [];
+    }
+  }
+
+  return new Promise((resolve) => {
+    const tx = db.transaction([STORE_ORDERS], 'readonly');
+    const store = tx.objectStore(STORE_ORDERS);
+    const req = store.getAll();
+
+    req.onsuccess = () => {
+      const all: OfflineOrderRecord[] = req.result || [];
+      all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      resolve(all);
+    };
+
+    req.onerror = () => resolve([]);
+  });
+}
+
+/**
+ * Mencoba sinkronisasi ulang satu pesanan offline tertentu
+ */
+export async function retryOfflineOrder(
+  id: string,
+  checkoutApi: (payload: any) => Promise<any>
+): Promise<{ success: boolean; message: string }> {
+  const db = await getDB();
+  if (!db) return { success: false, message: 'Database offline tidak tersedia.' };
+
+  return new Promise((resolve) => {
+    const tx = db.transaction([STORE_ORDERS], 'readwrite');
+    const store = tx.objectStore(STORE_ORDERS);
+    const getReq = store.get(id);
+
+    getReq.onsuccess = async () => {
+      const record: OfflineOrderRecord = getReq.result;
+      if (!record) {
+        resolve({ success: false, message: 'Pesanan offline tidak ditemukan.' });
+        return;
+      }
+
+      try {
+        await updateOfflineOrderStatus(id, 'SYNCING');
+        const res = await checkoutApi(record.payload);
+        if (res && (res.success || res.data)) {
+          const serverOrderId = res.data?.order?.id || res.data?.id;
+          await updateOfflineOrderStatus(id, 'SYNCED', null, serverOrderId);
+          resolve({ success: true, message: `Pesanan ${record.orderNumber} berhasil disinkronkan ke server!` });
+        } else {
+          const msg = res?.message || 'Gagal sinkronisasi ke server.';
+          await updateOfflineOrderStatus(id, 'FAILED', msg);
+          resolve({ success: false, message: msg });
+        }
+      } catch (err: any) {
+        const msg = err.message || 'Koneksi terputus saat mencoba sinkronisasi.';
+        await updateOfflineOrderStatus(id, 'FAILED', msg);
+        resolve({ success: false, message: msg });
+      }
+    };
+
+    getReq.onerror = () => resolve({ success: false, message: 'Gagal membaca pesanan offline.' });
+  });
+}
+
+/**
+ * Menghapus kode promo yang kedaluwarsa/habis dari pesanan offline lalu mengirim ulang
+ */
+export async function removePromoAndRetryOfflineOrder(
+  id: string,
+  checkoutApi: (payload: any) => Promise<any>
+): Promise<{ success: boolean; message: string }> {
+  const db = await getDB();
+  if (!db) return { success: false, message: 'Database offline tidak tersedia.' };
+
+  return new Promise((resolve) => {
+    const tx = db.transaction([STORE_ORDERS], 'readwrite');
+    const store = tx.objectStore(STORE_ORDERS);
+    const getReq = store.get(id);
+
+    getReq.onsuccess = async () => {
+      const record: OfflineOrderRecord = getReq.result;
+      if (!record) {
+        resolve({ success: false, message: 'Pesanan offline tidak ditemukan.' });
+        return;
+      }
+
+      // Bersihkan promoId & promoCode dari payload
+      const cleanedPayload = {
+        ...record.payload,
+        promoId: null,
+        promoCode: null,
+        discountAmount: 0,
+        notes: `${record.payload.notes || ''} [Resolusi Manual: Promo Dihapus]`.trim(),
+      };
+
+      // Perbarui payload di IndexedDB
+      record.payload = cleanedPayload;
+      const putTx = db.transaction([STORE_ORDERS], 'readwrite');
+      const putStore = putTx.objectStore(STORE_ORDERS);
+      putStore.put(record);
+
+      try {
+        await updateOfflineOrderStatus(id, 'SYNCING');
+        const res = await checkoutApi(cleanedPayload);
+        if (res && (res.success || res.data)) {
+          const serverOrderId = res.data?.order?.id || res.data?.id;
+          await updateOfflineOrderStatus(id, 'SYNCED', null, serverOrderId);
+          resolve({ success: true, message: `Pesanan ${record.orderNumber} berhasil disinkronkan tanpa promo!` });
+        } else {
+          const msg = res?.message || 'Gagal sinkronisasi ke server.';
+          await updateOfflineOrderStatus(id, 'FAILED', msg);
+          resolve({ success: false, message: msg });
+        }
+      } catch (err: any) {
+        const msg = err.message || 'Koneksi terputus saat sinkronisasi.';
+        await updateOfflineOrderStatus(id, 'FAILED', msg);
+        resolve({ success: false, message: msg });
+      }
+    };
+
+    getReq.onerror = () => resolve({ success: false, message: 'Gagal memproses pesanan offline.' });
+  });
+}
+
+/**
  * Melakukan sinkronisasi seluruh pesanan offline ke server backend secara sekuensial
  */
 export async function syncAllOfflineOrders(

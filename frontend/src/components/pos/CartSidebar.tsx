@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { CartItem, Customer } from '@/types';
+import { useCart } from '@/context/CartContext';
 import { rupiah } from '@/lib/utils';
 import {
   Pause,
@@ -86,8 +87,17 @@ export function CartSidebar({
   const [showPromoBox, setShowPromoBox] = useState(false);
   const [showNoteBox, setShowNoteBox] = useState(false);
 
+  const {
+    taxRate,
+    taxAmount,
+    serviceChargeRate,
+    serviceChargeAmount,
+    roundingAmount,
+    grandTotal: calculatedGrandTotal,
+  } = useCart();
+
   const subtotal = cart.reduce((sum, item) => sum + item.itemSubtotal, 0);
-  const grandTotal = Math.max(0, subtotal - discountAmount - claimedDownPayment);
+  const grandTotal = calculatedGrandTotal;
   const totalItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleApplyPromo = async () => {
@@ -941,6 +951,27 @@ export function CartSidebar({
                 <b>− {rupiah(claimedDownPayment)}</b>
               </div>
             )}
+
+            {serviceChargeAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563' }}>
+                <span>Service Charge ({serviceChargeRate}%):</span>
+                <b>+ {rupiah(serviceChargeAmount)}</b>
+              </div>
+            )}
+
+            {taxAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563' }}>
+                <span>PB1 Resto ({taxRate}%):</span>
+                <b>+ {rupiah(taxAmount)}</b>
+              </div>
+            )}
+
+            {roundingAmount !== 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+                <span>Pembulatan:</span>
+                <b>{roundingAmount > 0 ? `+ ${rupiah(roundingAmount)}` : `− ${rupiah(Math.abs(roundingAmount))}`}</b>
+              </div>
+            )}
           </div>
 
           {/* Total Bayar Headline */}
@@ -957,7 +988,11 @@ export function CartSidebar({
               <span style={{ fontSize: '12px', fontWeight: 800, color: '#1f2937', display: 'block', letterSpacing: '0.3px' }}>
                 TOTAL BAYAR
               </span>
-              <small style={{ fontSize: '9.5px', color: '#9ca3af' }}>Nett (0% Pajak, 0% Servis)</small>
+              <small style={{ fontSize: '9.5px', color: '#6b7280' }}>
+                {taxRate > 0 || serviceChargeRate > 0
+                  ? `Termasuk PB1 (${taxRate}%) & Servis (${serviceChargeRate}%)`
+                  : 'Nett (Harga Bersih)'}
+              </small>
             </div>
             <b style={{ fontSize: '19px', fontWeight: 800, color: '#57695b' }}>{rupiah(grandTotal)}</b>
           </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useShift } from '@/context/ShiftContext';
 import { useOfflineSync } from '@/context/OfflineSyncContext';
+import { OfflineOrdersModal } from '@/components/pos/OfflineOrdersModal';
 import { Icon } from '@/components/common/Icons';
 import { rupiah, formatTime } from '@/lib/utils';
 
@@ -38,7 +39,8 @@ export function PosHeader({
 }: PosHeaderProps) {
   const { user, logout } = useAuth();
   const { shift, summary, hasActiveShift } = useShift();
-  const { isOnline, pendingOfflineCount, isSyncing, triggerSync } = useOfflineSync();
+  const { isOnline, pendingOfflineCount, failedCount, isSyncing, triggerSync } = useOfflineSync();
+  const [offlineModalOpen, setOfflineModalOpen] = useState(false);
   const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
   const [shiftMinutes, setShiftMinutes] = useState(0);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -572,7 +574,9 @@ export function PosHeader({
 
         {/* Status Offline Badge (Berdampingan dengan Pengeluaran di Kiri) */}
         {!isOnline && (
-          <div
+          <button
+            type="button"
+            onClick={() => setOfflineModalOpen(true)}
             className="pos-nav-btn"
             style={{
               backgroundColor: 'rgba(239, 68, 68, 0.18)',
@@ -583,9 +587,9 @@ export function PosHeader({
               alignItems: 'center',
               gap: '6px',
               padding: '0 10px',
-              cursor: 'default',
+              cursor: 'pointer',
             }}
-            title="Koneksi terputus! Mode Offline aktif. Transaksi tersimpan lokal di kasir."
+            title="Koneksi terputus! Mode Offline aktif. Klik untuk melihat antrean transaksi offline."
           >
             <span
               style={{
@@ -597,33 +601,46 @@ export function PosHeader({
               }}
             />
             <span className="pos-nav-text">Offline</span>
-          </div>
+          </button>
         )}
 
         {/* Pending Offline Orders Sync Button */}
         {pendingOfflineCount > 0 && (
           <button
             type="button"
-            onClick={() => triggerSync()}
-            disabled={isSyncing || !isOnline}
+            onClick={() => setOfflineModalOpen(true)}
             className="pos-nav-btn"
             style={{
-              backgroundColor: isSyncing ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-              border: isSyncing ? '1px solid #3b82f6' : '1px solid #f59e0b',
-              color: isSyncing ? '#2563eb' : '#b45309',
-              fontWeight: 600,
+              backgroundColor:
+                failedCount > 0
+                  ? 'rgba(239, 68, 68, 0.18)'
+                  : isSyncing
+                  ? 'rgba(59, 130, 246, 0.2)'
+                  : 'rgba(245, 158, 11, 0.2)',
+              border:
+                failedCount > 0
+                  ? '1.5px solid #ef4444'
+                  : isSyncing
+                  ? '1px solid #3b82f6'
+                  : '1px solid #f59e0b',
+              color:
+                failedCount > 0
+                  ? '#dc2626'
+                  : isSyncing
+                  ? '#2563eb'
+                  : '#b45309',
+              fontWeight: 700,
+              cursor: 'pointer',
             }}
-            title={
-              isSyncing
-                ? 'Sedang menyinkronkan data transaksi ke server...'
-                : !isOnline
-                ? `${pendingOfflineCount} transaksi tersimpan lokal di kasir. Menunggu koneksi pulih...`
-                : `Klik untuk sinkronisasi ${pendingOfflineCount} transaksi offline ke server sekarang`
-            }
+            title="Klik untuk membuka pengelola dan resolusi transaksi offline"
           >
             <Icon name="rotateCcw" size={14} className={isSyncing ? 'spin' : ''} />
             <span className="pos-nav-text">
-              {isSyncing ? 'Sinkron...' : `Sinkron (${pendingOfflineCount})`}
+              {failedCount > 0
+                ? `Sinkron Bermasalah (${failedCount})`
+                : isSyncing
+                ? 'Sinkron...'
+                : `Sinkron (${pendingOfflineCount})`}
             </span>
           </button>
         )}
@@ -746,6 +763,9 @@ export function PosHeader({
             </div>
           </div>
         </div>
+      )}
+      {offlineModalOpen && (
+        <OfflineOrdersModal onClose={() => setOfflineModalOpen(false)} />
       )}
     </>
   );

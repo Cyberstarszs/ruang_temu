@@ -47,7 +47,7 @@ export class OrderService {
   async directCheckout(input: DirectCheckoutInput, user?: AuthUser) {
     const client = await pool.connect();
     try {
-      const {
+      let {
         shiftId,
         tableId,
         tableNumberFallback,
@@ -257,6 +257,9 @@ export class OrderService {
       }
 
       let verifiedDiscountAmount = 0;
+      let verifiedPromoId: string | null = null;
+      const isOfflineSyncOrder = Boolean(notes && notes.includes('[OFFLINE SYNC]'));
+
       if (promoId || promoCode) {
         const promoRes = await client.query(
           `SELECT * FROM promos 
@@ -269,50 +272,90 @@ export class OrderService {
           const promo = promoRes.rows[0];
           const todayJakarta = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
 
+          let isPromoValid = true;
+          let promoInvalidReason = '';
+
           if (!promo.is_active) {
-            throw { statusCode: 422, message: `Promo "${promo.code}" sedang tidak aktif.` };
-          }
-          if (promo.start_date && todayJakarta < promo.start_date) {
-            throw { statusCode: 422, message: `Promo "${promo.code}" belum mulai berlaku.` };
-          }
-          if (promo.end_date && todayJakarta > promo.end_date) {
-            throw { statusCode: 422, message: `Promo "${promo.code}" sudah kedaluwarsa.` };
-          }
-          if (promo.quota !== null && promo.used_count >= promo.quota) {
-            throw { statusCode: 422, message: `Kuota penggunaan promo "${promo.code}" telah habis.` };
-          }
-          if (subtotal < Number(promo.min_spend || 0)) {
-            throw {
-              statusCode: 422,
-              message: `Subtotal pesanan (Rp ${subtotal.toLocaleString('id-ID')}) belum mencapai minimal belanja promo (Rp ${Number(promo.min_spend).toLocaleString('id-ID')}).`,
-            };
+            isPromoValid = false;
+            promoInvalidReason = `Promo "${promo.code}" sedang tidak aktif.`;
+          } else if (promo.start_date && todayJakarta < promo.start_date) {
+            isPromoValid = false;
+            promoInvalidReason = `Promo "${promo.code}" belum mulai berlaku.`;
+          } else if (promo.end_date && todayJakarta > promo.end_date) {
+            isPromoValid = false;
+            promoInvalidReason = `Promo "${promo.code}" sudah kedaluwarsa.`;
+          } else if (promo.quota !== null && promo.used_count >= promo.quota) {
+            isPromoValid = false;
+            promoInvalidReason = `Kuota penggunaan promo "${promo.code}" telah habis.`;
+          } else if (subtotal < Number(promo.min_spend || 0)) {
+            isPromoValid = false;
+            promoInvalidReason = `Subtotal pesanan (Rp ${subtotal.toLocaleString('id-ID')}) belum mencapai minimal belanja promo (Rp ${Number(promo.min_spend).toLocaleString('id-ID')}).`;
           }
 
-          let calculatedDiscount = 0;
-          if (promo.discount_type === 'PERCENT') {
-            calculatedDiscount = (Number(promo.discount_value) / 100) * subtotal;
-            if (promo.max_discount && calculatedDiscount > Number(promo.max_discount)) {
-              calculatedDiscount = Number(promo.max_discount);
+          if (!isPromoValid) {
+            if (isOfflineSyncOrder) {
+              // Graceful offline tolerance: Don't reject the offline customer transaction that was already completed
+              verifiedDiscountAmount = Math.min(Number(discountAmount || 0), subtotal);
+              notes = `${notes || ''} [Offline Sync: Diskon ${promo.code} disetujui toleransi offline (${promoInvalidReason})]`;
+            } else {
+              throw { statusCode: 422, message: promoInvalidReason };
             }
-          } else if (promo.discount_type === 'FIXED_AMOUNT') {
-            calculatedDiscount = Math.min(Number(promo.discount_value), subtotal);
+          } else {
+            let calculatedDiscount = 0;
+            if (promo.discount_type === 'PERCENT') {
+              calculatedDiscount = (Number(promo.discount_value) / 100) * subtotal;
+              if (promo.max_discount && calculatedDiscount > Number(promo.max_discount)) {
+                calculatedDiscount = Number(promo.max_discount);
+              }
+            } else if (promo.discount_type === 'FIXED_AMOUNT') {
+              calculatedDiscount = Math.min(Number(promo.discount_value), subtotal);
+            }
+
+            verifiedDiscountAmount = Math.round(calculatedDiscount);
+            verifiedPromoId = promo.id;
+
+            // Atomically increment promo usage counter
+            await client.query(
+              `UPDATE promos SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1`,
+              [promo.id]
+            );
           }
-
-          verifiedDiscountAmount = Math.round(calculatedDiscount);
-
-          // Atomically increment promo usage counter
-          await client.query(
-            `UPDATE promos SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1`,
-            [promo.id]
-          );
+        } else if (isOfflineSyncOrder && Number(discountAmount) > 0) {
+          verifiedDiscountAmount = Math.min(Number(discountAmount), subtotal);
         }
       } else if (Number(discountAmount) > 0) {
         // Direct manual discount (capped at subtotal)
         verifiedDiscountAmount = Math.min(Number(discountAmount), subtotal);
       }
 
-      // Final amounts
-      const totalAmount = Math.max(0, subtotal - verifiedDiscountAmount - verifiedDownPayment);
+      // Fetch store settings for tax, service charge, and rounding
+      const settingsRes = await client.query(`SELECT tax_rate, service_charge_rate, rounding_rule FROM store_settings LIMIT 1`);
+      const storeSettings = settingsRes.rows[0] || { tax_rate: 0, service_charge_rate: 0, rounding_rule: 1 };
+
+      const taxRateNum = Number(storeSettings.tax_rate) || 0;
+      const serviceChargeRateNum = Number(storeSettings.service_charge_rate) || 0;
+      const roundingRuleNum = Number(storeSettings.rounding_rule) || 1;
+
+      const netSubtotal = Math.max(0, subtotal - verifiedDiscountAmount - verifiedDownPayment);
+      
+      const serviceChargeAmount = serviceChargeRateNum > 0
+        ? Math.round((netSubtotal * serviceChargeRateNum) / 100)
+        : 0;
+
+      const taxAmount = taxRateNum > 0
+        ? Math.round(((netSubtotal + serviceChargeAmount) * taxRateNum) / 100)
+        : 0;
+
+      const rawTotal = netSubtotal + serviceChargeAmount + taxAmount;
+
+      let roundedTotal = rawTotal;
+      let roundingAmount = 0;
+      if (roundingRuleNum > 1 && rawTotal > 0) {
+        roundedTotal = Math.round(rawTotal / roundingRuleNum) * roundingRuleNum;
+        roundingAmount = roundedTotal - rawTotal;
+      }
+
+      const totalAmount = Math.max(0, roundedTotal);
 
       // 4. Verify payments
       if ((!paymentsList || paymentsList.length === 0) && paymentMethod) {
@@ -360,10 +403,11 @@ export class OrderService {
       const orderNumber = generateOrderNumber();
       const orderRes = await client.query(
         `INSERT INTO orders (
-          order_number, shift_id, cashier_id, table_id, customer_id, reservation_id,
-          order_type, subtotal, discount_amount, claimed_down_payment, total_amount, total_hpp,
-          status, notes, paid_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'PAID', $13, NOW())
+          order_number, shift_id, cashier_id, table_id, customer_id, reservation_id, promo_id,
+          order_type, subtotal, discount_amount, claimed_down_payment,
+          tax_rate, tax_amount, service_charge_rate, service_charge_amount, rounding_amount,
+          total_amount, total_hpp, status, notes, paid_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'PAID', $19, NOW())
         RETURNING *`,
         [
           orderNumber,
@@ -372,10 +416,16 @@ export class OrderService {
           resolvedTableId,
           customerId || null,
           reservationId || null,
+          verifiedPromoId,
           orderType,
           subtotal,
           verifiedDiscountAmount,
           verifiedDownPayment,
+          taxRateNum,
+          taxAmount,
+          serviceChargeRateNum,
+          serviceChargeAmount,
+          roundingAmount,
           totalAmount,
           totalHpp,
           notes || null,
@@ -573,9 +623,37 @@ export class OrderService {
         [order.id]
       );
 
-      // Restock ingredients if requested
+      // 1. Rollback promo voucher usage count
+      if (order.promo_id) {
+        await client.query(
+          `UPDATE promos SET used_count = GREATEST(0, used_count - 1), updated_at = NOW() WHERE id = $1`,
+          [order.promo_id]
+        );
+      }
+
+      // 2. Unclaim reservation down payment
+      if (order.reservation_id) {
+        await client.query(
+          `UPDATE reservations SET is_dp_claimed = FALSE, status = 'CONFIRMED' WHERE id = $1`,
+          [order.reservation_id]
+        );
+      }
+
+      // 3. Rollback earned loyalty points from customer
+      if (order.customer_id && Number(order.total_amount) > 0) {
+        const pointsToDeduct = Math.floor(Number(order.total_amount) / 10000);
+        if (pointsToDeduct > 0) {
+          await client.query(
+            `UPDATE customers SET loyalty_points = GREATEST(0, loyalty_points - $1) WHERE id = $2`,
+            [pointsToDeduct, order.customer_id]
+          );
+        }
+      }
+
+      // 4. Restock ingredients if requested
       if (restock) {
         for (const item of itemsRes.rows) {
+          // Base recipe ingredients
           const recRes = await client.query(
             `SELECT ingredient_id, quantity, is_packaging_only FROM product_recipes WHERE product_id = $1`,
             [item.product_id]
@@ -593,6 +671,43 @@ export class OrderService {
                VALUES ($1, 'VOID_RESTOCK', $2, (SELECT stock_actual FROM ingredients WHERE id = $1), $3)`,
               [rec.ingredient_id, qtyToReturn, order.order_number]
             );
+          }
+
+          // Modifiers substitute ingredients
+          if (item.selected_modifiers) {
+            try {
+              const mods = typeof item.selected_modifiers === 'string'
+                ? JSON.parse(item.selected_modifiers)
+                : item.selected_modifiers;
+
+              if (Array.isArray(mods)) {
+                for (const mod of mods) {
+                  if (mod.id) {
+                    const modOptRes = await client.query(
+                      `SELECT substitute_ingredient_id, quantity_delta FROM modifier_options WHERE id = $1`,
+                      [mod.id]
+                    );
+                    if (modOptRes.rows.length > 0) {
+                      const mOpt = modOptRes.rows[0];
+                      if (mOpt.substitute_ingredient_id && Number(mOpt.quantity_delta) > 0) {
+                        const modQtyToReturn = Number(mOpt.quantity_delta) * item.quantity;
+                        await client.query(
+                          `UPDATE ingredients SET stock_actual = stock_actual + $1, updated_at = NOW() WHERE id = $2`,
+                          [modQtyToReturn, mOpt.substitute_ingredient_id]
+                        );
+                        await client.query(
+                          `INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
+                           VALUES ($1, 'VOID_RESTOCK', $2, (SELECT stock_actual FROM ingredients WHERE id = $1), $3)`,
+                          [mOpt.substitute_ingredient_id, modQtyToReturn, `${order.order_number} (Restock: ${mod.name})`]
+                        );
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('[Void Order] Gagal memulihkan stok modifier:', err);
+            }
           }
         }
       }

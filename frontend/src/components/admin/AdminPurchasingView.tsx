@@ -52,7 +52,12 @@ export function AdminPurchasingView() {
   const [isCreatePoOpen, setIsCreatePoOpen] = useState(false);
   const [poSupplierId, setPoSupplierId] = useState('');
   const [poNotes, setPoNotes] = useState('');
-  const [poItems, setPoItems] = useState<Array<{ ingredientId: string; quantity: number; unitCost: number }>>([]);
+  const [poItems, setPoItems] = useState<Array<{
+    ingredientId: string;
+    quantity: number;
+    unitCost: number;
+    unitType: 'PURCHASE_UNIT' | 'USAGE_UNIT';
+  }>>([]);
   const [poError, setPoError] = useState('');
   const [isSubmittingPo, setIsSubmittingPo] = useState(false);
 
@@ -174,12 +179,15 @@ export function AdminPurchasingView() {
   const handleAddPoItemRow = () => {
     const firstIng = ingredients[0];
     if (!firstIng) return;
+    const convRate = Number(firstIng.conversion_rate) > 0 ? Number(firstIng.conversion_rate) : 1000;
+    const defaultPricePerPurchaseUnit = Math.round((Number(firstIng.unit_cost) || 100) * convRate);
     setPoItems([
       ...poItems,
       {
         ingredientId: firstIng.id,
-        quantity: 1000,
-        unitCost: Number(firstIng.unit_cost) || 100,
+        quantity: 1,
+        unitCost: defaultPricePerPurchaseUnit || 50000,
+        unitType: 'PURCHASE_UNIT',
       },
     ]);
   };
@@ -1185,10 +1193,19 @@ export function AdminPurchasingView() {
                           {item.ingredient_name}
                         </td>
                         <td style={{ textAlign: 'center', padding: '0 6px', verticalAlign: 'middle' }}>
-                          {Number(item.quantity).toLocaleString('id-ID')} {item.usage_unit || 'gram'}
+                          {item.unit_type === 'PURCHASE_UNIT' ? (
+                            <div>
+                              <span style={{ fontWeight: 600 }}>{Number(item.quantity).toLocaleString('id-ID')} {item.purchase_unit || 'satuan beli'}</span>
+                              <span style={{ fontSize: '10.5px', color: '#64746b', display: 'block' }}>
+                                (= {(Number(item.quantity) * Number(item.ingredient_conversion_rate || item.conversion_rate || 1)).toLocaleString('id-ID')} {item.usage_unit || 'gram'})
+                              </span>
+                            </div>
+                          ) : (
+                            <span>{Number(item.quantity).toLocaleString('id-ID')} {item.usage_unit || 'gram'}</span>
+                          )}
                         </td>
                         <td style={{ textAlign: 'right', padding: '0 6px', verticalAlign: 'middle', color: '#64746b' }}>
-                          Rp {Number(item.unit_cost).toLocaleString('id-ID')}
+                          Rp {Number(item.unit_cost).toLocaleString('id-ID')} / {item.unit_type === 'PURCHASE_UNIT' ? (item.purchase_unit || 'satuan beli') : (item.usage_unit || 'satuan pakai')}
                         </td>
                         <td style={{ textAlign: 'right', padding: '0 6px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826' }}>
                           Rp {Number(item.subtotal).toLocaleString('id-ID')}
@@ -1422,7 +1439,7 @@ export function AdminPurchasingView() {
                           <div
                             style={{
                               display: 'grid',
-                              gridTemplateColumns: '2.5fr 1.5fr 1.5fr 1.5fr auto',
+                              gridTemplateColumns: '2fr 1.1fr 1.2fr 1.3fr 1.4fr auto',
                               gap: '6px',
                               alignItems: 'center',
                             }}
@@ -1435,13 +1452,49 @@ export function AdminPurchasingView() {
                                 const newItems = [...poItems];
                                 newItems[idx].ingredientId = val;
                                 const ing = ingredients.find((i) => i.id === val);
-                                if (ing) newItems[idx].unitCost = Number(ing.unit_cost);
+                                if (ing) {
+                                  const cRate = Number(ing.conversion_rate) > 0 ? Number(ing.conversion_rate) : 1000;
+                                  newItems[idx].unitCost = newItems[idx].unitType === 'PURCHASE_UNIT'
+                                    ? Math.round((Number(ing.unit_cost) || 100) * cRate)
+                                    : (Number(ing.unit_cost) || 100);
+                                }
                                 setPoItems(newItems);
                               }}
                               placeholder="Cari & pilih bahan..."
                               searchPlaceholder="Ketik nama bahan atau kode..."
                               emptyMessage="Bahan tidak ditemukan."
                             />
+
+                            {/* Satuan Selector */}
+                            <select
+                              value={item.unitType}
+                              onChange={(e) => {
+                                const newItems = [...poItems];
+                                const newType = e.target.value as 'PURCHASE_UNIT' | 'USAGE_UNIT';
+                                const ing = ingredients.find((i) => i.id === item.ingredientId);
+                                const cRate = ing && Number(ing.conversion_rate) > 0 ? Number(ing.conversion_rate) : 1000;
+                                if (newType === 'PURCHASE_UNIT' && item.unitType === 'USAGE_UNIT') {
+                                  newItems[idx].unitCost = Math.round(item.unitCost * cRate);
+                                } else if (newType === 'USAGE_UNIT' && item.unitType === 'PURCHASE_UNIT') {
+                                  newItems[idx].unitCost = Math.round(item.unitCost / cRate);
+                                }
+                                newItems[idx].unitType = newType;
+                                setPoItems(newItems);
+                              }}
+                              style={{
+                                padding: '6px 4px',
+                                borderRadius: '6px',
+                                border: '1px solid #d1d5db',
+                                fontSize: '11px',
+                                background: '#fff',
+                                outline: 'none',
+                                fontWeight: 600,
+                                color: '#374151',
+                              }}
+                            >
+                              <option value="PURCHASE_UNIT">{selectedIng?.purchase_unit || 'Satuan Beli'}</option>
+                              <option value="USAGE_UNIT">{selectedIng?.usage_unit || 'Satuan Pakai'}</option>
+                            </select>
 
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                               <NumberInput
@@ -1464,13 +1517,13 @@ export function AdminPurchasingView() {
                                 }}
                               />
                               <span style={{ position: 'absolute', right: '6px', fontSize: '10px', color: '#888' }}>
-                                {selectedIng?.usage_unit || ''}
+                                {item.unitType === 'PURCHASE_UNIT' ? selectedIng?.purchase_unit : selectedIng?.usage_unit}
                               </span>
                             </div>
 
                             <NumberInput
                               allowDecimal
-                              placeholder="Harga"
+                              placeholder="Harga Satuan"
                               value={item.unitCost}
                               onChange={(e) => {
                                 const newItems = [...poItems];
@@ -1509,12 +1562,20 @@ export function AdminPurchasingView() {
 
                           {selectedIng && (
                             <div style={{ fontSize: '11px', color: '#64746b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span style={{ background: '#edf3ee', color: '#57695b', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                                1 {selectedIng.purchase_unit} = {Number(selectedIng.conversion_rate).toLocaleString('id-ID')} {selectedIng.usage_unit}
-                              </span>
-                              <span>
-                                (HPP saat ini: Rp {Math.round(Number(selectedIng.unit_cost)).toLocaleString('id-ID')} / {selectedIng.usage_unit})
-                              </span>
+                              {item.unitType === 'PURCHASE_UNIT' ? (
+                                <>
+                                  <span style={{ background: '#edf3ee', color: '#57695b', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                    Konversi: {item.quantity || 0} {selectedIng.purchase_unit} = {((Number(item.quantity) || 0) * (Number(selectedIng.conversion_rate) || 1)).toLocaleString('id-ID')} {selectedIng.usage_unit}
+                                  </span>
+                                  <span>
+                                    (HPP Masuk: Rp {Math.round((Number(item.unitCost) || 0) / (Number(selectedIng.conversion_rate) || 1)).toLocaleString('id-ID')} / {selectedIng.usage_unit})
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                  Input langsung satuan pakai ({selectedIng.usage_unit})
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>

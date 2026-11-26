@@ -160,7 +160,8 @@ export async function getPurchaseOrderById(req: Request, res: Response, next: Ne
         COALESCE(i.name, 'Bahan Dihapus') as ingredient_name, 
         i.code as ingredient_code, 
         COALESCE(i.usage_unit::text, 'gram') as usage_unit, 
-        i.purchase_unit
+        i.purchase_unit,
+        COALESCE(i.conversion_rate, 1) as ingredient_conversion_rate
       FROM purchase_order_items poi
       LEFT JOIN ingredients i ON poi.ingredient_id = i.id
       WHERE poi.purchase_order_id = $1
@@ -190,17 +191,36 @@ export async function createPurchaseOrder(req: Request, res: Response, next: Nex
     return;
   }
 
-  const processedItems: Array<{ ingredient_id: string; quantity: number; unit_cost: number }> = [];
+  const processedItems: Array<{
+    ingredient_id: string;
+    quantity: number;
+    unit_cost: number;
+    unit_type: string;
+    conversion_rate: number;
+  }> = [];
 
   for (const item of items) {
     const ingId = item.ingredient_id || item.ingredientId;
     const q = Number(item.quantity);
     const c = Number(item.unit_cost ?? item.unitPrice ?? 0);
+    const uType = (item.unit_type || item.unitType || 'PURCHASE_UNIT').toUpperCase();
     if (!ingId || isNaN(q) || q <= 0 || isNaN(c) || c < 0) {
       res.status(400).json({ success: false, message: 'Setiap item pembelian wajib memiliki kuantitas (> 0) dan harga satuan (>= 0) yang valid.' });
       return;
     }
-    processedItems.push({ ingredient_id: ingId, quantity: q, unit_cost: c });
+
+    const ingCheck = await pool.query('SELECT conversion_rate FROM ingredients WHERE id = $1', [ingId]);
+    const convRate = ingCheck.rows.length > 0 && Number(ingCheck.rows[0].conversion_rate) > 0
+      ? Number(ingCheck.rows[0].conversion_rate)
+      : 1;
+
+    processedItems.push({
+      ingredient_id: ingId,
+      quantity: q,
+      unit_cost: c,
+      unit_type: uType,
+      conversion_rate: convRate,
+    });
   }
 
   const client = await pool.connect();
@@ -228,9 +248,9 @@ export async function createPurchaseOrder(req: Request, res: Response, next: Nex
     for (const item of processedItems) {
       const subtotal = item.quantity * item.unit_cost;
       await client.query(`
-        INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, quantity, unit_cost, subtotal)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [poId, item.ingredient_id, item.quantity, item.unit_cost, subtotal]);
+        INSERT INTO purchase_order_items (purchase_order_id, ingredient_id, quantity, unit_cost, subtotal, unit_type, conversion_rate)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [poId, item.ingredient_id, item.quantity, item.unit_cost, subtotal, item.unit_type, item.conversion_rate]);
     }
 
     await client.query(`
@@ -282,34 +302,48 @@ export async function receivePurchaseOrder(req: Request, res: Response, next: Ne
       return;
     }
 
-    // Get PO items
+    // Get PO items with units and conversion rates
     const itemsRes = await client.query(`
-      SELECT poi.*, i.conversion_rate, i.stock_actual
+      SELECT poi.*, i.conversion_rate as ingredient_conversion_rate, i.stock_actual, i.usage_unit, i.purchase_unit
       FROM purchase_order_items poi
       JOIN ingredients i ON poi.ingredient_id = i.id
       WHERE poi.purchase_order_id = $1
     `, [id]);
 
     for (const item of itemsRes.rows) {
-      const qtyToAdd = Number(item.quantity);
-      
+      const rawQty = Number(item.quantity);
+      const convRate = Number(item.conversion_rate) > 0
+        ? Number(item.conversion_rate)
+        : (Number(item.ingredient_conversion_rate) > 0 ? Number(item.ingredient_conversion_rate) : 1);
+
+      // Distinguish purchase unit (e.g. 5 kg) vs usage unit (5000 gr)
+      const isPurchaseUnit = item.unit_type === 'PURCHASE_UNIT' || (!item.unit_type && convRate > 1 && rawQty < 100);
+      const qtyToAdd = isPurchaseUnit ? rawQty * convRate : rawQty;
+      const costPerUsageUnit = isPurchaseUnit ? Number(item.unit_cost) / convRate : Number(item.unit_cost);
+
       const updateIngRes = await client.query(`
         UPDATE ingredients
         SET stock_actual = stock_actual + $1,
             unit_cost = CASE WHEN $2::numeric > 0 THEN $2::numeric ELSE unit_cost END,
             updated_at = NOW()
         WHERE id = $3
-        RETURNING stock_actual
-      `, [qtyToAdd, item.unit_cost, item.ingredient_id]);
+        RETURNING stock_actual, name, usage_unit, purchase_unit
+      `, [qtyToAdd, costPerUsageUnit, item.ingredient_id]);
 
       if (updateIngRes.rows.length > 0) {
-        const newBalance = updateIngRes.rows[0].stock_actual;
+        const ing = updateIngRes.rows[0];
+        const newBalance = ing.stock_actual;
 
         // Record stock movement
         await client.query(`
           INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
           VALUES ($1, 'PURCHASE_RECEIPT', $2, $3, $4)
-        `, [item.ingredient_id, qtyToAdd, newBalance, po.po_number]);
+        `, [
+          item.ingredient_id,
+          qtyToAdd,
+          newBalance,
+          `${po.po_number}: Masuk ${rawQty} ${isPurchaseUnit ? (item.purchase_unit || 'satuan beli') : (item.usage_unit || 'satuan pakai')}`
+        ]);
       }
     }
 

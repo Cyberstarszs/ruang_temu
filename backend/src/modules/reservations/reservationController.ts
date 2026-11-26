@@ -81,10 +81,15 @@ export async function createReservation(req: Request, res: Response, next: NextF
       RETURNING *
     `, [customerName.trim(), phoneNumber.trim(), tableId, reservationTime, guests, verifiedDp]);
 
-    // Update table status to RESERVED if within today
-    await pool.query(`
-      UPDATE dining_tables SET status = 'RESERVED' WHERE id = $1 AND status = 'AVAILABLE'
-    `, [tableId]);
+    // Update table status to RESERVED only if reservation is for TODAY in Asia/Jakarta
+    const todayJakarta = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+    const resvJakarta = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(resvDate);
+
+    if (todayJakarta === resvJakarta) {
+      await pool.query(`
+        UPDATE dining_tables SET status = 'RESERVED' WHERE id = $1 AND status = 'AVAILABLE'
+      `, [tableId]);
+    }
 
     res.status(201).json({
       success: true,

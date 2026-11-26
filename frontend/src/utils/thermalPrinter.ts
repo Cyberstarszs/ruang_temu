@@ -150,14 +150,36 @@ export function printBrowserThermalReceipt(order: Order, options?: { paperWidth?
           `
               : ''
           }
-          <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
-            <span>Pajak Resto (0% PB1):</span>
-            <span>Rp 0</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
-            <span>Service Charge (0%):</span>
-            <span>Rp 0</span>
-          </div>
+          ${
+            Number(order.tax_amount || order.taxAmount) > 0
+              ? `
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
+              <span>PB1 Resto (${order.tax_rate || order.taxRate || 0}%):</span>
+              <span>${rupiah(order.tax_amount || order.taxAmount)}</span>
+            </div>
+          `
+              : ''
+          }
+          ${
+            Number(order.service_charge_amount || order.serviceChargeAmount) > 0
+              ? `
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
+              <span>Service Charge (${order.service_charge_rate || order.serviceChargeRate || 0}%):</span>
+              <span>${rupiah(order.service_charge_amount || order.serviceChargeAmount)}</span>
+            </div>
+          `
+              : ''
+          }
+          ${
+            Number(order.rounding_amount || order.roundingAmount)
+              ? `
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
+              <span>Pembulatan:</span>
+              <span>${rupiah(order.rounding_amount || order.roundingAmount)}</span>
+            </div>
+          `
+              : ''
+          }
         </div>
 
         <div class="double-divider"></div>
