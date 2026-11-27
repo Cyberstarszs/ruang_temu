@@ -84,7 +84,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
         api.reports.getDailySummary({ from, to }),
         api.reports.getHourlyHeatmap({ from, to }),
         api.inventory.getAll(),
-        api.orders.getOrders({ from, to, status: 'PAID', limit: 500 }),
+        api.orders.getOrders({ from, to, status: 'PAID', limit: 10 }),
       ]);
 
       if (sumRes.success && sumRes.data) {
@@ -116,8 +116,25 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
     );
   }, [allIngredients]);
 
-  // Daily trend calculation
+  // Daily trend calculation (aggregated server-side over the full range, no 500-order cap)
   const dailyTrend = useMemo(() => {
+    if (summary?.dailyTrend) {
+      return summary.dailyTrend.map((row) => {
+        const d = new Date(row.date + 'T00:00:00+07:00');
+        const label = new Intl.DateTimeFormat('id-ID', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        }).format(d);
+        return {
+          date: row.date,
+          label,
+          revenue: Number(row.revenue || 0),
+          count: Number(row.count || 0),
+        };
+      });
+    }
+
     if (!orders.length) return [];
     const map: Record<string, { date: string; label: string; revenue: number; count: number }> = {};
 
@@ -130,12 +147,13 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
         const label = new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }).format(d);
         map[dateStr] = { date: dateStr, label, revenue: 0, count: 0 };
       }
-      map[dateStr].revenue += Number(o.total_amount || 0);
+      const netOrderRevenue = Math.max(0, Number(o.subtotal || 0) - Number(o.discount_amount || 0));
+      map[dateStr].revenue += netOrderRevenue;
       map[dateStr].count += 1;
     }
 
     return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
-  }, [orders]);
+  }, [summary, orders]);
 
   const maxDailySales = useMemo(() => {
     return Math.max(1, ...dailyTrend.map((d) => d.revenue));
@@ -161,6 +179,30 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
   }, [orders]);
 
   const breakdown = useMemo(() => {
+    if (summary?.paymentBreakdown && summary?.orderTypeBreakdown) {
+      const cashAmount = Number(summary.paymentBreakdown.cashAmount || 0);
+      const cashCount = Number(summary.paymentBreakdown.cashCount || 0);
+      const qrisAmount = Number(summary.paymentBreakdown.nonCashAmount || 0);
+      const qrisCount = Number(summary.paymentBreakdown.nonCashCount || 0);
+      const dineInCount = Number(summary.orderTypeBreakdown.dineInCount || 0);
+      const takeawayCount = Number(summary.orderTypeBreakdown.takeawayCount || 0);
+      const totalRevenue = cashAmount + qrisAmount || 1;
+      const totalOrders = dineInCount + takeawayCount || 1;
+
+      return {
+        cashAmount,
+        cashCount,
+        cashPct: Math.round((cashAmount / totalRevenue) * 100),
+        qrisAmount,
+        qrisCount,
+        qrisPct: Math.round((qrisAmount / totalRevenue) * 100),
+        dineInCount,
+        dineInPct: Math.round((dineInCount / totalOrders) * 100),
+        takeawayCount,
+        takeawayPct: Math.round((takeawayCount / totalOrders) * 100),
+      };
+    }
+
     let cashAmount = 0;
     let cashCount = 0;
     let qrisAmount = 0;
@@ -207,7 +249,7 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
       takeawayCount,
       takeawayPct: Math.round((takeawayCount / totalOrders) * 100),
     };
-  }, [orders]);
+  }, [summary, orders]);
 
   const maxHourlySales = Math.max(1, ...heatmap.map((h) => h.salesVolume));
 
@@ -346,13 +388,18 @@ export function AdminDashboardView({ onNavigateTab }: AdminDashboardViewProps) {
           }}
         >
           <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-            Penjualan Bersih
+            Penjualan Bersih (DPP)
           </span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             Rp {Number(summary?.netSales || 0).toLocaleString('id-ID')}
           </div>
           <div style={{ fontSize: '12px', color: '#71717a' }}>
             {summary?.totalTransactions || 0} transaksi lunas
+            {(Number(summary?.totalTax || 0) > 0 || Number(summary?.totalServiceCharge || 0) > 0) && (
+              <>
+                {' '}• Pajak/Servis Rp {(Number(summary?.totalTax || 0) + Number(summary?.totalServiceCharge || 0)).toLocaleString('id-ID')}
+              </>
+            )}
           </div>
         </div>
 

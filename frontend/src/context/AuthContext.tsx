@@ -33,6 +33,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+
+    const handleAuthRevoked = () => {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('ruang_temu_token');
+      localStorage.removeItem('ruang_temu_user');
+    };
+
+    window.addEventListener('ruang-temu:auth-revoked', handleAuthRevoked);
+    return () => {
+      window.removeEventListener('ruang-temu:auth-revoked', handleAuthRevoked);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {

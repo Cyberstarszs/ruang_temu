@@ -57,6 +57,8 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     setTakeawayName,
     discountAmount,
     setDiscountAmount,
+    promoId,
+    setPromoId,
     promoCode,
     setPromoCode,
     promoError,
@@ -65,11 +67,19 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     setPromoSuccess,
     claimedDownPayment,
     setClaimedDownPayment,
+    effectiveDownPayment,
     reservationId,
     setReservationId,
     heldOrders,
     updateHeldOrders,
     subtotal,
+    redeemPoints,
+    pointsDiscountAmount,
+    taxRate,
+    taxAmount,
+    serviceChargeRate,
+    serviceChargeAmount,
+    roundingAmount,
     grandTotal,
     handleQuickAdd: cartQuickAdd,
     handleCustomizationConfirm: cartCustomizationConfirm,
@@ -135,7 +145,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
         await cacheCatalogData('tables', tableRes.data);
       }
     } catch (err) {
-      console.error('Error loading master data, fallback to IndexedDB cache:', err);
+      console.warn('Error loading master data, fallback to IndexedDB cache:', err);
       const [cachedProds, cachedTables] = await Promise.all([
         getCachedCatalogData<Product[]>('products'),
         getCachedCatalogData<DiningTable[]>('tables'),
@@ -334,12 +344,15 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       const res = await api.promos.validate(code, subtotal);
       if (res.success && res.data) {
         setDiscountAmount(res.data.discountAmount);
+        setPromoId(res.data.id || null);
         setPromoCode(res.data.code);
         setPromoSuccess(`${res.data.name} diterapkan: Potongan ${rupiah(res.data.discountAmount)}`);
       } else {
+        setPromoId(null);
         setPromoError(res.message || 'Kode promo tidak valid.');
       }
     } catch (err: any) {
+      setPromoId(null);
       setPromoError(err.message || 'Kode promo tidak valid.');
     }
   };
@@ -370,8 +383,11 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       cashReceived: paymentData.cashReceived,
       cashChange: paymentData.cashChange,
       referenceNumber: paymentData.referenceNumber,
+      promoId: promoId || null,
+      promoCode: promoCode || null,
       discountAmount,
-      claimedDownPayment,
+      redeemPoints,
+      claimedDownPayment: effectiveDownPayment,
       notes: orderNote.trim() || (orderType === 'TAKEAWAY' && takeawayName ? `Takeaway: ${takeawayName}` : undefined),
     };
 
@@ -395,12 +411,18 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
           notes: item.customization?.notes || item.customization?.selectedOptions?.join(', '),
         })),
         subtotal,
-        discountAmount,
-        claimedDownPayment,
+        discountAmount: discountAmount + pointsDiscountAmount,
+        taxRate,
+        taxAmount,
+        serviceChargeRate,
+        serviceChargeAmount,
+        roundingAmount,
+        claimedDownPayment: effectiveDownPayment,
         totalAmount: grandTotal,
         paymentMethod: paymentData.paymentMethod,
         cashReceived: paymentData.cashReceived,
         cashChange: paymentData.cashChange,
+        payments: paymentData.payments,
         isOffline: true,
         notes: orderNote.trim() || (orderType === 'TAKEAWAY' && takeawayName ? `Takeaway: ${takeawayName}` : undefined),
       };
@@ -442,13 +464,19 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
             printTarget: item.product.print_target,
             notes: item.customization?.notes || item.customization?.selectedOptions?.join(', '),
           })),
-          subtotal,
-          discountAmount,
-          claimedDownPayment,
-          totalAmount: grandTotal,
+          subtotal: Number(createdOrder.subtotal ?? subtotal),
+          discountAmount: Number(createdOrder.discount_amount ?? discountAmount),
+          taxRate: Number(createdOrder.tax_rate ?? taxRate),
+          taxAmount: Number(createdOrder.tax_amount ?? taxAmount),
+          serviceChargeRate: Number(createdOrder.service_charge_rate ?? serviceChargeRate),
+          serviceChargeAmount: Number(createdOrder.service_charge_amount ?? serviceChargeAmount),
+          roundingAmount: Number(createdOrder.rounding_amount ?? roundingAmount),
+          claimedDownPayment: Number(createdOrder.claimed_down_payment ?? effectiveDownPayment),
+          totalAmount: Number(createdOrder.total_amount ?? grandTotal),
           paymentMethod: paymentData.paymentMethod,
           cashReceived: paymentData.cashReceived,
           cashChange: paymentData.cashChange,
+          payments: paymentData.payments,
           isOffline: false,
           notes: createdOrder.notes || orderNote.trim() || (orderType === 'TAKEAWAY' && takeawayName ? `Takeaway: ${takeawayName}` : undefined),
         });
@@ -471,7 +499,8 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
         err.message?.toLowerCase().includes('failed') ||
         err.statusCode === 502 ||
         err.statusCode === 503 ||
-        err.statusCode === 504;
+        err.statusCode === 504 ||
+        (err.statusCode === 500 && !err.data);
 
       if (isNetworkIssue) {
         console.warn('[POS] Jaringan terputus saat checkout, menyimpan transaksi ke antrean offline...');
@@ -502,11 +531,17 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       })),
       subtotal: Number(order.subtotal),
       discountAmount: Number(order.discount_amount),
+      taxRate: Number(order.tax_rate || 0),
+      taxAmount: Number(order.tax_amount || 0),
+      serviceChargeRate: Number(order.service_charge_rate || 0),
+      serviceChargeAmount: Number(order.service_charge_amount || 0),
+      roundingAmount: Number(order.rounding_amount || 0),
       claimedDownPayment: Number(order.claimed_down_payment),
       totalAmount: Number(order.total_amount),
       paymentMethod: payment?.method || 'CASH',
       cashReceived: payment?.cashReceived,
       cashChange: payment?.cashChange,
+      payments: order.payments,
       notes: order.notes,
     });
   };
@@ -570,7 +605,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       <main
         className={isCartOpen ? '' : 'cart-closed'}
         style={{
-          gridTemplateColumns: isCartOpen ? 'minmax(0, 1fr) 380px' : '1fr',
+          gridTemplateColumns: isCartOpen ? 'minmax(0, 1fr) 410px' : '1fr',
           transition: 'grid-template-columns 0.25s ease',
         }}
       >
@@ -756,6 +791,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
             onOpenSplitBill={() => setSplitBillOpen(true)}
             onValidatePromo={handleValidatePromo}
             onClearPromo={() => {
+              setPromoId(null);
               setPromoCode('');
               setDiscountAmount(0);
               setPromoSuccess('');

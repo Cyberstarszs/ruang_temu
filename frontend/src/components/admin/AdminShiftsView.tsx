@@ -733,8 +733,11 @@ export function AdminShiftsView() {
                   const cashInNum = Number(s.total_cash_in || 0);
                   const cashOutNum = Number(s.total_cash_out || 0);
                   const totalSalesNum = Number(s.total_sales || 0);
+                  const postCloseVoidCashNum = Number(s.post_close_void_cash || 0);
+                  const postCloseVoidSalesNum = Number(s.post_close_void_sales || 0);
+                  const voidCountNum = Number(s.void_orders_count || 0);
 
-                  const calculatedExpected = openingCashNum + cashSalesNum + cashInNum - cashOutNum;
+                  const calculatedExpected = openingCashNum + cashSalesNum + postCloseVoidCashNum + cashInNum - cashOutNum;
                   const displayExpected = isOpen ? calculatedExpected : Number(s.system_expected_cash ?? calculatedExpected);
 
                   return (
@@ -829,7 +832,16 @@ export function AdminShiftsView() {
                               `Ekspektasi Kas Laci`,
                               [
                                 { label: 'Modal Awal Kasir', value: `Rp ${openingCashNum.toLocaleString('id-ID')}` },
-                                { label: '(+) Penjualan Tunai', value: `+Rp ${cashSalesNum.toLocaleString('id-ID')}`, color: '#15803d' },
+                                { label: '(+) Penjualan Tunai (PAID)', value: `+Rp ${cashSalesNum.toLocaleString('id-ID')}`, color: '#15803d' },
+                                ...(postCloseVoidCashNum > 0
+                                  ? [
+                                      {
+                                        label: '(+) Tunai Order Di-Void Pasca Tutup Sif',
+                                        value: `+Rp ${postCloseVoidCashNum.toLocaleString('id-ID')}`,
+                                        color: '#b45309',
+                                      },
+                                    ]
+                                  : []),
                                 { label: '(+) Kas Masuk Operasional', value: `+Rp ${cashInNum.toLocaleString('id-ID')}`, color: '#15803d' },
                                 { label: '(-) Kas Keluar Operasional', value: `-Rp ${cashOutNum.toLocaleString('id-ID')}`, color: '#b91c1c' },
                                 { label: '(=) Total Ekspektasi Kas', value: `Rp ${displayExpected.toLocaleString('id-ID')}`, isHighlight: true },
@@ -925,9 +937,18 @@ export function AdminShiftsView() {
                               e,
                               `Rincian Penjualan & Order`,
                               [
-                                { label: 'Total Penjualan (Omzet)', value: `Rp ${totalSalesNum.toLocaleString('id-ID')}`, isHighlight: true },
+                                { label: 'Total Penjualan (Omzet PAID)', value: `Rp ${totalSalesNum.toLocaleString('id-ID')}`, isHighlight: true },
                                 { label: '• Penjualan Tunai (Kas Laci)', value: `Rp ${cashSalesNum.toLocaleString('id-ID')}`, color: '#15803d' },
                                 { label: '• QRIS / Non-Tunai', value: `Rp ${nonCashSalesNum.toLocaleString('id-ID')}`, color: '#0369a1' },
+                                ...(voidCountNum > 0
+                                  ? [
+                                      {
+                                        label: `Order Void (${voidCountNum} struk)`,
+                                        value: postCloseVoidSalesNum > 0 ? `-Rp ${postCloseVoidSalesNum.toLocaleString('id-ID')} pasca tutup` : `${voidCountNum} batal`,
+                                        color: '#b91c1c',
+                                      },
+                                    ]
+                                  : []),
                                 { label: 'Jumlah Transaksi Order', value: `${s.total_orders || 0} struk order` },
                                 { label: 'Frekuensi Mutasi Kas', value: `${s.movement_count || 0} kali mutasi` },
                               ],

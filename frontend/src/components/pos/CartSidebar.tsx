@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CartItem, Customer } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { rupiah } from '@/lib/utils';
@@ -86,6 +86,11 @@ export function CartSidebar({
   const [clearConfirm, setClearConfirm] = useState(false);
   const [showPromoBox, setShowPromoBox] = useState(false);
   const [showNoteBox, setShowNoteBox] = useState(false);
+  const [showFeeDetails, setShowFeeDetails] = useState(false);
+
+  useEffect(() => {
+    setPromoInput(promoCode);
+  }, [promoCode]);
 
   const {
     taxRate,
@@ -93,6 +98,10 @@ export function CartSidebar({
     serviceChargeRate,
     serviceChargeAmount,
     roundingAmount,
+    redeemPoints,
+    setRedeemPoints,
+    pointsDiscountAmount,
+    maxRedeemablePoints,
     grandTotal: calculatedGrandTotal,
   } = useCart();
 
@@ -120,7 +129,7 @@ export function CartSidebar({
   return (
     <>
       <aside
-        className={`new-pos-cart ${mobileOpen ? 'open' : ''}`}
+        className={`new-pos-cart pos-cart-compact ${mobileOpen ? 'open' : ''}`}
         style={{
           backgroundColor: '#ffffff',
           display: 'flex',
@@ -143,7 +152,7 @@ export function CartSidebar({
         {/* 1. COMPACT CART HEADER */}
         <div
           style={{
-            padding: '10px 14px',
+            padding: '8px 12px',
             borderBottom: '1px solid #f0efe9',
             display: 'flex',
             alignItems: 'center',
@@ -152,8 +161,8 @@ export function CartSidebar({
             flexShrink: 0,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#1c2826' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: '#1c2826' }}>
               Pesanan Aktif
             </h2>
             {totalItemCount > 0 && (
@@ -173,7 +182,7 @@ export function CartSidebar({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               type="button"
               onClick={onHoldOrder}
@@ -183,30 +192,29 @@ export function CartSidebar({
                 background: cart.length === 0 ? '#fafaf8' : '#f0f4f1',
                 border: '1px solid #dcdfd5',
                 color: cart.length === 0 ? '#9ca3af' : '#57695b',
-                fontSize: '11.5px',
+                fontSize: '11px',
                 fontWeight: 600,
                 cursor: cart.length === 0 ? 'default' : 'pointer',
-                padding: '4px 9px',
+                padding: '3px 8px',
                 borderRadius: '6px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
               }}
             >
-              <Pause size={12} />
+              <Pause size={11} />
               <span>Tahan</span>
             </button>
 
-            {/* Separator to prevent accidental misclicks */}
-            <div style={{ width: '1px', height: '16px', backgroundColor: '#e5e7eb' }} />
+            <div style={{ width: '1px', height: '14px', backgroundColor: '#e5e7eb' }} />
 
             {cart.length > 0 && (
               <button
                 type="button"
                 onClick={() => setClearConfirm(true)}
                 style={{
-                  width: '28px',
-                  height: '28px',
+                  width: '26px',
+                  height: '26px',
                   borderRadius: '6px',
                   border: '1px solid #fecaca',
                   background: '#fef2f2',
@@ -220,7 +228,7 @@ export function CartSidebar({
                 title="Kosongkan seluruh isi keranjang"
                 aria-label="Kosongkan pesanan"
               >
-                <Trash2 size={13} />
+                <Trash2 size={12} />
               </button>
             )}
 
@@ -229,8 +237,8 @@ export function CartSidebar({
                 type="button"
                 onClick={onCloseCart}
                 style={{
-                  width: '28px',
-                  height: '28px',
+                  width: '26px',
+                  height: '26px',
                   borderRadius: '6px',
                   border: '1px solid #e5e7eb',
                   background: '#ffffff',
@@ -244,7 +252,7 @@ export function CartSidebar({
                 title="Tutup Panel Keranjang"
                 aria-label="Tutup Panel Keranjang"
               >
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
           </div>
@@ -253,12 +261,12 @@ export function CartSidebar({
         {/* 2. COMPACT ORDER CONTROLS (Tipe Order + Meja / Pelanggan) */}
         <div
           style={{
-            padding: '8px 12px',
+            padding: '6px 12px',
             background: '#fafaf8',
             borderBottom: '1px solid #f0efe9',
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px',
+            gap: '5px',
             flexShrink: 0,
           }}
         >
@@ -267,7 +275,7 @@ export function CartSidebar({
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '4px',
+              gap: '3px',
               backgroundColor: '#eeeee9',
               padding: '2px',
               borderRadius: '7px',
@@ -277,7 +285,7 @@ export function CartSidebar({
               type="button"
               onClick={() => onSetOrderType('DINE_IN')}
               style={{
-                padding: '5px 8px',
+                padding: '4px 8px',
                 borderRadius: '5px',
                 border: 'none',
                 backgroundColor: orderType === 'DINE_IN' ? '#ffffff' : 'transparent',
@@ -293,7 +301,7 @@ export function CartSidebar({
                 transition: 'all 0.12s ease',
               }}
             >
-              <Utensils size={13} />
+              <Utensils size={12} />
               <span>Dine In</span>
             </button>
 
@@ -301,7 +309,7 @@ export function CartSidebar({
               type="button"
               onClick={() => onSetOrderType('TAKEAWAY')}
               style={{
-                padding: '5px 8px',
+                padding: '4px 8px',
                 borderRadius: '5px',
                 border: 'none',
                 backgroundColor: orderType === 'TAKEAWAY' ? '#ffffff' : 'transparent',
@@ -317,12 +325,12 @@ export function CartSidebar({
                 transition: 'all 0.12s ease',
               }}
             >
-              <ShoppingBag size={13} />
+              <ShoppingBag size={12} />
               <span>Takeaway</span>
             </button>
           </div>
 
-          {/* Row 2: Table / Takeaway input (58%) & Customer CRM button (42%) */}
+          {/* Row 2: Table / Takeaway input (55%) & Customer CRM button (45%) */}
           <div style={{ display: 'flex', gap: '6px' }}>
             <div style={{ flex: '1 1 55%', position: 'relative' }}>
               {orderType === 'DINE_IN' ? (
@@ -354,7 +362,7 @@ export function CartSidebar({
                     title="Ketik nomor meja (hanya angka)"
                     style={{
                       width: '100%',
-                      height: '32px',
+                      height: '30px',
                       padding: '0 24px 0 26px',
                       borderRadius: '6px',
                       border: selectedTable?.number ? '1.5px solid #57695b' : '1px solid #d1cfc7',
@@ -377,7 +385,7 @@ export function CartSidebar({
                       alignItems: 'center',
                     }}
                   >
-                    <MapPin size={13} />
+                    <MapPin size={12} />
                   </span>
                   {selectedTable?.number && (
                     <button
@@ -410,7 +418,7 @@ export function CartSidebar({
                   placeholder="Nama Pemesan..."
                   style={{
                     width: '100%',
-                    height: '32px',
+                    height: '30px',
                     padding: '0 8px',
                     borderRadius: '6px',
                     border: takeawayName ? '1.5px solid #57695b' : '1px solid #d1cfc7',
@@ -429,7 +437,7 @@ export function CartSidebar({
               onClick={onOpenCustomerModal}
               style={{
                 flex: '1 1 45%',
-                height: '32px',
+                height: '30px',
                 padding: '0 8px',
                 borderRadius: '6px',
                 border: customer ? '1.5px solid #57695b' : '1px solid #d1cfc7',
@@ -446,7 +454,7 @@ export function CartSidebar({
               title={customer ? `${customer.name} (${customer.tier})` : 'Pilih Pelanggan Member'}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <User size={13} color={customer ? '#57695b' : '#9ca3af'} />
+                <User size={12} color={customer ? '#57695b' : '#9ca3af'} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {customer ? customer.name : '+ Member CRM'}
                 </span>
@@ -456,13 +464,13 @@ export function CartSidebar({
           </div>
         </div>
 
-        {/* 3. HERO SECTION: SCROLLABLE CART ITEMS LIST (EXPANDS DYNAMICALLY) */}
+        {/* 3. HERO SECTION: SCROLLABLE CART ITEMS LIST (ROOMY & LEGIBLE) */}
         <div
           style={{
             flex: '1 1 0%',
             overflowY: 'auto',
             minHeight: 0,
-            padding: '8px 12px',
+            padding: '6px 10px',
             scrollbarWidth: 'thin',
           }}
         >
@@ -470,7 +478,7 @@ export function CartSidebar({
             <div
               style={{
                 height: '100%',
-                minHeight: '120px',
+                minHeight: '140px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -487,161 +495,188 @@ export function CartSidebar({
               </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {cart.map((item, index) => (
-                <div
-                  key={`${item.product.id}-${index}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 8px',
-                    borderRadius: '8px',
-                    backgroundColor: '#fafaf8',
-                    border: '1px solid #f0efe9',
-                    gap: '8px',
-                    transition: 'background 0.1s ease',
-                  }}
-                >
-                  {/* Thumbnail Foto Menu */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {cart.map((item, index) => {
+                const unitPrice = item.customization
+                  ? item.product.price + item.customization.unitPriceAdjustment
+                  : item.product.price;
+                const optionText =
+                  item.customization?.selectedOptions && item.customization.selectedOptions.length > 0
+                    ? item.customization.selectedOptions.join(' · ')
+                    : '';
+
+                return (
                   <div
+                    key={`${item.product.id}-${index}`}
                     style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '6px',
-                      overflow: 'hidden',
-                      border: '1px solid #e5e7eb',
-                      backgroundColor: '#f3f4f6',
-                      flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      justifyContent: 'space-between',
+                      padding: '5px 8px',
+                      borderRadius: '8px',
+                      backgroundColor: '#fafaf8',
+                      border: '1px solid #efeee8',
+                      gap: '8px',
+                      transition: 'background 0.1s ease',
                     }}
                   >
-                    {item.product.image_url ? (
-                      <img
-                        src={item.product.image_url}
-                        alt={item.product.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <Coffee size={16} color="#9ca3af" />
-                    )}
-                  </div>
-
-                  {/* Deskripsi & Harga Produk */}
-                  <div style={{ flex: '1 1 0%', minWidth: 0 }}>
+                    {/* Thumbnail Foto Menu Compact */}
                     <div
                       style={{
-                        fontSize: '12.5px',
-                        fontWeight: 700,
-                        color: '#1f2937',
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '6px',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        lineHeight: '16px',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: '#f3f4f6',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
-                      title={item.product.name}
                     >
-                      {item.product.name}
+                      {item.product.image_url ? (
+                        <img
+                          src={item.product.image_url}
+                          alt={item.product.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Coffee size={15} color="#9ca3af" />
+                      )}
                     </div>
 
-                    {item.customization?.selectedOptions && item.customization.selectedOptions.length > 0 && (
+                    {/* Deskripsi 2 Baris Ringkas & Lega */}
+                    <div style={{ flex: '1 1 0%', minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: '10.5px',
-                          color: '#6b7280',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          color: '#1f2937',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          lineHeight: '16px',
+                        }}
+                        title={item.product.name}
+                      >
+                        {item.product.name}
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          lineHeight: '15px',
                           marginTop: '1px',
-                        }}
-                      >
-                        {item.customization.selectedOptions.join(' · ')}
-                      </div>
-                    )}
-
-                    {item.customization?.notes && (
-                      <div
-                        style={{
-                          fontSize: '10.5px',
-                          color: '#57695b',
-                          fontStyle: 'italic',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
                         }}
                       >
-                        "{item.customization.notes}"
+                        <span style={{ fontWeight: 700, color: '#57695b', flexShrink: 0 }}>
+                          {rupiah(item.itemSubtotal)}
+                        </span>
+                        {item.quantity > 1 && (
+                          <span style={{ color: '#9ca3af', flexShrink: 0 }}>
+                            ({rupiah(unitPrice)})
+                          </span>
+                        )}
+                        {optionText && (
+                          <span
+                            style={{
+                              color: '#6b7280',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title={optionText}
+                          >
+                            · {optionText}
+                          </span>
+                        )}
                       </div>
-                    )}
 
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#57695b', marginTop: '2px' }}>
-                      {rupiah(item.itemSubtotal)}
+                      {item.customization?.notes && (
+                        <div
+                          style={{
+                            fontSize: '10.5px',
+                            color: '#57695b',
+                            fontStyle: 'italic',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            lineHeight: '14px',
+                          }}
+                        >
+                          "{item.customization.notes}"
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Stepper Buttons (Compact & Touch-Friendly 28x28px) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (item.quantity > 1) {
+                            onUpdateQuantity(index, item.quantity - 1);
+                          } else {
+                            onRemoveItem(index);
+                          }
+                        }}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          border: '1.5px solid #d1d5db',
+                          backgroundColor: '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#1f2937',
+                          padding: 0,
+                          touchAction: 'manipulation',
+                        }}
+                        title={item.quantity === 1 ? 'Hapus item' : 'Kurangi jumlah'}
+                      >
+                        <Minus size={13} strokeWidth={2.5} />
+                      </button>
+
+                      <b style={{ minWidth: '20px', textAlign: 'center', fontSize: '13px', fontWeight: 800, color: '#111827' }}>
+                        {item.quantity}
+                      </b>
+
+                      <button
+                        type="button"
+                        onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          border: '1.5px solid #57695b',
+                          backgroundColor: '#57695b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          padding: 0,
+                          touchAction: 'manipulation',
+                        }}
+                        title="Tambah jumlah"
+                      >
+                        <Plus size={13} strokeWidth={2.5} />
+                      </button>
                     </div>
                   </div>
-
-                  {/* Stepper Buttons (Touchscreen-friendly: 32x32px) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (item.quantity > 1) {
-                          onUpdateQuantity(index, item.quantity - 1);
-                        } else {
-                          onRemoveItem(index);
-                        }
-                      }}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '6px',
-                        border: '1.5px solid #d1d5db',
-                        backgroundColor: '#ffffff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#1f2937',
-                        padding: 0,
-                        touchAction: 'manipulation',
-                      }}
-                      title={item.quantity === 1 ? 'Hapus item' : 'Kurangi jumlah'}
-                    >
-                      <Minus size={14} strokeWidth={2.5} />
-                    </button>
-
-                    <b style={{ minWidth: '24px', textAlign: 'center', fontSize: '13.5px', fontWeight: 800, color: '#111827' }}>
-                      {item.quantity}
-                    </b>
-
-                    <button
-                      type="button"
-                      onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '6px',
-                        border: '1.5px solid #57695b',
-                        backgroundColor: '#57695b',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        padding: 0,
-                        touchAction: 'manipulation',
-                      }}
-                      title="Tambah jumlah"
-                    >
-                      <Plus size={14} strokeWidth={2.5} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -649,16 +684,16 @@ export function CartSidebar({
         {/* 4. COMPACT FOOTER SUMMARY & CHECKOUT */}
         <div
           style={{
-            padding: '10px 14px',
+            padding: '8px 12px 10px',
             backgroundColor: '#ffffff',
             borderTop: '1px solid #f0efe9',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '6px',
             flexShrink: 0,
           }}
         >
-          {/* Quick Actions for Promo & Notes - 1 Baris Full Boxed Style Matching No Meja & Member */}
+          {/* Quick Actions for Promo & Notes */}
           <div
             style={{
               display: 'grid',
@@ -675,9 +710,9 @@ export function CartSidebar({
                 if (showNoteBox) setShowNoteBox(false);
               }}
               style={{
-                height: '34px',
-                padding: '0 10px',
-                borderRadius: '7px',
+                height: '30px',
+                padding: '0 9px',
+                borderRadius: '6px',
                 border: promoCode
                   ? '1.5px solid #2e7d32'
                   : showPromoBox
@@ -685,20 +720,20 @@ export function CartSidebar({
                   : '1px solid #d1cfc7',
                 backgroundColor: promoCode ? '#edf7ed' : showPromoBox ? '#f3f6f3' : '#ffffff',
                 color: promoCode ? '#1e4620' : '#374151',
-                fontSize: '12px',
+                fontSize: '11.5px',
                 fontWeight: promoCode || showPromoBox ? 700 : 500,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                 overflow: 'hidden',
               }}
               title={promoCode ? `Promo Aktif: ${promoCode}` : 'Masukkan Kode Promo Diskon'}
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <Percent size={14} color={promoCode ? '#2e7d32' : '#57695b'} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Percent size={13} color={promoCode ? '#2e7d32' : '#57695b'} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {promoCode ? `Promo: ${promoCode}` : '+ Promo'}
                 </span>
@@ -722,9 +757,9 @@ export function CartSidebar({
                 if (showPromoBox) setShowPromoBox(false);
               }}
               style={{
-                height: '34px',
-                padding: '0 10px',
-                borderRadius: '7px',
+                height: '30px',
+                padding: '0 9px',
+                borderRadius: '6px',
                 border: orderNote
                   ? '1.5px solid #57695b'
                   : showNoteBox
@@ -732,20 +767,20 @@ export function CartSidebar({
                   : '1px solid #d1cfc7',
                 backgroundColor: orderNote ? '#f3f6f3' : showNoteBox ? '#f3f6f3' : '#ffffff',
                 color: orderNote ? '#1c2826' : '#374151',
-                fontSize: '12px',
+                fontSize: '11.5px',
                 fontWeight: orderNote || showNoteBox ? 700 : 500,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                 overflow: 'hidden',
               }}
               title={orderNote ? `Catatan: ${orderNote}` : 'Tambahkan Catatan Pesanan'}
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <StickyNote size={14} color={orderNote ? '#57695b' : '#6b7280'} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <StickyNote size={13} color={orderNote ? '#57695b' : '#6b7280'} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {orderNote ? 'Catatan Aktif' : '+ Catatan'}
                 </span>
@@ -931,6 +966,43 @@ export function CartSidebar({
             </div>
           )}
 
+          {/* Loyalty Point Redemption Toggle (when Member with points is selected) */}
+          {customer && Number(customer.loyalty_points || 0) > 0 && maxRedeemablePoints > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '6px 10px',
+                borderRadius: '8px',
+                border: redeemPoints > 0 ? '1px solid #15803d' : '1px dashed #c8cfc4',
+                backgroundColor: redeemPoints > 0 ? '#f0fdf4' : '#f8faf8',
+                fontSize: '11px',
+              }}
+            >
+              <span style={{ color: '#374151', fontWeight: 600 }}>
+                Poin: <strong>{customer.loyalty_points}</strong> ({rupiah(customer.loyalty_points * 100)})
+              </span>
+              <button
+                type="button"
+                onClick={() => setRedeemPoints(redeemPoints > 0 ? 0 : maxRedeemablePoints)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: redeemPoints > 0 ? '#dc2626' : '#57695b',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {redeemPoints > 0 ? 'Batal Poin' : `Tukar ${maxRedeemablePoints} pts`}
+              </button>
+            </div>
+          )}
+
           {/* Price Breakdown */}
           <div style={{ fontSize: '11.5px', color: '#6b7280', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -945,6 +1017,13 @@ export function CartSidebar({
               </div>
             )}
 
+            {pointsDiscountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
+                <span>Tukar Poin ({redeemPoints} pts):</span>
+                <b>− {rupiah(pointsDiscountAmount)}</b>
+              </div>
+            )}
+
             {claimedDownPayment > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
                 <span>Uang Muka (DP):</span>
@@ -952,26 +1031,85 @@ export function CartSidebar({
               </div>
             )}
 
-            {serviceChargeAmount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563' }}>
-                <span>Service Charge ({serviceChargeRate}%):</span>
-                <b>+ {rupiah(serviceChargeAmount)}</b>
-              </div>
-            )}
+            {(serviceChargeAmount > 0 || taxAmount > 0 || roundingAmount !== 0) && (() => {
+              const netAdjustments = serviceChargeAmount + taxAmount + roundingAmount;
+              const feeLabels = [
+                serviceChargeAmount > 0 ? `Servis ${serviceChargeRate}%` : '',
+                taxAmount > 0 ? `PB1 ${taxRate}%` : '',
+                roundingAmount !== 0 ? 'Pembulatan' : '',
+              ]
+                .filter(Boolean)
+                .join(' · ');
 
-            {taxAmount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563' }}>
-                <span>PB1 Resto ({taxRate}%):</span>
-                <b>+ {rupiah(taxAmount)}</b>
-              </div>
-            )}
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowFeeDetails((prev) => !prev)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      width: '100%',
+                      padding: 0,
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#6b7280',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    title="Klik untuk melihat/sembunyikan rincian pajak, servis & pembulatan"
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span>{feeLabels}</span>
+                      <span style={{ fontSize: '9.5px', opacity: 0.8 }}>{showFeeDetails ? '▾' : '▸'}</span>
+                    </span>
+                    <b style={{ color: '#4b5563', flexShrink: 0 }}>
+                      {netAdjustments > 0
+                        ? `+ ${rupiah(netAdjustments)}`
+                        : netAdjustments < 0
+                        ? `− ${rupiah(Math.abs(netAdjustments))}`
+                        : rupiah(0)}
+                    </b>
+                  </button>
 
-            {roundingAmount !== 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
-                <span>Pembulatan:</span>
-                <b>{roundingAmount > 0 ? `+ ${rupiah(roundingAmount)}` : `− ${rupiah(Math.abs(roundingAmount))}`}</b>
-              </div>
-            )}
+                  {showFeeDetails && (
+                    <div
+                      style={{
+                        padding: '3px 6px',
+                        borderRadius: '5px',
+                        backgroundColor: '#fafaf8',
+                        border: '1px solid #efeee8',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1px',
+                        fontSize: '10.5px',
+                      }}
+                    >
+                      {serviceChargeAmount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563' }}>
+                          <span>Service Charge ({serviceChargeRate}%):</span>
+                          <b>+ {rupiah(serviceChargeAmount)}</b>
+                        </div>
+                      )}
+                      {taxAmount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4b5563' }}>
+                          <span>PB1 Resto ({taxRate}%):</span>
+                          <b>+ {rupiah(taxAmount)}</b>
+                        </div>
+                      )}
+                      {roundingAmount !== 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+                          <span>Pembulatan:</span>
+                          <b>{roundingAmount > 0 ? `+ ${rupiah(roundingAmount)}` : `− ${rupiah(Math.abs(roundingAmount))}`}</b>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Total Bayar Headline */}
@@ -980,21 +1118,14 @@ export function CartSidebar({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingTop: '6px',
+              paddingTop: '4px',
               borderTop: '1.5px dashed #e5e7eb',
             }}
           >
-            <div>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1f2937', display: 'block', letterSpacing: '0.3px' }}>
-                TOTAL BAYAR
-              </span>
-              <small style={{ fontSize: '9.5px', color: '#6b7280' }}>
-                {taxRate > 0 || serviceChargeRate > 0
-                  ? `Termasuk PB1 (${taxRate}%) & Servis (${serviceChargeRate}%)`
-                  : 'Nett (Harga Bersih)'}
-              </small>
-            </div>
-            <b style={{ fontSize: '19px', fontWeight: 800, color: '#57695b' }}>{rupiah(grandTotal)}</b>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#1f2937', letterSpacing: '0.3px' }}>
+              TOTAL BAYAR
+            </span>
+            <b style={{ fontSize: '17.5px', fontWeight: 800, color: '#57695b' }}>{rupiah(grandTotal)}</b>
           </div>
 
           {/* Action Buttons (Split + Checkout) */}
@@ -1005,7 +1136,7 @@ export function CartSidebar({
               onClick={onOpenSplitBill}
               title="Pisah tagihan sama rata (Split Bill)"
               style={{
-                width: '38px',
+                width: '36px',
                 height: '38px',
                 borderRadius: '8px',
                 border: '1px solid #d1d5db',
@@ -1018,7 +1149,7 @@ export function CartSidebar({
                 flexShrink: 0,
               }}
             >
-              <Split size={16} />
+              <Split size={15} />
             </button>
 
             {(() => {
@@ -1033,13 +1164,13 @@ export function CartSidebar({
                   onClick={onOpenPayment}
                   style={{
                     flex: 1,
-                    height: '40px',
+                    height: '38px',
                     borderRadius: '8px',
                     backgroundColor: isDisabled ? '#f3f4f6' : '#57695b',
                     color: isDisabled ? '#4b5563' : '#ffffff',
                     border: isDisabled ? '1.5px dashed #cbd5e1' : 'none',
                     fontWeight: 700,
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',

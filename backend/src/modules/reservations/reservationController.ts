@@ -50,7 +50,7 @@ export async function createReservation(req: Request, res: Response, next: NextF
       SELECT id FROM reservations 
       WHERE table_id = $1 
         AND status = 'CONFIRMED'
-        AND reservation_time BETWEEN ($2::timestamp - INTERVAL '2 hours') AND ($2::timestamp + INTERVAL '2 hours')
+        AND reservation_time BETWEEN ($2::timestamptz - INTERVAL '2 hours') AND ($2::timestamptz + INTERVAL '2 hours')
     `, [tableId, reservationTime]);
 
     if (conflictRes.rows.length > 0) {
@@ -98,5 +98,152 @@ export async function createReservation(req: Request, res: Response, next: NextF
     });
   } catch (err) {
     next(err);
+  }
+}
+
+export async function cancelReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await pool.connect();
+  try {
+    const id = req.params.id as string;
+    const { reason = 'Dibatalkan oleh tamu / staf', refundDp = false } = req.body || {};
+
+    await client.query('BEGIN');
+
+    const resvRes = await client.query(
+      `SELECT r.*, t.table_number
+       FROM reservations r
+       JOIN dining_tables t ON r.table_id = t.id
+       WHERE r.id = $1
+       FOR UPDATE OF r`,
+      [id]
+    );
+
+    if (resvRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Data reservasi tidak ditemukan.' });
+      return;
+    }
+
+    const resv = resvRes.rows[0];
+    if (resv.status === 'CANCELLED') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'Reservasi ini sudah dibatalkan sebelumnya.' });
+      return;
+    }
+
+    if (resv.status === 'COMPLETED' || resv.is_dp_claimed) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'Reservasi yang DP-nya sudah diklaim tidak dapat dibatalkan.' });
+      return;
+    }
+
+    const updatedResv = await client.query(
+      `UPDATE reservations SET status = 'CANCELLED' WHERE id = $1 RETURNING *`,
+      [id]
+    );
+
+    // Release RESERVED table if no other active confirmed reservation exists for today (Asia/Jakarta)
+    await client.query(
+      `UPDATE dining_tables
+       SET status = 'AVAILABLE', updated_at = NOW()
+       WHERE id = $1
+         AND status = 'RESERVED'
+         AND NOT EXISTS (
+           SELECT 1 FROM reservations
+           WHERE table_id = $1
+             AND id <> $2
+             AND status = 'CONFIRMED'
+             AND DATE(reservation_time AT TIME ZONE 'Asia/Jakarta') = DATE(NOW() AT TIME ZONE 'Asia/Jakarta')
+         )`,
+      [resv.table_id, id]
+    );
+
+    const dpAmount = Number(resv.down_payment_amount || 0);
+    let refundMovementShiftId: string | null = null;
+
+    if (refundDp && dpAmount > 0) {
+      const openShiftRes = await client.query(
+        `SELECT id, opening_cash FROM cashier_shifts WHERE status = 'OPEN' ORDER BY opened_at DESC LIMIT 1 FOR UPDATE`
+      );
+      if (openShiftRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          success: false,
+          message: 'Tidak ada sif kasir aktif untuk mencatat refund tunai DP reservasi.',
+        });
+        return;
+      }
+
+      const activeShift = openShiftRes.rows[0];
+      const salesRes = await client.query(
+        `SELECT COALESCE(SUM(op.amount_paid), 0) as cash_sales
+         FROM orders o JOIN order_payments op ON o.id = op.order_id
+         WHERE o.shift_id = $1 AND o.status = 'PAID' AND op.payment_method = 'CASH'`,
+        [activeShift.id]
+      );
+      const cashMovRes = await client.query(
+        `SELECT
+           COALESCE(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END), 0) as cash_in,
+           COALESCE(SUM(CASE WHEN type = 'CASH_OUT' THEN amount ELSE 0 END), 0) as cash_out
+         FROM cash_movements WHERE shift_id = $1`,
+        [activeShift.id]
+      );
+
+      const currentDrawerCash =
+        Number(activeShift.opening_cash || 0) +
+        Number(salesRes.rows[0]?.cash_sales || 0) +
+        Number(cashMovRes.rows[0]?.cash_in || 0) -
+        Number(cashMovRes.rows[0]?.cash_out || 0);
+
+      if (currentDrawerCash < dpAmount) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          success: false,
+          message: `Saldo tunai laci sif aktif (Rp ${currentDrawerCash.toLocaleString('id-ID')}) tidak mencukupi untuk refund DP (Rp ${dpAmount.toLocaleString('id-ID')}).`,
+        });
+        return;
+      }
+
+      await client.query(
+        `INSERT INTO cash_movements (shift_id, type, category, description, amount)
+         VALUES ($1, 'CASH_OUT', 'RESERVATION_REFUND', $2, $3)`,
+        [
+          activeShift.id,
+          `Refund DP Batal Reservasi (${resv.customer_name} - Meja ${resv.table_number}): ${reason}`,
+          dpAmount,
+        ]
+      );
+      refundMovementShiftId = activeShift.id;
+    }
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+       VALUES ($1, 'CANCEL_RESERVATION', 'reservations', $2, $3)`,
+      [
+        req.user?.id || null,
+        id,
+        JSON.stringify({
+          customerName: resv.customer_name,
+          tableNumber: resv.table_number,
+          downPaymentAmount: dpAmount,
+          refundDp: Boolean(refundDp),
+          refundMovementShiftId,
+          reason: String(reason),
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `Reservasi ${resv.customer_name} berhasil dibatalkan${refundMovementShiftId ? ' & DP dikembalikan dari kas laci' : ''}.`,
+      data: updatedResv.rows[0],
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
+  } finally {
+    client.release();
   }
 }

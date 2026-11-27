@@ -52,6 +52,7 @@ export function AdminInventoryView() {
   const [isOpnameModalOpen, setIsOpnameModalOpen] = useState(false);
   const [opnameSearch, setOpnameSearch] = useState('');
   const [opnameCounts, setOpnameCounts] = useState<{ [id: string]: string }>({});
+  const [opnameSnapshots, setOpnameSnapshots] = useState<{ [id: string]: number }>({});
   const [opnameNotes, setOpnameNotes] = useState<{ [id: string]: string }>({});
   const [isSubmittingOpname, setIsSubmittingOpname] = useState(false);
 
@@ -169,12 +170,15 @@ export function AdminInventoryView() {
   // Opname Handlers
   const openOpnameModal = () => {
     const initialCounts: { [id: string]: string } = {};
+    const initialSnapshots: { [id: string]: number } = {};
     const initialNotes: { [id: string]: string } = {};
     ingredients.forEach((ing) => {
       initialCounts[ing.id] = cleanNumStr(ing.stock_actual, '0');
+      initialSnapshots[ing.id] = Number(ing.stock_actual || 0);
       initialNotes[ing.id] = '';
     });
     setOpnameCounts(initialCounts);
+    setOpnameSnapshots(initialSnapshots);
     setOpnameNotes(initialNotes);
     setOpnameSearch('');
     setIsOpnameModalOpen(true);
@@ -186,6 +190,7 @@ export function AdminInventoryView() {
       const items = ingredients.map((ing) => ({
         ingredientId: ing.id,
         actualCount: parseCleanNumber(opnameCounts[ing.id] ?? ing.stock_actual),
+        systemCountSnapshot: opnameSnapshots[ing.id] ?? Number(ing.stock_actual || 0),
         notes: opnameNotes[ing.id]?.trim() || 'Stok Opname Rutin',
       }));
 

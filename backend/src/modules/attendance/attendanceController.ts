@@ -1,17 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../../config/database';
 
+function getJakartaNowParts() {
+  const now = new Date();
+  const workDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
+  const timeParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const hour = Number(timeParts.find((p) => p.type === 'hour')?.value ?? '0') % 24;
+  const minute = Number(timeParts.find((p) => p.type === 'minute')?.value ?? '0');
+  return { workDate, hour, minute };
+}
+
 // 1. CLOCK IN
 export async function clockIn(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user?.id;
-    const { notes } = req.body;
+    const { notes, lateAfterHour } = req.body || {};
+    const { workDate, hour } = getJakartaNowParts();
 
-    // Check if already clocked in today
+    // Check if already clocked in today (Asia/Jakarta date)
     const existing = await pool.query(`
       SELECT * FROM employee_attendances 
-      WHERE user_id = $1 AND work_date = CURRENT_DATE
-    `, [userId]);
+      WHERE user_id = $1 AND work_date = $2::date
+    `, [userId, workDate]);
 
     if (existing.rows.length > 0) {
       res.status(400).json({
@@ -22,22 +37,30 @@ export async function clockIn(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    // Determine status (LATE if after 09:00, or PRESENT)
-    const currentHour = new Date().getHours();
-    const status = currentHour >= 9 ? 'LATE' : 'PRESENT';
+    // Determine status using explicit Asia/Jakarta hour (default cutoff 09:00 WIB)
+    const parsedCutoff = Number(lateAfterHour);
+    const cutoffHour = Number.isFinite(parsedCutoff) && parsedCutoff >= 0 && parsedCutoff <= 23 ? parsedCutoff : 9;
+    const status = hour >= cutoffHour ? 'LATE' : 'PRESENT';
 
     const result = await pool.query(`
       INSERT INTO employee_attendances (user_id, work_date, clock_in, status, notes)
-      VALUES ($1, CURRENT_DATE, CURRENT_TIMESTAMP, $2, $3)
+      VALUES ($1, $2::date, CURRENT_TIMESTAMP, $3, $4)
       RETURNING *
-    `, [userId, status, notes || null]);
+    `, [userId, workDate, status, notes || null]);
 
     res.status(201).json({
       success: true,
       message: `Presensi masuk berhasil dicatat. Status: ${status === 'LATE' ? 'Terlambat' : 'Tepat Waktu'}.`,
       data: result.rows[0],
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      res.status(400).json({
+        success: false,
+        message: 'Anda sudah melakukan presensi masuk hari ini.',
+      });
+      return;
+    }
     next(err);
   }
 }
@@ -46,11 +69,12 @@ export async function clockIn(req: Request, res: Response, next: NextFunction): 
 export async function clockOut(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user?.id;
+    const { workDate } = getJakartaNowParts();
 
     const existing = await pool.query(`
       SELECT * FROM employee_attendances 
-      WHERE user_id = $1 AND work_date = CURRENT_DATE
-    `, [userId]);
+      WHERE user_id = $1 AND work_date = $2::date
+    `, [userId, workDate]);
 
     if (existing.rows.length === 0) {
       res.status(400).json({
@@ -95,10 +119,11 @@ export async function clockOut(req: Request, res: Response, next: NextFunction):
 export async function getTodayStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user?.id;
+    const { workDate } = getJakartaNowParts();
     const result = await pool.query(`
       SELECT * FROM employee_attendances 
-      WHERE user_id = $1 AND work_date = CURRENT_DATE
-    `, [userId]);
+      WHERE user_id = $1 AND work_date = $2::date
+    `, [userId, workDate]);
 
     res.json({
       success: true,
@@ -113,6 +138,7 @@ export async function getTodayStatus(req: Request, res: Response, next: NextFunc
 export async function getAttendanceList(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { startDate, endDate } = req.query;
+    const { workDate } = getJakartaNowParts();
     let query = `
       SELECT ea.*, u.name as employee_name, u.role as employee_role
       FROM employee_attendances ea
@@ -124,7 +150,8 @@ export async function getAttendanceList(req: Request, res: Response, next: NextF
       query += ` WHERE ea.work_date BETWEEN $1 AND $2`;
       params.push(startDate, endDate);
     } else {
-      query += ` WHERE ea.work_date = CURRENT_DATE`;
+      query += ` WHERE ea.work_date = $1::date`;
+      params.push(workDate);
     }
 
     query += ` ORDER BY ea.clock_in DESC`;

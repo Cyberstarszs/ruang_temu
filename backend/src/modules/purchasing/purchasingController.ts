@@ -113,10 +113,12 @@ export async function getPurchaseOrders(req: Request, res: Response, next: NextF
         po.*, 
         COALESCE(s.name, 'Supplier Dihapus') as supplier_name, 
         s.phone as supplier_phone, 
-        COALESCE(u.name, 'Owner') as ordered_by_name
+        COALESCE(u.name, 'Owner') as ordered_by_name,
+        pu.name as paid_by_name
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN users u ON po.ordered_by_user_id = u.id
+      LEFT JOIN users pu ON po.paid_by_user_id = pu.id
     `;
     const params: any[] = [];
     if (status) {
@@ -142,10 +144,12 @@ export async function getPurchaseOrderById(req: Request, res: Response, next: Ne
         COALESCE(s.name, 'Supplier Dihapus') as supplier_name, 
         s.phone as supplier_phone, 
         s.address as supplier_address, 
-        COALESCE(u.name, 'Owner') as ordered_by_name
+        COALESCE(u.name, 'Owner') as ordered_by_name,
+        pu.name as paid_by_name
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN users u ON po.ordered_by_user_id = u.id
+      LEFT JOIN users pu ON po.paid_by_user_id = pu.id
       WHERE po.id = $1
     `, [id]);
 
@@ -202,7 +206,7 @@ export async function createPurchaseOrder(req: Request, res: Response, next: Nex
   for (const item of items) {
     const ingId = item.ingredient_id || item.ingredientId;
     const q = Number(item.quantity);
-    const c = Number(item.unit_cost ?? item.unitPrice ?? 0);
+    const c = Number(item.unit_cost ?? item.unitCost ?? item.unitPrice ?? 0);
     const uType = (item.unit_type || item.unitType || 'PURCHASE_UNIT').toUpperCase();
     if (!ingId || isNaN(q) || q <= 0 || isNaN(c) || c < 0) {
       res.status(400).json({ success: false, message: 'Setiap item pembelian wajib memiliki kuantitas (> 0) dan harga satuan (>= 0) yang valid.' });
@@ -302,39 +306,64 @@ export async function receivePurchaseOrder(req: Request, res: Response, next: Ne
       return;
     }
 
-    // Get PO items with units and conversion rates
+    // Get PO items ordered deterministically by ingredient_id for deadlock-free FOR UPDATE locking
     const itemsRes = await client.query(`
-      SELECT poi.*, i.conversion_rate as ingredient_conversion_rate, i.stock_actual, i.usage_unit, i.purchase_unit
+      SELECT poi.*, i.conversion_rate as ingredient_conversion_rate, i.usage_unit, i.purchase_unit
       FROM purchase_order_items poi
       JOIN ingredients i ON poi.ingredient_id = i.id
       WHERE poi.purchase_order_id = $1
+      ORDER BY poi.ingredient_id ASC
     `, [id]);
 
+    const avcoDetails: any[] = [];
+
     for (const item of itemsRes.rows) {
+      const ingLockRes = await client.query(
+        `SELECT id, name, stock_actual, unit_cost, usage_unit, purchase_unit
+         FROM ingredients WHERE id = $1 FOR UPDATE`,
+        [item.ingredient_id]
+      );
+      if (ingLockRes.rows.length === 0) continue;
+
+      const lockedIng = ingLockRes.rows[0];
       const rawQty = Number(item.quantity);
       const convRate = Number(item.conversion_rate) > 0
         ? Number(item.conversion_rate)
         : (Number(item.ingredient_conversion_rate) > 0 ? Number(item.ingredient_conversion_rate) : 1);
 
-      // Distinguish purchase unit (e.g. 5 kg) vs usage unit (5000 gr)
-      const isPurchaseUnit = item.unit_type === 'PURCHASE_UNIT' || (!item.unit_type && convRate > 1 && rawQty < 100);
+      const isPurchaseUnit = item.unit_type
+        ? item.unit_type === 'PURCHASE_UNIT'
+        : (convRate > 1 && rawQty < 100);
       const qtyToAdd = isPurchaseUnit ? rawQty * convRate : rawQty;
-      const costPerUsageUnit = isPurchaseUnit ? Number(item.unit_cost) / convRate : Number(item.unit_cost);
+      const incomingCostPerUsageUnit = isPurchaseUnit ? Number(item.unit_cost) / convRate : Number(item.unit_cost);
+
+      // Weighted Moving Average Cost (AVCO): (Stok Lama * HPP Lama + Stok Masuk * HPP Masuk) / Total Stok
+      const oldStock = Math.max(0, Number(lockedIng.stock_actual || 0));
+      const oldCost = Math.max(0, Number(lockedIng.unit_cost || 0));
+      let nextUnitCost = oldCost;
+      if (incomingCostPerUsageUnit > 0 && qtyToAdd > 0) {
+        if (oldStock <= 0) {
+          nextUnitCost = Number(incomingCostPerUsageUnit.toFixed(4));
+        } else {
+          const totalValue = oldStock * oldCost + qtyToAdd * incomingCostPerUsageUnit;
+          const totalQty = oldStock + qtyToAdd;
+          nextUnitCost = Number((totalValue / totalQty).toFixed(4));
+        }
+      }
 
       const updateIngRes = await client.query(`
         UPDATE ingredients
         SET stock_actual = stock_actual + $1,
-            unit_cost = CASE WHEN $2::numeric > 0 THEN $2::numeric ELSE unit_cost END,
+            unit_cost = $2::numeric,
             updated_at = NOW()
         WHERE id = $3
         RETURNING stock_actual, name, usage_unit, purchase_unit
-      `, [qtyToAdd, costPerUsageUnit, item.ingredient_id]);
+      `, [qtyToAdd, nextUnitCost, item.ingredient_id]);
 
       if (updateIngRes.rows.length > 0) {
         const ing = updateIngRes.rows[0];
         const newBalance = ing.stock_actual;
 
-        // Record stock movement
         await client.query(`
           INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
           VALUES ($1, 'PURCHASE_RECEIPT', $2, $3, $4)
@@ -344,6 +373,16 @@ export async function receivePurchaseOrder(req: Request, res: Response, next: Ne
           newBalance,
           `${po.po_number}: Masuk ${rawQty} ${isPurchaseUnit ? (item.purchase_unit || 'satuan beli') : (item.usage_unit || 'satuan pakai')}`
         ]);
+
+        avcoDetails.push({
+          ingredientId: item.ingredient_id,
+          name: ing.name,
+          qtyAdded: qtyToAdd,
+          oldStock,
+          oldUnitCost: oldCost,
+          incomingUnitCost: Number(incomingCostPerUsageUnit.toFixed(4)),
+          newAvcoUnitCost: nextUnitCost,
+        });
       }
     }
 
@@ -358,17 +397,143 @@ export async function receivePurchaseOrder(req: Request, res: Response, next: Ne
     await client.query(`
       INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
       VALUES ($1, 'RECEIVE_PO', 'purchase_orders', $2, $3)
-    `, [userId, id, JSON.stringify({ po_number: po.po_number, received_items: itemsRes.rows.length })]);
+    `, [userId, id, JSON.stringify({ po_number: po.po_number, received_items: itemsRes.rows.length, avcoDetails })]);
 
     await client.query('COMMIT');
 
     res.json({
       success: true,
-      message: `Purchase Order ${po.po_number} berhasil diterima. Saldo stok telah ditambahkan ke sistem!`,
+      message: `Purchase Order ${po.po_number} berhasil diterima. Saldo stok & HPP rata-rata (AVCO) telah diperbarui!`,
       data: updatedPo.rows[0],
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+// 6b. PAY PURCHASE ORDER (Accounts Payable Settlement)
+export async function payPurchaseOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const { paymentMethod = 'BANK_TRANSFER', notes, deductFromActiveShift = false } = req.body || {};
+
+  const allowedMethods = ['CASH', 'BANK_TRANSFER', 'QRIS', 'DEBIT_CARD'];
+  const cleanMethod = String(paymentMethod).toUpperCase();
+  if (!allowedMethods.includes(cleanMethod)) {
+    res.status(400).json({ success: false, message: 'Metode pelunasan PO tidak valid.' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const poRes = await client.query(`SELECT * FROM purchase_orders WHERE id = $1 FOR UPDATE`, [id]);
+    if (poRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Purchase Order tidak ditemukan.' });
+      return;
+    }
+
+    const po = poRes.rows[0];
+    if (po.status === 'CANCELLED') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'PO yang telah dibatalkan tidak dapat dilunasi.' });
+      return;
+    }
+    if (po.payment_status === 'PAID') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ success: false, message: 'PO ini sudah berstatus LUNAS.' });
+      return;
+    }
+
+    let linkedShiftId: string | null = null;
+    const totalAmount = Number(po.total_amount || 0);
+
+    if (Boolean(deductFromActiveShift) && cleanMethod === 'CASH' && totalAmount > 0) {
+      const shiftRes = await client.query(
+        `SELECT id, opening_cash FROM cashier_shifts WHERE status = 'OPEN' ORDER BY opened_at DESC LIMIT 1 FOR UPDATE`
+      );
+      if (shiftRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ success: false, message: 'Tidak ada sif kasir aktif (OPEN) untuk memotong kas laci.' });
+        return;
+      }
+      const activeShift = shiftRes.rows[0];
+      const salesRes = await client.query(
+        `SELECT COALESCE(SUM(op.amount_paid), 0) as cash_sales
+         FROM orders o JOIN order_payments op ON o.id = op.order_id
+         WHERE o.shift_id = $1 AND o.status = 'PAID' AND op.payment_method = 'CASH'`,
+        [activeShift.id]
+      );
+      const pettyRes = await client.query(
+        `SELECT
+           COALESCE(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END), 0) as cash_in,
+           COALESCE(SUM(CASE WHEN type = 'CASH_OUT' THEN amount ELSE 0 END), 0) as cash_out
+         FROM cash_movements WHERE shift_id = $1`,
+        [activeShift.id]
+      );
+      const available =
+        Number(activeShift.opening_cash || 0) +
+        Number(salesRes.rows[0].cash_sales || 0) +
+        Number(pettyRes.rows[0].cash_in || 0) -
+        Number(pettyRes.rows[0].cash_out || 0);
+
+      if (totalAmount > available) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          success: false,
+          message: `Saldo laci kasir aktif (Rp ${Math.max(0, available).toLocaleString('id-ID')}) tidak mencukupi untuk pelunasan PO Rp ${totalAmount.toLocaleString('id-ID')}. Gunakan Kas Besar/Transfer.`,
+        });
+        return;
+      }
+
+      await client.query(
+        `INSERT INTO cash_movements (shift_id, type, category, description, amount)
+         VALUES ($1, 'CASH_OUT', 'PEMBELIAN_PO', $2, $3)`,
+        [activeShift.id, `Pelunasan ${po.po_number}${notes ? `: ${notes}` : ''}`, totalAmount]
+      );
+      linkedShiftId = activeShift.id;
+    }
+
+    const updated = await client.query(`
+      UPDATE purchase_orders
+      SET payment_status = 'PAID',
+          paid_at = CURRENT_TIMESTAMP,
+          payment_method = $1,
+          paid_by_user_id = $2,
+          payment_notes = $3
+      WHERE id = $4
+      RETURNING *
+    `, [cleanMethod, userId, notes?.trim() || null, id]);
+
+    await client.query(`
+      INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+      VALUES ($1, 'PAY_PO', 'purchase_orders', $2, $3)
+    `, [
+      userId,
+      id,
+      JSON.stringify({
+        po_number: po.po_number,
+        total_amount: totalAmount,
+        payment_method: cleanMethod,
+        deductedFromShiftId: linkedShiftId,
+        notes: notes?.trim() || null,
+      }),
+    ]);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `Pelunasan Purchase Order ${po.po_number} (${cleanMethod}) berhasil dicatat.`,
+      data: updated.rows[0],
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     next(err);
   } finally {
     client.release();

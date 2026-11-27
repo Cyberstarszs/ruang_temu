@@ -28,15 +28,43 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   const url = `${API_BASE}${endpoint}`;
-  const response = await fetch(url, {
+  const method = (options.method || 'GET').toUpperCase();
+  let response = await fetch(url, {
     ...options,
     headers,
   });
 
-  const data = await response.json().catch(() => null);
+  let data = await response.json().catch(() => null);
+
+  // Retry once on transient proxy network failure (e.g. ECONNRESET / server restart -> non-JSON 500/502/503/504) for idempotent GET calls
+  if (!response.ok && !data && response.status >= 500 && method === 'GET') {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+    data = await response.json().catch(() => null);
+  }
 
   if (!response.ok) {
     const message = data?.message || `Terjadi kesalahan server (${response.status})`;
+    if (typeof window !== 'undefined') {
+      const isLoginEndpoint = endpoint.startsWith('/auth/login');
+      const isAccountDeactivated =
+        response.status === 403 &&
+        typeof message === 'string' &&
+        message.toLowerCase().includes('dinonaktifkan');
+
+      if ((response.status === 401 && !isLoginEndpoint) || isAccountDeactivated) {
+        localStorage.removeItem('ruang_temu_token');
+        localStorage.removeItem('ruang_temu_user');
+        window.dispatchEvent(
+          new CustomEvent('ruang-temu:auth-revoked', {
+            detail: { status: response.status, message },
+          })
+        );
+      }
+    }
     throw new ApiError(message, response.status, data);
   }
 
@@ -122,7 +150,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
-    submitStocktake: (items: Array<{ ingredientId: string; actualCount: number; notes?: string }>) =>
+    submitStocktake: (items: Array<{ ingredientId: string; actualCount: number; systemCountSnapshot?: number; notes?: string }>) =>
       request<{ success: boolean; data: any; message: string }>('/inventory/stocktake', {
         method: 'POST',
         body: JSON.stringify({ items }),
@@ -158,6 +186,11 @@ export const api = {
     receiveOrder: (id: string) =>
       request<{ success: boolean; data: any; message: string }>(`/purchasing/orders/${id}/receive`, {
         method: 'POST',
+      }),
+    payOrder: (id: string, payload?: { paymentMethod?: string; notes?: string; deductFromActiveShift?: boolean }) =>
+      request<{ success: boolean; data: any; message: string }>(`/purchasing/orders/${id}/pay`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
       }),
     cancelOrder: (id: string) =>
       request<{ success: boolean; data?: any; message: string }>(`/purchasing/orders/${id}/cancel`, {
@@ -360,6 +393,23 @@ export const api = {
   // Reservations
   reservations: {
     getAll: () => request<{ success: boolean; data: any[] }>('/reservations'),
+    create: (payload: {
+      customerName: string;
+      phoneNumber: string;
+      tableId: string;
+      reservationTime: string;
+      guestCount?: number;
+      downPaymentAmount?: number;
+    }) =>
+      request<{ success: boolean; data: any; message?: string }>('/reservations', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    cancel: (id: string, payload?: { reason?: string; refundDp?: boolean }) =>
+      request<{ success: boolean; data: any; message?: string }>(`/reservations/${id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload || {}),
+      }),
   },
 
   // Reports & Analytics
@@ -410,15 +460,33 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
-    getOrders: (params?: { date?: string; from?: string; to?: string; status?: string; limit?: number }) => {
+    getOrders: (params?: { date?: string; from?: string; to?: string; status?: string; limit?: number; offset?: number }) => {
       const q = new URLSearchParams();
       if (params?.date) q.append('date', params.date);
       if (params?.from) q.append('from', params.from);
       if (params?.to) q.append('to', params.to);
       if (params?.status) q.append('status', params.status);
-      if (params?.limit) q.append('limit', params.limit.toString());
+      if (params?.limit !== undefined) q.append('limit', params.limit.toString());
+      if (params?.offset !== undefined) q.append('offset', params.offset.toString());
       const queryStr = q.toString() ? `?${q.toString()}` : '';
-      return request<{ success: boolean; data: any[] }>(`/orders${queryStr}`);
+      return request<{
+        success: boolean;
+        data: any[];
+        meta?: {
+          total: number;
+          limit: number;
+          offset: number;
+          summary?: {
+            paidCount: number;
+            voidCount: number;
+            totalRevenue: number;
+            totalVoidAmount: number;
+            dineInCount: number;
+            takeawayCount: number;
+            aov: number;
+          };
+        };
+      }>(`/orders${queryStr}`);
     },
     voidOrder: (id: string, payload: { managerPin: string; reason: string; restock?: boolean }) =>
       request<{ success: boolean; data: any; message: string }>(`/orders/${id}/void`, {

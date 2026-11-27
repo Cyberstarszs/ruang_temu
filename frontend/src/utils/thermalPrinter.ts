@@ -1,9 +1,31 @@
 import { rupiah, formatDate, formatTime } from './formatters';
-import type { Order } from '../types';
+import type { Order, StoreSettings } from '../types';
 
-export function printBrowserThermalReceipt(order: Order, options?: { paperWidth?: '58mm' | '80mm' }) {
-  const paperWidth = options?.paperWidth || '58mm';
+function getCachedStoreSettings(): Partial<StoreSettings> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('ruang_temu_store_settings_cache');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function printBrowserThermalReceipt(
+  order: Order,
+  options?: { paperWidth?: '58mm' | '80mm'; settings?: Partial<StoreSettings> | null }
+) {
+  const settings = options?.settings || getCachedStoreSettings();
+  const paperWidth = options?.paperWidth || settings?.paper_size || '58mm';
   const widthPx = paperWidth === '58mm' ? '300px' : '400px';
+  const storeName = settings?.store_name || 'RUANG TEMU';
+  const tagline = settings?.tagline || 'Coffee, Eatery, Community';
+  const address = settings?.address || 'Jl. Raya Pamekasan No. 24, Madura';
+  const phone = settings?.phone || '';
+  const receiptFooter = settings?.receipt_footer || 'Terima kasih atas kunjungan Anda!';
+  const wifiSsid = settings?.wifi_ssid || 'Ruang Temu Cafe';
+  const wifiPassword = settings?.wifi_password || '';
+  const instagram = settings?.instagram || '@ruangtemu.cafe';
 
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
@@ -112,10 +134,10 @@ export function printBrowserThermalReceipt(order: Order, options?: { paperWidth?
       </head>
       <body>
         <div class="text-center">
-          <div class="title">RUANG TEMU</div>
-          <div class="subtitle">Coffee, Eatery, Community</div>
-          <div style="font-size: 9px; margin-bottom: 4px;">Jl. Raya Cafe No. 88, Kota Anda</div>
-          <div style="font-size: 9px;">Telp: (021) 789-0123</div>
+          <div class="title">${storeName}</div>
+          <div class="subtitle">${tagline}</div>
+          <div style="font-size: 9px; margin-bottom: 4px;">${address}</div>
+          ${phone ? `<div style="font-size: 9px;">Telp: ${phone}</div>` : ''}
         </div>
 
         <div class="divider"></div>
@@ -141,7 +163,7 @@ export function printBrowserThermalReceipt(order: Order, options?: { paperWidth?
             <span>${rupiah(order.subtotal)}</span>
           </div>
           ${
-            order.discount_amount && order.discount_amount > 0
+            Number(order.discount_amount || 0) > 0
               ? `
             <div style="display: flex; justify-content: space-between; color: #b00;">
               <span>Diskon Promo:</span>
@@ -151,31 +173,41 @@ export function printBrowserThermalReceipt(order: Order, options?: { paperWidth?
               : ''
           }
           ${
-            Number(order.tax_amount || order.taxAmount) > 0
+            Number((order as any).service_charge_amount ?? (order as any).serviceChargeAmount ?? 0) > 0
               ? `
             <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
-              <span>PB1 Resto (${order.tax_rate || order.taxRate || 0}%):</span>
-              <span>${rupiah(order.tax_amount || order.taxAmount)}</span>
+              <span>Service Charge (${Number((order as any).service_charge_rate ?? (order as any).serviceChargeRate ?? 0)}%):</span>
+              <span>${rupiah(Number((order as any).service_charge_amount ?? (order as any).serviceChargeAmount ?? 0))}</span>
             </div>
           `
               : ''
           }
           ${
-            Number(order.service_charge_amount || order.serviceChargeAmount) > 0
+            Number((order as any).tax_amount ?? (order as any).taxAmount ?? 0) > 0
               ? `
             <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
-              <span>Service Charge (${order.service_charge_rate || order.serviceChargeRate || 0}%):</span>
-              <span>${rupiah(order.service_charge_amount || order.serviceChargeAmount)}</span>
+              <span>PB1 Resto (${Number((order as any).tax_rate ?? (order as any).taxRate ?? 0)}%):</span>
+              <span>${rupiah(Number((order as any).tax_amount ?? (order as any).taxAmount ?? 0))}</span>
             </div>
           `
               : ''
           }
           ${
-            Number(order.rounding_amount || order.roundingAmount)
+            Number(order.claimed_down_payment || 0) > 0
+              ? `
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #0369a1;">
+              <span>Potongan DP:</span>
+              <span>-${rupiah(Number(order.claimed_down_payment))}</span>
+            </div>
+          `
+              : ''
+          }
+          ${
+            Number((order as any).rounding_amount ?? (order as any).roundingAmount ?? 0) !== 0
               ? `
             <div style="display: flex; justify-content: space-between; font-size: 9px; color: #555;">
               <span>Pembulatan:</span>
-              <span>${rupiah(order.rounding_amount || order.roundingAmount)}</span>
+              <span>${Number((order as any).rounding_amount ?? (order as any).roundingAmount ?? 0) > 0 ? '+' : '-'}${rupiah(Math.abs(Number((order as any).rounding_amount ?? (order as any).roundingAmount ?? 0)))}</span>
             </div>
           `
               : ''
@@ -203,10 +235,10 @@ export function printBrowserThermalReceipt(order: Order, options?: { paperWidth?
         <div class="divider"></div>
 
         <div class="text-center" style="font-size: 9px; margin-top: 8px;">
-          <div>Harga sudah termasuk pajak (Nett Pricing)</div>
-          <div style="margin-top: 4px; font-weight: bold;">Terima kasih atas kunjungan Anda!</div>
-          <div style="margin-top: 2px;">WiFi: RuangTemu-Guest | Pass: kopihitam</div>
-          <div style="margin-top: 2px; color: #666;">IG: @ruangtemu.cafe</div>
+          <div>${Number((order as any).tax_amount ?? (order as any).taxAmount ?? 0) > 0 || Number((order as any).service_charge_amount ?? (order as any).serviceChargeAmount ?? 0) > 0 ? `Termasuk PB1 ${Number((order as any).tax_rate ?? (order as any).taxRate ?? 0)}% & Servis ${Number((order as any).service_charge_rate ?? (order as any).serviceChargeRate ?? 0)}%` : 'Harga Nett (0% Pajak & Layanan)'}</div>
+          <div style="margin-top: 4px; font-weight: bold;">${receiptFooter}</div>
+          ${wifiSsid ? `<div style="margin-top: 2px;">WiFi: ${wifiSsid}${wifiPassword ? ` | Pass: ${wifiPassword}` : ''}</div>` : ''}
+          ${instagram ? `<div style="margin-top: 2px; color: #666;">IG: ${instagram}</div>` : ''}
         </div>
       </body>
     </html>

@@ -50,8 +50,12 @@ export function PaymentModal({
   }, [grandTotal]);
 
   const cashChange = Math.max(0, cashReceived - grandTotal);
-  const splitTotal = splitCash + splitQris;
-  const isSplitValid = splitTotal >= grandTotal;
+  const normalizedSplitQris = Math.min(grandTotal, Math.max(0, splitQris));
+  const remainingCashDueAfterQris = Math.max(0, grandTotal - normalizedSplitQris);
+  const normalizedSplitCash = Math.min(splitCash, remainingCashDueAfterQris);
+  const splitCashChange = Math.max(0, splitCash - remainingCashDueAfterQris);
+  const splitTotal = splitCash + normalizedSplitQris;
+  const isSplitValid = normalizedSplitQris <= grandTotal && splitTotal >= grandTotal;
 
   const quickCashOptions = [
     { label: 'Uang Pas', value: grandTotal },
@@ -93,21 +97,29 @@ export function PaymentModal({
           return;
         }
 
+        const splitLegs: any[] = [];
+        if (normalizedSplitCash > 0 || normalizedSplitQris === 0) {
+          splitLegs.push({
+            method: 'CASH',
+            amount: normalizedSplitCash,
+            cashReceived: splitCash,
+            cashChange: splitCashChange,
+          });
+        }
+        if (normalizedSplitQris > 0) {
+          splitLegs.push({
+            method: 'QRIS',
+            amount: normalizedSplitQris,
+            referenceNumber: refNumber || undefined,
+          });
+        }
+
         await onProcessPayment({
-          paymentMethod: 'CASH',
-          payments: [
-            {
-              method: 'CASH',
-              amount: splitCash,
-              cashReceived: splitCash,
-              cashChange: 0,
-            },
-            {
-              method: 'QRIS',
-              amount: splitQris,
-              referenceNumber: refNumber || undefined,
-            },
-          ],
+          paymentMethod: normalizedSplitCash > 0 ? 'CASH' : 'QRIS',
+          cashReceived: splitCash > 0 ? splitCash : undefined,
+          cashChange: splitCashChange,
+          referenceNumber: refNumber || undefined,
+          payments: splitLegs,
         });
       } else {
         await onProcessPayment({
@@ -473,7 +485,9 @@ export function PaymentModal({
                       onChange={(e) => {
                         const val = parseThousands(e.target.value);
                         setSplitCash(val);
-                        setSplitQris(Math.max(0, grandTotal - val));
+                        if (splitQris === 0 && val <= grandTotal) {
+                          setSplitQris(Math.max(0, grandTotal - val));
+                        }
                       }}
                       style={{
                         width: '100%',
@@ -512,7 +526,7 @@ export function PaymentModal({
                       placeholder="0"
                       value={formatThousands(splitQris)}
                       onChange={(e) => {
-                        const val = parseThousands(e.target.value);
+                        const val = Math.min(grandTotal, parseThousands(e.target.value));
                         setSplitQris(val);
                         setSplitCash(Math.max(0, grandTotal - val));
                       }}
@@ -539,8 +553,15 @@ export function PaymentModal({
                   borderRadius: '6px',
                 }}
               >
-                Tercatat {rupiah(splitTotal)} dari {rupiah(grandTotal)}
-                {!isSplitValid && ` (Kurang ${rupiah(grandTotal - splitTotal)})`}
+                <div>
+                  Tagihan {rupiah(grandTotal)} — Tunai masuk {rupiah(normalizedSplitCash)} + QRIS {rupiah(normalizedSplitQris)}
+                  {!isSplitValid && ` (Kurang ${rupiah(grandTotal - splitTotal)})`}
+                </div>
+                {splitCashChange > 0 && (
+                  <div style={{ marginTop: '3px', color: '#1b4332', fontWeight: 700 }}>
+                    Kembalian Tunai: {rupiah(splitCashChange)} (Tunai diterima {rupiah(splitCash)})
+                  </div>
+                )}
               </div>
             </div>
           )}

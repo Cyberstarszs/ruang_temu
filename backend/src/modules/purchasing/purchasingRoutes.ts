@@ -8,6 +8,7 @@ import {
   getPurchaseOrderById,
   createPurchaseOrder,
   receivePurchaseOrder,
+  payPurchaseOrder,
   cancelPurchaseOrder,
 } from './purchasingController';
 import { requireAuth, requireRoles } from '../../middlewares/auth';
@@ -26,6 +27,7 @@ router.get('/orders', getPurchaseOrders);
 router.get('/orders/:id', getPurchaseOrderById);
 router.post('/orders', requireRoles('OWNER'), createPurchaseOrder);
 router.post('/orders/:id/receive', requireRoles('OWNER'), receivePurchaseOrder);
+router.post('/orders/:id/pay', requireRoles('OWNER'), payPurchaseOrder);
 router.post('/orders/:id/cancel', requireRoles('OWNER'), cancelPurchaseOrder);
 
 export default router;

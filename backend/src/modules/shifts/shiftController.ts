@@ -74,59 +74,87 @@ export async function getCurrentShift(req: Request, res: Response, next: NextFun
 }
 
 export async function openShift(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await pool.connect();
   try {
     const userId = req.user?.id;
     const { openingCash } = req.body;
 
-    if (openingCash === undefined || Number(openingCash) < 0) {
+    if (openingCash === undefined || Number(openingCash) < 0 || isNaN(Number(openingCash))) {
       res.status(400).json({ success: false, message: 'Nominal modal awal kasir wajib diisi (minimal 0).' });
       return;
     }
 
+    await client.query('BEGIN');
+
+    // Lock the cashier row so concurrent double-clicks / multi-tab calls serialize cleanly
+    const userLock = await client.query(
+      `SELECT id FROM users WHERE id = $1 FOR UPDATE`,
+      [userId]
+    );
+    if (userLock.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Akun kasir tidak ditemukan.' });
+      return;
+    }
+
     // Check if cashier already has an open shift
-    const existing = await pool.query(
-      `SELECT id FROM cashier_shifts WHERE cashier_id = $1 AND status = 'OPEN'`,
+    const existing = await client.query(
+      `SELECT id FROM cashier_shifts WHERE cashier_id = $1 AND status = 'OPEN' FOR UPDATE`,
       [userId]
     );
 
     if (existing.rows.length > 0) {
+      await client.query('ROLLBACK');
       res.status(409).json({ success: false, message: 'Anda sudah memiliki sif kasir yang sedang aktif.' });
       return;
     }
 
-    const insertRes = await pool.query(
+    const insertRes = await client.query(
       `INSERT INTO cashier_shifts (cashier_id, opening_cash, status)
        VALUES ($1, $2, 'OPEN')
        RETURNING *`,
-      [userId, openingCash]
+      [userId, Number(openingCash)]
     );
+
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
       message: 'Sif kasir berhasil dibuka.',
       data: insertRes.rows[0],
     });
-  } catch (err) {
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err?.code === '23505') {
+      res.status(409).json({ success: false, message: 'Anda sudah memiliki sif kasir yang sedang aktif.' });
+      return;
+    }
     next(err);
+  } finally {
+    client.release();
   }
 }
 
 export async function closeShift(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await pool.connect();
   try {
     const userId = req.user?.id;
     const { shiftId, blindCountedCash, notes, managerPin } = req.body;
 
-    if (!shiftId || blindCountedCash === undefined || Number(blindCountedCash) < 0) {
+    if (!shiftId || blindCountedCash === undefined || Number(blindCountedCash) < 0 || isNaN(Number(blindCountedCash))) {
       res.status(400).json({ success: false, message: 'ID Sif dan jumlah uang fisik hasil hitung (minimal 0) wajib diisi.' });
       return;
     }
 
-    const shiftRes = await pool.query(
-      `SELECT * FROM cashier_shifts WHERE id = $1 AND cashier_id = $2 AND status = 'OPEN'`,
+    await client.query('BEGIN');
+
+    const shiftRes = await client.query(
+      `SELECT * FROM cashier_shifts WHERE id = $1 AND cashier_id = $2 AND status = 'OPEN' FOR UPDATE`,
       [shiftId, userId]
     );
 
     if (shiftRes.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Sif aktif tidak ditemukan.' });
       return;
     }
@@ -135,7 +163,7 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
 
     // Compute actual system expected cash:
     // Expected = Opening Cash + Cash Payments Received + Cash In - Cash Out
-    const salesRes = await pool.query(
+    const salesRes = await client.query(
       `SELECT COALESCE(SUM(op.amount_paid), 0) as cash_sales
        FROM orders o
        JOIN order_payments op ON o.id = op.order_id
@@ -143,7 +171,7 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
       [shift.id]
     );
 
-    const pettyRes = await pool.query(
+    const pettyRes = await client.query(
       `SELECT 
          COALESCE(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END), 0) as cash_in,
          COALESCE(SUM(CASE WHEN type = 'CASH_OUT' THEN amount ELSE 0 END), 0) as cash_out
@@ -161,17 +189,65 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
     const diff = counted - systemExpected;
 
     let managerId: string | null = null;
-    if (managerPin) {
-      const mgrRes = await pool.query(
-        `SELECT id FROM users WHERE role = 'OWNER' AND pin_code = $1 AND is_active = TRUE`,
-        [managerPin.trim()]
-      );
-      if (mgrRes.rows.length > 0) {
-        managerId = mgrRes.rows[0].id;
+    let managerName: string | null = null;
+
+    if (diff !== 0) {
+      const cleanPin = managerPin ? String(managerPin).trim() : '';
+      if (!cleanPin) {
+        await client.query('ROLLBACK');
+        res.status(403).json({
+          success: false,
+          requiresManagerPin: true,
+          message: 'Terdeteksi selisih kas fisik dengan sistem. Panggil Owner untuk memasukkan PIN otorisasi dan isi catatan selisih.',
+        });
+        return;
       }
+
+      const mgrRes = await client.query(
+        `SELECT id, name FROM users WHERE role = 'OWNER' AND pin_code = $1 AND is_active = TRUE`,
+        [cleanPin]
+      );
+      if (mgrRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(403).json({
+          success: false,
+          requiresManagerPin: true,
+          message: 'PIN Owner tidak valid untuk otorisasi penutupan sif dengan selisih kas.',
+        });
+        return;
+      }
+
+      if (!notes || !String(notes).trim()) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          success: false,
+          requiresManagerPin: true,
+          message: 'Catatan alasan selisih kas wajib diisi sebelum menutup sif.',
+        });
+        return;
+      }
+
+      managerId = mgrRes.rows[0].id;
+      managerName = mgrRes.rows[0].name;
+    } else if (managerPin && String(managerPin).trim()) {
+      const mgrRes = await client.query(
+        `SELECT id, name FROM users WHERE role = 'OWNER' AND pin_code = $1 AND is_active = TRUE`,
+        [String(managerPin).trim()]
+      );
+      if (mgrRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(403).json({
+          success: false,
+          requiresManagerPin: true,
+          message: 'PIN Owner yang dimasukkan tidak valid.',
+        });
+        return;
+      }
+      managerId = mgrRes.rows[0].id;
+      managerName = mgrRes.rows[0].name;
     }
 
-    const updated = await pool.query(
+    const updated = await client.query(
       `UPDATE cashier_shifts
        SET closed_at = NOW(),
            system_expected_cash = $1,
@@ -182,8 +258,30 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
            status = 'CLOSED'
        WHERE id = $6
        RETURNING *`,
-      [systemExpected, counted, diff, notes || null, managerId, shiftId]
+      [systemExpected, counted, diff, notes?.trim() || null, managerId, shiftId]
     );
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+       VALUES ($1, 'CLOSE_SHIFT', 'cashier_shifts', $2, $3)`,
+      [
+        managerId || userId,
+        shiftId,
+        JSON.stringify({
+          openingCash: opening,
+          cashSales,
+          cashIn,
+          cashOut,
+          systemExpected,
+          blindCountedCash: counted,
+          difference: diff,
+          approvedByOwner: managerName,
+          notes: notes?.trim() || null,
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
 
     res.json({
       success: true,
@@ -203,16 +301,22 @@ export async function closeShift(req: Request, res: Response, next: NextFunction
       },
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     next(err);
+  } finally {
+    client.release();
   }
 }
 
 export async function recordCashMovement(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await pool.connect();
   try {
+    const userId = req.user?.id;
     const { shiftId, type, category, description, amount, receipt_url } = req.body;
+    const numericAmount = Number(amount);
 
-    if (!shiftId || !type || !category || !amount || Number(amount) <= 0) {
-      res.status(400).json({ success: false, message: 'ID Sif, jenis (CASH_IN/CASH_OUT), kategori, dan nominal wajib diisi.' });
+    if (!shiftId || !type || !category || amount === undefined || isNaN(numericAmount) || numericAmount <= 0) {
+      res.status(400).json({ success: false, message: 'ID Sif, jenis (CASH_IN/CASH_OUT), kategori, dan nominal (> 0) wajib diisi.' });
       return;
     }
 
@@ -221,26 +325,75 @@ export async function recordCashMovement(req: Request, res: Response, next: Next
       return;
     }
 
-    // Verify shift exists and is currently OPEN
-    const shiftCheck = await pool.query(
-      `SELECT id, status FROM cashier_shifts WHERE id = $1`,
+    await client.query('BEGIN');
+
+    // Verify shift exists and is currently OPEN with row lock
+    const shiftCheck = await client.query(
+      `SELECT id, status, opening_cash FROM cashier_shifts WHERE id = $1 FOR UPDATE`,
       [shiftId]
     );
     if (shiftCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Sif kasir tidak ditemukan.' });
       return;
     }
-    if (shiftCheck.rows[0].status !== 'OPEN') {
+    const shift = shiftCheck.rows[0];
+    if (shift.status !== 'OPEN') {
+      await client.query('ROLLBACK');
       res.status(400).json({ success: false, message: 'Tidak dapat mencatat mutasi kas pada sif yang sudah ditutup.' });
       return;
     }
 
-    const insertRes = await pool.query(
+    // Balance Check for CASH_OUT against live expected cash in drawer
+    if (type === 'CASH_OUT') {
+      const salesRes = await client.query(
+        `SELECT COALESCE(SUM(op.amount_paid), 0) as cash_sales
+         FROM orders o
+         JOIN order_payments op ON o.id = op.order_id
+         WHERE o.shift_id = $1 AND o.status = 'PAID' AND op.payment_method = 'CASH'`,
+        [shiftId]
+      );
+      const pettyRes = await client.query(
+        `SELECT 
+           COALESCE(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END), 0) as cash_in,
+           COALESCE(SUM(CASE WHEN type = 'CASH_OUT' THEN amount ELSE 0 END), 0) as cash_out
+         FROM cash_movements WHERE shift_id = $1`,
+        [shiftId]
+      );
+      const availableDrawerCash =
+        Number(shift.opening_cash || 0) +
+        Number(salesRes.rows[0].cash_sales || 0) +
+        Number(pettyRes.rows[0].cash_in || 0) -
+        Number(pettyRes.rows[0].cash_out || 0);
+
+      if (numericAmount > availableDrawerCash) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          success: false,
+          message: `Saldo kas tunai di laci tidak mencukupi untuk pengeluaran ini (tersedia Rp ${Math.max(0, availableDrawerCash).toLocaleString('id-ID')}, diminta Rp ${numericAmount.toLocaleString('id-ID')}).`,
+        });
+        return;
+      }
+    }
+
+    const insertRes = await client.query(
       `INSERT INTO cash_movements (shift_id, type, category, description, amount, receipt_url)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [shiftId, type, category, description || category, Number(amount), receipt_url || null]
+      [shiftId, type, category, description || category, numericAmount, receipt_url || null]
     );
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+       VALUES ($1, 'CASH_MOVEMENT', 'cash_movements', $2, $3)`,
+      [
+        userId || null,
+        insertRes.rows[0].id,
+        JSON.stringify({ shiftId, type, category, amount: numericAmount, hasReceipt: Boolean(receipt_url) }),
+      ]
+    );
+
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
@@ -248,7 +401,10 @@ export async function recordCashMovement(req: Request, res: Response, next: Next
       data: insertRes.rows[0],
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     next(err);
+  } finally {
+    client.release();
   }
 }
 
@@ -370,7 +526,10 @@ export async function getShiftHistory(req: Request, res: Response, next: NextFun
         (SELECT COALESCE(SUM(op.amount_paid), 0) FROM orders o JOIN order_payments op ON o.id = op.order_id WHERE o.shift_id = s.id AND o.status = 'PAID' AND op.payment_method != 'CASH') as non_cash_sales,
         (SELECT COALESCE(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END), 0) FROM cash_movements cm WHERE cm.shift_id = s.id) as total_cash_in,
         (SELECT COALESCE(SUM(CASE WHEN type = 'CASH_OUT' THEN amount ELSE 0 END), 0) FROM cash_movements cm WHERE cm.shift_id = s.id) as total_cash_out,
-        (SELECT COUNT(*) FROM cash_movements cm WHERE cm.shift_id = s.id) as movement_count
+        (SELECT COUNT(*) FROM cash_movements cm WHERE cm.shift_id = s.id) as movement_count,
+        (SELECT COUNT(*) FROM orders o WHERE o.shift_id = s.id AND o.status = 'CANCELLED') as void_orders_count,
+        (SELECT COALESCE(SUM(op.amount_paid), 0) FROM orders o JOIN order_payments op ON o.id = op.order_id WHERE o.shift_id = s.id AND o.status = 'CANCELLED' AND s.closed_at IS NOT NULL AND o.updated_at > s.closed_at AND op.payment_method = 'CASH') as post_close_void_cash,
+        (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.shift_id = s.id AND o.status = 'CANCELLED' AND s.closed_at IS NOT NULL AND o.updated_at > s.closed_at) as post_close_void_sales
       FROM cashier_shifts s
       JOIN users u ON s.cashier_id = u.id
       LEFT JOIN users m ON s.approved_by_manager_id = m.id

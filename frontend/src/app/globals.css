@@ -18265,10 +18265,10 @@ textarea:focus-visible {
 }
 .new-pos > main {
   height: calc(100dvh - 64px);
-  padding: 16px 20px 20px;
+  padding: 12px 16px 14px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 410px;
+  gap: 16px;
   overflow: hidden;
   transition: grid-template-columns 0.25s ease;
 }
@@ -19253,14 +19253,14 @@ textarea:focus-visible {
 
 /* POS floor must remain last because this stylesheet contains legacy responsive modules. */
 .new-pos,
-.new-pos :is(div, span, small, em, label, button, th, td) {
+.new-pos :is(div, span, small, em, label, button, th, td):not(.pos-cart-compact):not(.pos-cart-compact *) {
   font-size: max(13px, 1em);
 }
-.new-pos small,
+.new-pos small:not(.pos-cart-compact small),
 .new-pos .pos-admin-return {
   font-size: 13px !important;
 }
-.new-pos :is(input, select, textarea) {
+.new-pos :is(input, select, textarea):not(.pos-cart-compact *) {
   font-size: 16px;
 }
 @media (max-width: 767px) {

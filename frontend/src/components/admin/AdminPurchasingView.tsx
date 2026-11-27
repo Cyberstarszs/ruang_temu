@@ -48,6 +48,14 @@ export function AdminPurchasingView() {
   const [selectedPo, setSelectedPo] = useState<PurchaseOrder | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
 
+  // Pay PO Modal
+  const [payPoTarget, setPayPoTarget] = useState<PurchaseOrder | null>(null);
+  const [payMethod, setPayMethod] = useState<'BANK_TRANSFER' | 'CASH' | 'QRIS' | 'DEBIT_CARD'>('BANK_TRANSFER');
+  const [payDeductDrawer, setPayDeductDrawer] = useState(false);
+  const [payNotes, setPayNotes] = useState('');
+  const [payError, setPayError] = useState('');
+  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
+
   // Create PO Modal
   const [isCreatePoOpen, setIsCreatePoOpen] = useState(false);
   const [poSupplierId, setPoSupplierId] = useState('');
@@ -173,6 +181,40 @@ export function AdminPurchasingView() {
       }
     } catch (err: any) {
       alert(err.message || 'Gagal membatalkan PO.');
+    }
+  };
+
+  const openPayPoModal = (po: PurchaseOrder) => {
+    setPayPoTarget(po);
+    setPayMethod('BANK_TRANSFER');
+    setPayDeductDrawer(false);
+    setPayNotes('');
+    setPayError('');
+  };
+
+  const handleConfirmPayPo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payPoTarget) return;
+    setPayError('');
+    setIsSubmittingPay(true);
+    try {
+      const res = await api.purchasing.payOrder(payPoTarget.id, {
+        paymentMethod: payMethod,
+        deductFromActiveShift: payMethod === 'CASH' ? payDeductDrawer : false,
+        notes: payNotes.trim() || undefined,
+      });
+      if (res.success) {
+        showToast(res.message || `PO ${payPoTarget.po_number} berhasil dilunasi.`);
+        setPayPoTarget(null);
+        setSelectedPo(null);
+        loadData();
+      } else {
+        setPayError(res.message || 'Gagal mencatat pelunasan PO.');
+      }
+    } catch (err: any) {
+      setPayError(err.message || 'Gagal mencatat pelunasan PO.');
+    } finally {
+      setIsSubmittingPay(false);
     }
   };
 
@@ -314,6 +356,8 @@ export function AdminPurchasingView() {
     let receivedPoCount = 0;
     let cancelledPoCount = 0;
     let totalSpend = 0;
+    let unpaidAmount = 0;
+    let unpaidCount = 0;
 
     purchaseOrders.forEach((po) => {
       if (po.status === 'RECEIVED') {
@@ -324,6 +368,11 @@ export function AdminPurchasingView() {
       } else {
         pendingPoCount++;
       }
+
+      if (po.status !== 'CANCELLED' && po.payment_status !== 'PAID') {
+        unpaidCount++;
+        unpaidAmount += Number(po.total_amount) || 0;
+      }
     });
 
     return {
@@ -332,6 +381,8 @@ export function AdminPurchasingView() {
       receivedPoCount,
       cancelledPoCount,
       totalSpend,
+      unpaidAmount,
+      unpaidCount,
       supplierCount: suppliers.length,
     };
   }, [purchaseOrders, suppliers]);
@@ -534,8 +585,10 @@ export function AdminPurchasingView() {
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             Rp {Math.round(metrics.totalSpend).toLocaleString('id-ID')}
           </div>
-          <div style={{ fontSize: '11px', color: '#8b968f' }}>
-            Total nominal PO yang telah berhasil diterima
+          <div style={{ fontSize: '11px', color: metrics.unpaidCount > 0 ? '#b45309' : '#8b968f', fontWeight: metrics.unpaidCount > 0 ? 600 : 400 }}>
+            {metrics.unpaidCount > 0
+              ? `Hutang PO belum lunas (${metrics.unpaidCount}): Rp ${Math.round(metrics.unpaidAmount).toLocaleString('id-ID')}`
+              : 'Semua tagihan PO telah lunas'}
           </div>
         </div>
 
@@ -778,19 +831,20 @@ export function AdminPurchasingView() {
                   <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Dibuat Oleh</th>
                   <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Total Biaya</th>
                   <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Status Barang</th>
+                  <th style={{ padding: '9px 12px', fontWeight: 600, fontSize: '11.5px' }}>Pembayaran</th>
                   <th style={{ padding: '9px 14px', fontWeight: 600, fontSize: '11.5px', textAlign: 'right' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
+                    <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
                       Memuat daftar Purchase Order...
                     </td>
                   </tr>
                 ) : filteredPurchaseOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#8b968f' }}>
+                    <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#8b968f' }}>
                       Tidak ada Purchase Order yang sesuai.
                     </td>
                   </tr>
@@ -902,7 +956,43 @@ export function AdminPurchasingView() {
                           )}
                         </td>
 
-                        {/* 7. Aksi */}
+                        {/* 7. Status Pembayaran */}
+                        <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+                          {isCancelled ? (
+                            <span style={{ fontSize: '10.5px', color: '#9ca3af' }}>-</span>
+                          ) : po.payment_status === 'PAID' ? (
+                            <span
+                              style={{
+                                padding: '2px 7px',
+                                borderRadius: '5px',
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                fontWeight: 700,
+                                fontSize: '10.5px',
+                                display: 'inline-block',
+                              }}
+                              title={po.payment_method ? `Metode: ${po.payment_method}` : 'Lunas'}
+                            >
+                              Lunas{po.payment_method ? ` (${po.payment_method})` : ''}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                padding: '2px 7px',
+                                borderRadius: '5px',
+                                background: '#fff1f2',
+                                color: '#be123c',
+                                fontWeight: 700,
+                                fontSize: '10.5px',
+                                display: 'inline-block',
+                              }}
+                            >
+                              Belum Bayar
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 8. Aksi */}
                         <td style={{ padding: '8px 14px', verticalAlign: 'middle', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                             <button
@@ -921,6 +1011,30 @@ export function AdminPurchasingView() {
                             >
                               Detail
                             </button>
+
+                            {!isCancelled && po.payment_status !== 'PAID' && (
+                              <button
+                                type="button"
+                                onClick={() => openPayPoModal(po)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '4px 8px',
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '5px',
+                                  fontWeight: 700,
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                }}
+                                title="Catat pelunasan hutang/pembayaran PO ini"
+                              >
+                                <Receipt size={11} />
+                                Bayar
+                              </button>
+                            )}
 
                             {!isReceived && !isCancelled && (
                               <button
@@ -1228,11 +1342,32 @@ export function AdminPurchasingView() {
                   border: '1px solid #e7e8e3',
                 }}
               >
-                <span style={{ fontWeight: 600, color: '#4b5563', fontSize: '12.5px' }}>Total Biaya Pengadaan</span>
+                <div>
+                  <span style={{ fontWeight: 600, color: '#4b5563', fontSize: '12.5px', display: 'block' }}>
+                    Total Biaya Pengadaan
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: selectedPo.payment_status === 'PAID' ? '#15803d' : '#be123c',
+                    }}
+                  >
+                    {selectedPo.payment_status === 'PAID'
+                      ? `Status Bayar: LUNAS (${selectedPo.payment_method || 'PAID'})${selectedPo.paid_at ? ` · ${new Date(selectedPo.paid_at).toLocaleDateString('id-ID')}` : ''}`
+                      : 'Status Bayar: BELUM DIBAYAR (Hutang PO)'}
+                  </span>
+                </div>
                 <span style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826' }}>
                   Rp {Number(selectedPo.total_amount).toLocaleString('id-ID')}
                 </span>
               </div>
+
+              {selectedPo.payment_notes && (
+                <div style={{ fontSize: '11.5px', color: '#15803d' }}>
+                  Catatan Pelunasan: <em>{selectedPo.payment_notes}</em>
+                </div>
+              )}
 
               {selectedPo.notes && (
                 <div style={{ fontSize: '11.5px', color: '#64746b' }}>
@@ -1267,6 +1402,25 @@ export function AdminPurchasingView() {
               >
                 Tutup
               </button>
+
+              {selectedPo.status !== 'CANCELLED' && selectedPo.payment_status !== 'PAID' && (
+                <button
+                  type="button"
+                  onClick={() => openPayPoModal(selectedPo)}
+                  style={{
+                    padding: '7px 14px',
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Catat Pelunasan PO
+                </button>
+              )}
 
               {selectedPo.status === 'ORDERED' && (
                 <>
@@ -1851,6 +2005,168 @@ export function AdminPurchasingView() {
                   }}
                 >
                   {isSubmittingSup ? 'Menyimpan...' : editingSupplier ? 'Perbarui Supplier' : 'Simpan Supplier'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: PELUNASAN HUTANG / PEMBAYARAN PO */}
+      {payPoTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e7e8e3',
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  Pelunasan {payPoTarget.po_number}
+                </h3>
+                <span style={{ fontSize: '11.5px', color: '#64746b' }}>
+                  Supplier: {payPoTarget.supplier_name} · Rp {Number(payPoTarget.total_amount).toLocaleString('id-ID')}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPayPoTarget(null)}
+                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmPayPo} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {payError && (
+                <div style={{ padding: '8px 12px', borderRadius: '7px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px' }}>
+                  {payError}
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  Metode Pembayaran Pelunasan
+                </label>
+                <Select value={payMethod} onValueChange={(v) => setPayMethod(v as any)}>
+                  <SelectTrigger style={{ width: '100%', height: '36px', background: '#ffffff', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                    <SelectValue placeholder="Pilih Metode Bayar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BANK_TRANSFER">Transfer Bank / Rekening Usaha</SelectItem>
+                    <SelectItem value="CASH">Tunai (Cash)</SelectItem>
+                    <SelectItem value="QRIS">QRIS</SelectItem>
+                    <SelectItem value="DEBIT_CARD">Kartu Debit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {payMethod === 'CASH' && (
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    color: '#92400e',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={payDeductDrawer}
+                    onChange={(e) => setPayDeductDrawer(e.target.checked)}
+                    style={{ marginTop: '2px' }}
+                  />
+                  <span>
+                    <strong>Potong langsung dari Laci Kasir Aktif</strong> (catat sebagai <code>CASH_OUT</code> sif saat ini). Biarkan tidak dicentang jika dibayar dari kas besar / dompet Owner.
+                  </span>
+                </label>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  Catatan / No. Referensi Transfer
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Transfer BCA No. Ref 882190"
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '12.5px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPayPoTarget(null)}
+                  style={{
+                    padding: '7px 14px',
+                    background: '#f0f0eb',
+                    border: '1px solid #dcdfd5',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#4b5563',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPay}
+                  style={{
+                    padding: '7px 18px',
+                    background: '#1d4ed8',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: isSubmittingPay ? 'not-allowed' : 'pointer',
+                    opacity: isSubmittingPay ? 0.7 : 1,
+                  }}
+                >
+                  {isSubmittingPay ? 'Menyimpan...' : 'Konfirmasi Lunas'}
                 </button>
               </div>
             </form>

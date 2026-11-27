@@ -236,10 +236,16 @@ export interface Order {
   customer_id?: string | null;
   customer_name?: string | null;
   reservation_id?: string | null;
+  promo_id?: string | null;
   order_type: 'DINE_IN' | 'TAKEAWAY';
   subtotal: number | string;
   discount_amount: number | string;
   claimed_down_payment: number | string;
+  tax_rate?: number | string;
+  tax_amount?: number | string;
+  service_charge_rate?: number | string;
+  service_charge_amount?: number | string;
+  rounding_amount?: number | string;
   total_amount: number | string;
   status: 'PENDING_PAYMENT_AT_CASHIER' | 'PAID' | 'CANCELLED' | 'EXPIRED';
   notes?: string | null;
@@ -272,6 +278,8 @@ export interface MenuMatrixItem {
   category: string;
   price: number;
   cost: number;
+  hasRecipe?: boolean;
+  isEstimatedCost?: boolean;
   margin: number;
   quantity: number;
   revenue: number;
@@ -286,6 +294,7 @@ export interface MenuMatrixResponse {
     averageQuantity: number;
     maxQuantity: number;
     totalProducts: number;
+    unrecipiedCount?: number;
   };
 }
 
@@ -314,6 +323,9 @@ export interface DirectCheckoutPayload {
   cashChange?: number;
   referenceNumber?: string;
   discountAmount?: number;
+  discountAuthorizerPin?: string;
+  promoId?: string | null;
+  promoCode?: string | null;
   claimedDownPayment?: number;
   notes?: string;
 }
@@ -329,6 +341,7 @@ export interface HeldOrder {
   items: CartItem[];
   subtotal: number;
   discountAmount: number;
+  promoId?: string | null;
   promoCode: string;
   claimedDownPayment: number;
   grandTotal: number;
@@ -340,10 +353,18 @@ export interface HeldOrder {
 
 export interface DailySummary {
   date: string;
+  fromDate?: string;
+  toDate?: string;
   totalTransactions: number;
+  grossSales?: number;
   netSales: number;
   totalCogs: number;
   totalDiscounts?: number;
+  totalTax?: number;
+  totalServiceCharge?: number;
+  totalRounding?: number;
+  totalDownPaymentClaimed?: number;
+  totalCollected?: number;
   grossProfit: number;
   grossMarginPercentage: string;
   averageBasketSize: number;
@@ -352,6 +373,21 @@ export interface DailySummary {
     total_qty: string | number;
     total_revenue: string | number;
   }>;
+  dailyTrend?: Array<{
+    date: string;
+    revenue: number;
+    count: number;
+  }>;
+  paymentBreakdown?: {
+    cashAmount: number;
+    cashCount: number;
+    nonCashAmount: number;
+    nonCashCount: number;
+  };
+  orderTypeBreakdown?: {
+    dineInCount: number;
+    takeawayCount: number;
+  };
 }
 
 export interface HourlyHeatmapItem {
@@ -429,6 +465,10 @@ export interface PurchaseOrder {
   status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
   total_amount: number;
   payment_status: 'UNPAID' | 'PAID';
+  paid_at?: string | null;
+  payment_method?: string | null;
+  payment_notes?: string | null;
+  paid_by_name?: string | null;
   notes?: string | null;
   ordered_by_user_id: string;
   ordered_by_name?: string;
@@ -492,6 +532,9 @@ export interface ShiftAuditItem {
   total_cash_in?: number;
   total_cash_out?: number;
   movement_count: number;
+  void_orders_count?: number;
+  post_close_void_cash?: number;
+  post_close_void_sales?: number;
 }
 
 export interface StaffUser {

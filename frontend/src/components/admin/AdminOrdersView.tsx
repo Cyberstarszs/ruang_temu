@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
-import { Order } from '@/types';
+import { Order, StoreSettings } from '@/types';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
   Select,
@@ -39,9 +39,22 @@ const formatModifiers = (modifiers: any): string => {
   return '';
 };
 
+const PAGE_SIZE = 100;
+
 export function AdminOrdersView() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [serverSummary, setServerSummary] = useState<{
+    paidCount: number;
+    voidCount: number;
+    totalRevenue: number;
+    totalVoidAmount: number;
+    dineInCount: number;
+    takeawayCount: number;
+    aov: number;
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'CANCELLED'>('ALL');
   const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
@@ -62,6 +75,33 @@ export function AdminOrdersView() {
   const [restockStock, setRestockStock] = useState(true);
   const [voidError, setVoidError] = useState('');
   const [isVoiding, setIsVoiding] = useState(false);
+  const [storeSettings, setStoreSettings] = useState<Partial<StoreSettings> | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem('ruang_temu_store_settings_cache');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    api.settings
+      .get()
+      .then((res) => {
+        if (isMounted && res.success && res.data) {
+          setStoreSettings(res.data);
+          try {
+            localStorage.setItem('ruang_temu_store_settings_cache', JSON.stringify(res.data));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Floating Popover for multi-item menu details
   const [popover, setPopover] = useState<{
@@ -138,23 +178,50 @@ export function AdminOrdersView() {
     });
   };
 
-  const loadOrders = async () => {
-    setIsLoading(true);
+  const fetchOrdersPage = async (append = false) => {
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
-      const params: { limit?: number; from?: string; to?: string } = { limit: 300 };
+      const nextOffset = append ? orders.length : 0;
+      const params: { limit?: number; offset?: number; from?: string; to?: string } = {
+        limit: PAGE_SIZE,
+        offset: nextOffset,
+      };
       if (dateRange.from) params.from = dateRange.from;
       if (dateRange.to) params.to = dateRange.to;
 
       const res = await api.orders.getOrders(params);
       if (res.success && res.data) {
-        setOrders(res.data);
+        if (append) {
+          setOrders((prev) => {
+            const seen = new Set(prev.map((o) => o.id));
+            const uniqueNext = res.data.filter((o) => !seen.has(o.id));
+            return [...prev, ...uniqueNext];
+          });
+        } else {
+          setOrders(res.data);
+        }
+        if (res.meta) {
+          setTotalOrders(Number(res.meta.total || res.data.length));
+          if (res.meta.summary) {
+            setServerSummary(res.meta.summary);
+          }
+        } else {
+          setTotalOrders((prev) => (append ? prev : res.data.length));
+        }
       }
     } catch (err) {
       console.error('Failed to load orders ledger:', err);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
+
+  const loadOrders = () => fetchOrdersPage(false);
 
   useEffect(() => {
     loadOrders();
@@ -237,28 +304,53 @@ export function AdminOrdersView() {
     });
   }, [orders, cashierFilter, searchQuery, statusFilter, paymentFilter]);
 
-  // KPI Calculations
-  const paidOrders = useMemo(() => orders.filter((o) => o.status === 'PAID'), [orders]);
-  const voidOrders = useMemo(() => orders.filter((o) => o.status === 'CANCELLED'), [orders]);
+  // KPI Calculations (prioritize full server aggregation over paginated slice)
+  const localPaidOrders = useMemo(() => orders.filter((o) => o.status === 'PAID'), [orders]);
+  const localVoidOrders = useMemo(() => orders.filter((o) => o.status === 'CANCELLED'), [orders]);
+  const paidOrders = useMemo(
+    () => (serverSummary ? { length: serverSummary.paidCount } : localPaidOrders),
+    [serverSummary, localPaidOrders]
+  );
+  const voidOrders = useMemo(
+    () => (serverSummary ? { length: serverSummary.voidCount } : localVoidOrders),
+    [serverSummary, localVoidOrders]
+  );
   const totalRevenue = useMemo(
-    () => paidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
-    [paidOrders]
+    () =>
+      serverSummary
+        ? serverSummary.totalRevenue
+        : localPaidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+    [serverSummary, localPaidOrders]
   );
   const totalVoidAmount = useMemo(
-    () => voidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
-    [voidOrders]
+    () =>
+      serverSummary
+        ? serverSummary.totalVoidAmount
+        : localVoidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+    [serverSummary, localVoidOrders]
   );
   const dineInCount = useMemo(
-    () => paidOrders.filter((o) => o.order_type === 'DINE_IN').length,
-    [paidOrders]
+    () =>
+      serverSummary
+        ? serverSummary.dineInCount
+        : localPaidOrders.filter((o) => o.order_type === 'DINE_IN').length,
+    [serverSummary, localPaidOrders]
   );
   const takeawayCount = useMemo(
-    () => paidOrders.filter((o) => o.order_type === 'TAKEAWAY').length,
-    [paidOrders]
+    () =>
+      serverSummary
+        ? serverSummary.takeawayCount
+        : localPaidOrders.filter((o) => o.order_type === 'TAKEAWAY').length,
+    [serverSummary, localPaidOrders]
   );
   const aov = useMemo(
-    () => (paidOrders.length > 0 ? Math.round(totalRevenue / paidOrders.length) : 0),
-    [paidOrders, totalRevenue]
+    () =>
+      serverSummary
+        ? serverSummary.aov
+        : localPaidOrders.length > 0
+          ? Math.round(totalRevenue / localPaidOrders.length)
+          : 0,
+    [serverSummary, localPaidOrders, totalRevenue]
   );
 
   // Export to CSV
@@ -1111,6 +1203,45 @@ export function AdminOrdersView() {
             </tbody>
           </table>
         </div>
+        {(totalOrders > orders.length || orders.length > 0) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 16px',
+              borderTop: '1px solid #eef0eb',
+              background: '#fafbf9',
+              fontSize: '12px',
+              color: '#64746b',
+            }}
+          >
+            <span>
+              Menampilkan <strong>{orders.length}</strong> dari <strong>{Math.max(totalOrders, orders.length)}</strong> transaksi
+              {filteredOrders.length !== orders.length ? ` (${filteredOrders.length} cocok dengan filter)` : ''}
+            </span>
+            {orders.length < totalOrders && (
+              <button
+                type="button"
+                onClick={() => fetchOrdersPage(true)}
+                disabled={isLoadingMore}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #57695b',
+                  background: '#ffffff',
+                  color: '#57695b',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                  opacity: isLoadingMore ? 0.6 : 1,
+                }}
+              >
+                {isLoadingMore ? 'Memuat...' : `Muat ${Math.min(PAGE_SIZE, totalOrders - orders.length)} Berikutnya`}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 5. ORDER DETAIL MODAL */}
@@ -1281,10 +1412,31 @@ export function AdminOrdersView() {
                     <span>-Rp {Number(selectedOrder.discount_amount).toLocaleString('id-ID')}</span>
                   </div>
                 )}
+                {Number(selectedOrder.service_charge_amount || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                    <span>Biaya Layanan ({Number(selectedOrder.service_charge_rate || 0)}%)</span>
+                    <span>Rp {Number(selectedOrder.service_charge_amount).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {Number(selectedOrder.tax_amount || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                    <span>Pajak PB1 ({Number(selectedOrder.tax_rate || 0)}%)</span>
+                    <span>Rp {Number(selectedOrder.tax_amount).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
                 {Number(selectedOrder.claimed_down_payment) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0369a1', fontWeight: 600 }}>
                     <span>Klaim DP</span>
                     <span>-Rp {Number(selectedOrder.claimed_down_payment).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {Number(selectedOrder.rounding_amount || 0) !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64746b' }}>
+                    <span>Pembulatan</span>
+                    <span>
+                      {Number(selectedOrder.rounding_amount) > 0 ? '+' : '-'}Rp{' '}
+                      {Math.abs(Number(selectedOrder.rounding_amount)).toLocaleString('id-ID')}
+                    </span>
                   </div>
                 )}
                 <div
@@ -1479,14 +1631,21 @@ export function AdminOrdersView() {
               {/* Header */}
               <div style={{ textAlign: 'center', marginBottom: '14px' }}>
                 <div style={{ fontSize: '16px', fontWeight: 800, letterSpacing: '1px' }}>
-                  RUANG TEMU
+                  {storeSettings?.store_name || 'RUANG TEMU'}
                 </div>
-                <div style={{ fontSize: '11px', color: '#4b5563' }}>
-                  Integrated Cafe &amp; Roastery
-                </div>
+                {(storeSettings?.tagline || !storeSettings) && (
+                  <div style={{ fontSize: '11px', color: '#4b5563' }}>
+                    {storeSettings?.tagline || 'Coffee, Eatery, Community'}
+                  </div>
+                )}
                 <div style={{ fontSize: '10.5px', color: '#6b7280' }}>
-                  Jl. Cempaka Putih No. 18, Jakarta
+                  {storeSettings?.address || 'Jl. Raya Pamekasan No. 24, Madura'}
                 </div>
+                {storeSettings?.phone && (
+                  <div style={{ fontSize: '10.5px', color: '#6b7280' }}>
+                    Telp: {storeSettings.phone}
+                  </div>
+                )}
                 <div style={{ borderBottom: '1px dashed #9ca3af', margin: '10px 0' }} />
               </div>
 
@@ -1548,10 +1707,31 @@ export function AdminOrdersView() {
                     <span>-Rp {Number(receiptOrder.discount_amount).toLocaleString('id-ID')}</span>
                   </div>
                 )}
+                {Number(receiptOrder.service_charge_amount || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Servis ({Number(receiptOrder.service_charge_rate || 0)}%):</span>
+                    <span>Rp {Number(receiptOrder.service_charge_amount).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {Number(receiptOrder.tax_amount || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>PB1 ({Number(receiptOrder.tax_rate || 0)}%):</span>
+                    <span>Rp {Number(receiptOrder.tax_amount).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
                 {Number(receiptOrder.claimed_down_payment) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Klaim DP:</span>
                     <span>-Rp {Number(receiptOrder.claimed_down_payment).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {Number(receiptOrder.rounding_amount || 0) !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Pembulatan:</span>
+                    <span>
+                      {Number(receiptOrder.rounding_amount) > 0 ? '+' : '-'}Rp{' '}
+                      {Math.abs(Number(receiptOrder.rounding_amount)).toLocaleString('id-ID')}
+                    </span>
                   </div>
                 )}
                 <div
@@ -1599,8 +1779,18 @@ export function AdminOrdersView() {
               {/* Footer */}
               <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '10.5px', color: '#6b7280' }}>
                 <div style={{ borderBottom: '1px dashed #9ca3af', marginBottom: '8px' }} />
-                <div>Terima Kasih Atas Kunjungan Anda</div>
-                <div>Wifi: RUANG_TEMU_GUEST / Password: kopiindonesia</div>
+                <div>
+                  {Number(receiptOrder.tax_amount || 0) > 0 || Number(receiptOrder.service_charge_amount || 0) > 0
+                    ? `Termasuk PB1 ${Number(receiptOrder.tax_rate || 0)}% & Servis ${Number(receiptOrder.service_charge_rate || 0)}%`
+                    : 'Harga Nett (0% Pajak & Layanan)'}
+                </div>
+                <div>{storeSettings?.receipt_footer || 'Terima kasih atas kunjungan Anda!'}</div>
+                {storeSettings?.wifi_ssid && (
+                  <div>
+                    Wifi: {storeSettings.wifi_ssid}
+                    {storeSettings.wifi_password ? ` / Password: ${storeSettings.wifi_password}` : ''}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -41,7 +41,7 @@ export async function voidOrder(req: Request, res: Response, next: NextFunction)
 export async function getOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { date, from, to, status, limit, offset } = req.query;
-    const orders = await orderService.getOrders({
+    const result = await orderService.getOrdersWithMeta({
       date: date as string,
       from: from as string,
       to: to as string,
@@ -51,7 +51,8 @@ export async function getOrders(req: Request, res: Response, next: NextFunction)
     });
     res.json({
       success: true,
-      data: orders,
+      data: result.rows,
+      meta: result.meta,
     });
   } catch (err) {
     next(err);

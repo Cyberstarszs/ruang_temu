@@ -1104,14 +1104,10 @@ export function CashMovementModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// 4. CLOSE SHIFT MODAL (TIDAK PERLU PIN OWNER & OTOMATIS LOGOUT)
+// 4. CLOSE SHIFT MODAL (BLIND CLOSE SEJATI + WAJIB PIN OWNER JIKA SELISIH + RINGKASAN AKHIR PASCA TUTUP)
 export function CloseShiftModal({ onClose }: { onClose: () => void }) {
-  const { shift, summary, refreshShift, closeShift } = useShift();
+  const { closeShift } = useShift();
   const { logout } = useAuth();
-
-  useEffect(() => {
-    refreshShift();
-  }, [refreshShift]);
 
   // Denominasi Lembaran
   const [denominations, setDenominations] = useState<{ [key: string]: number }>({
@@ -1128,63 +1124,34 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
   const [useDetailedDenomination, setUseDetailedDenomination] = useState(true);
   const [manualPhysicalCash, setManualPhysicalCash] = useState<number>(0);
   const [notes, setNotes] = useState('');
+  const [managerPin, setManagerPin] = useState('');
+  const [requiresPin, setRequiresPin] = useState(false);
+  const [closedReconciliation, setClosedReconciliation] = useState<{
+    openingCash: number;
+    cashSales: number;
+    cashIn: number;
+    cashOut: number;
+    systemExpected: number;
+    blindCountedCash: number;
+    difference: number;
+    status: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Perhitungan Keuangan Kas Sif dari Sistem
-  const openingCash = Number(summary?.openingCash ?? shift?.opening_cash ?? 0);
-  const cashSales = Number(summary?.cashSalesTotal ?? 0);
-  const cashIn = Number(summary?.totalCashIn ?? 0);
-  const cashOut = Number(summary?.totalCashOut ?? 0);
-  const expectedCash = Number(
-    summary?.expectedCash !== undefined
-      ? summary.expectedCash
-      : openingCash + cashSales + cashIn - cashOut
-  );
-
-  // Compute calculated physical cash
+  // Compute calculated physical cash (Blind Drop: tidak menampilkan ekspektasi sistem sebelumnya)
   const calculatedFromDenominations = Object.entries(denominations).reduce((sum, [key, count]) => {
     if (key === 'coins') return sum + (count || 0);
     return sum + Number(key) * (count || 0);
   }, 0);
 
   const physicalCash = useDetailedDenomination ? calculatedFromDenominations : manualPhysicalCash;
-  const cashDifference = physicalCash - expectedCash;
-  const isShortage = cashDifference < 0;
 
   const handleDenomChange = (denom: string, val: number) => {
     setDenominations((prev) => ({
       ...prev,
       [denom]: Math.max(0, val),
     }));
-  };
-
-  // Aksi Cepat: Isi Uang Pas Sesuai Ekspektasi Sistem
-  const handleFillExactCash = () => {
-    const target = Math.max(0, expectedCash);
-    setManualPhysicalCash(target);
-
-    // Hitung pecahan lembaran otomatis yang paling pas untuk denominasi
-    let remaining = target;
-    const newDenoms: { [key: string]: number } = {
-      '100000': 0,
-      '50000': 0,
-      '20000': 0,
-      '10000': 0,
-      '5000': 0,
-      '2000': 0,
-      '1000': 0,
-      'coins': 0,
-    };
-    const bills = [100000, 50000, 20000, 10000, 5000, 2000, 1000];
-    for (const bill of bills) {
-      const count = Math.floor(remaining / bill);
-      newDenoms[String(bill)] = count;
-      remaining %= bill;
-    }
-    newDenoms['coins'] = remaining;
-    setDenominations(newDenoms);
-    setError('');
   };
 
   // Aksi Reset: Kosongkan Hitungan Kas
@@ -1202,6 +1169,11 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
     });
   };
 
+  const handleFinishAndLogout = () => {
+    onClose();
+    logout();
+  };
+
   const handleClose = async () => {
     setError('');
     if (physicalCash < 0) {
@@ -1209,11 +1181,13 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    // Peringatan audit jika uang kurang dan catatan kosong
-    if (isShortage && !notes.trim()) {
-      setError(
-        `Kas fisik laci terdeteksi KURANG sebesar ${rupiah(Math.abs(cashDifference))}. Wajib tuliskan alasan/keterangan selisih kas pada kolom Catatan di bawah sebelum menutup sif.`
-      );
+    if (requiresPin && (!managerPin.trim() || managerPin.trim().length < 4)) {
+      setError('PIN Otorisasi Owner (minimal 4 digit) wajib diisi untuk menutup sif dengan selisih kas.');
+      return;
+    }
+
+    if (requiresPin && !notes.trim()) {
+      setError('Catatan alasan selisih kas wajib diisi sebelum menutup sif.');
       return;
     }
 
@@ -1223,13 +1197,18 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       const res = await closeShift({
         blindCountedCash: physicalCash,
         notes: notes.trim() || undefined,
+        managerPin: managerPin.trim() || undefined,
       });
 
-      if (res.success) {
-        // Otomatis logout setelah tutup sif berhasil!
-        onClose();
-        logout();
+      if (res.success && res.reconciliation) {
+        setClosedReconciliation(res.reconciliation);
+        setLoading(false);
+      } else if (res.success) {
+        handleFinishAndLogout();
       } else {
+        if (res.requiresManagerPin) {
+          setRequiresPin(true);
+        }
         setError(res.message || 'Gagal menutup sif kasir.');
         setLoading(false);
       }
@@ -1238,6 +1217,104 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       setLoading(false);
     }
   };
+
+  // View setelah sif berhasil ditutup: tampilkan hasil rekonsiliasi final lalu logout
+  if (closedReconciliation) {
+    const isBalanced = closedReconciliation.difference === 0;
+    const isOver = closedReconciliation.difference > 0;
+    return (
+      <div className="bo-modal-layer" onClick={handleFinishAndLogout}>
+        <div
+          className="bo-modal"
+          role="dialog"
+          aria-modal="true"
+          style={{ maxWidth: '520px', width: '92%' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="bo-modal-head">
+            <div>
+              <h2>Rekonsiliasi Akhir Sif Selesai</h2>
+              <p>Data sif telah dikunci. Tinjau ringkasan akhir sebelum keluar akun.</p>
+            </div>
+            <button onClick={handleFinishAndLogout} aria-label="Tutup & Keluar">
+              <Icon name="close" size={20} />
+            </button>
+          </header>
+
+          <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                backgroundColor: isBalanced ? '#f0fdf4' : isOver ? '#eff6ff' : '#fef2f2',
+                border: `1.5px solid ${isBalanced ? '#86efac' : isOver ? '#93c5fd' : '#fca5a5'}`,
+                color: isBalanced ? '#166534' : isOver ? '#1e40af' : '#991b1b',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+              }}
+            >
+              <span>Status Rekonsiliasi: {closedReconciliation.status}</span>
+              <span>
+                {closedReconciliation.difference === 0
+                  ? 'Rp 0'
+                  : closedReconciliation.difference > 0
+                  ? `+${rupiah(closedReconciliation.difference)}`
+                  : `-${rupiah(Math.abs(closedReconciliation.difference))}`}
+              </span>
+            </div>
+
+            <div
+              style={{
+                background: '#f8faf9',
+                borderRadius: '10px',
+                border: '1px solid #dce4dd',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                fontSize: '13px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#4b5563' }}>Modal Awal Laci:</span>
+                <b>{rupiah(closedReconciliation.openingCash)}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d' }}>
+                <span>(+) Penjualan Tunai:</span>
+                <b>+{rupiah(closedReconciliation.cashSales)}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534' }}>
+                <span>(+) Kas Masuk Operasional:</span>
+                <b>+{rupiah(closedReconciliation.cashIn)}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b91c1c' }}>
+                <span>(-) Kas Keluar Operasional:</span>
+                <b>-{rupiah(closedReconciliation.cashOut)}</b>
+              </div>
+              <div style={{ height: '1px', background: '#dce4dd', margin: '4px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700 }}>Ekspektasi Kas Sistem:</span>
+                <b>{rupiah(closedReconciliation.systemExpected)}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2d6a4f' }}>
+                <span style={{ fontWeight: 700 }}>Hitung Fisik Kasir:</span>
+                <b>{rupiah(closedReconciliation.blindCountedCash)}</b>
+              </div>
+            </div>
+          </div>
+
+          <footer className="modal-actions" style={{ padding: '14px 20px', borderTop: '1px solid #eee' }}>
+            <button type="button" className="bo-primary" onClick={handleFinishAndLogout}>
+              Selesai & Keluar Akun (Logout)
+            </button>
+          </footer>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bo-modal-layer" onClick={onClose}>
@@ -1250,8 +1327,8 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       >
         <header className="bo-modal-head">
           <div>
-            <h2>Tutup Sif Kasir</h2>
-            <p>Rekonsiliasi kas laci dan hitung uang fisik. Sif akan ditutup dan akun otomatis keluar.</p>
+            <h2>Tutup Sif Kasir (Blind Close)</h2>
+            <p>Hitung uang fisik di laci tanpa melihat angka ekspektasi sistem. Sistem akan mencatat & mengaudit selisih.</p>
           </div>
           <button onClick={onClose} aria-label="Tutup">
             <Icon name="close" size={20} />
@@ -1280,154 +1357,47 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {/* 1. KARTU INFORMASI FORMULA EKSPEKTASI KAS SIF */}
+          {/* 1. PANDUAN BLIND DROP */}
           <div
             style={{
               background: '#f8faf9',
               borderRadius: '10px',
-              border: '1.5px solid #dce4dd',
-              padding: '12px 14px',
+              border: '1px solid #dce4dd',
+              padding: '11px 14px',
               marginBottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              fontSize: '12px',
+              color: '#374151',
             }}
           >
-            <div
+            <div>
+              <b style={{ display: 'block', color: '#1c2826', marginBottom: '2px' }}>
+                🔒 Prosedur Blind Cash Drop Aktif
+              </b>
+              <span>Hitung seluruh uang tunai riil di laci. Jika terdapat selisih dengan sistem, otorisasi PIN Owner diperlukan.</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetCash}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px',
-                borderBottom: '1px solid #eef2ef',
-                paddingBottom: '8px',
+                height: '32px',
+                padding: '0 12px',
+                borderRadius: '7px',
+                border: '1px solid #d1d5db',
+                background: '#ffffff',
+                color: '#6b7280',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                flexShrink: 0,
               }}
+              title="Kosongkan hitungan kas fisik"
             >
-              <span
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: '#2d3748',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <Icon name="calculator" size={14} />
-                Formula Kas Sif (Ekspektasi Sistem)
-              </span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  color: '#57695b',
-                  background: '#eaf0ea',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  fontWeight: 600,
-                }}
-              >
-                {summary?.orderCount || 0} Struk Selesai
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
-              {/* Modal Awal */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#4a5568' }}>Modal Awal Kasir:</span>
-                <b style={{ color: '#1a202c' }}>{rupiah(openingCash)}</b>
-              </div>
-
-              {/* (+) Penjualan Tunai */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#15803d' }}>(+) Penjualan Tunai:</span>
-                <b style={{ color: '#15803d' }}>+{rupiah(cashSales)}</b>
-              </div>
-
-              {/* (+) Kas Masuk */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#166534' }}>(+) Kas Masuk Operasional:</span>
-                <b style={{ color: '#166534' }}>+{rupiah(cashIn)}</b>
-              </div>
-
-              {/* (-) Kas Keluar */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#b91c1c' }}>(-) Kas Keluar Operasional:</span>
-                <b style={{ color: '#b91c1c' }}>-{rupiah(cashOut)}</b>
-              </div>
-
-              <div style={{ height: '1px', background: '#dce4dd', margin: '4px 0' }} />
-
-              {/* Total Ekspektasi Kas */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '13.5px',
-                  paddingTop: '2px',
-                }}
-              >
-                <span style={{ fontWeight: 700, color: '#1c2826' }}>Total Ekspektasi Kas Laci:</span>
-                <b style={{ fontWeight: 800, color: '#2d6a4f', fontSize: '16px' }}>{rupiah(expectedCash)}</b>
-              </div>
-            </div>
-
-            {/* AKSI TOMBOL ISI UANG PAS & RESET */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                alignItems: 'center',
-                marginTop: '12px',
-                paddingTop: '10px',
-                borderTop: '1px dashed #dce4dd',
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleFillExactCash}
-                style={{
-                  flex: 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  height: '34px',
-                  padding: '0 12px',
-                  borderRadius: '7px',
-                  border: '1.5px solid #57695b',
-                  background: '#edf3ee',
-                  color: '#2d6a4f',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                }}
-                title="Isi jumlah kas fisik sesuai persis dengan ekspektasi sistem"
-              >
-                <Icon name="checkCircle" size={14} />
-                <span>Isi Uang Pas ({rupiah(expectedCash)})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResetCash}
-                style={{
-                  height: '34px',
-                  padding: '0 12px',
-                  borderRadius: '7px',
-                  border: '1px solid #d1d5db',
-                  background: '#ffffff',
-                  color: '#6b7280',
-                  fontSize: '11.5px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-                title="Kosongkan hitungan kas fisik"
-              >
-                Reset
-              </button>
-            </div>
+              Reset Hitungan
+            </button>
           </div>
 
           {/* 2. METODE HITUNG FISIK (PECAHAN LEMBAR vs TOTAL LANGSUNG) */}
@@ -1523,7 +1493,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                     transform: 'translateY(-50%)',
                     fontSize: '18px',
                     fontWeight: 700,
-                    color: isShortage ? '#dc2626' : '#57695b',
+                    color: '#57695b',
                     pointerEvents: 'none',
                   }}
                 >
@@ -1538,7 +1508,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                   style={{
                     width: '100%',
                     padding: '10px 14px 10px 48px',
-                    border: isShortage ? '1.5px solid #dc2626' : '1.5px solid #57695b',
+                    border: '1.5px solid #57695b',
                     borderRadius: '8px',
                     fontSize: '18px',
                     fontWeight: 700,
@@ -1562,81 +1532,46 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
               marginBottom: '12px',
             }}
           >
-            <span style={{ fontSize: '13px', color: '#57695b', fontWeight: 600 }}>Total Uang Fisik Laci:</span>
+            <span style={{ fontSize: '13px', color: '#57695b', fontWeight: 600 }}>Total Uang Fisik Dihitung:</span>
             <b style={{ fontSize: '18px', color: '#57695b' }}>{rupiah(physicalCash)}</b>
           </div>
 
-          {/* 4. PERINGATAN / INDIKATOR SELISIH KAS */}
-          {isShortage ? (
+          {/* 4. PANEL OTORISASI PIN OWNER (Muncul otomatis jika terdeteksi selisih saat submit) */}
+          {requiresPin && (
             <div
               style={{
                 padding: '12px 14px',
-                backgroundColor: '#fef2f2',
+                backgroundColor: '#fffbeb',
+                border: '1.5px solid #f59e0b',
                 borderRadius: '8px',
-                border: '1.5px solid #f87171',
-                color: '#991b1b',
                 marginBottom: '14px',
-                display: 'flex',
-                gap: '10px',
-                alignItems: 'flex-start',
               }}
             >
-              <div style={{ flexShrink: 0, marginTop: '2px', color: '#dc2626' }}>
-                <Icon name="alertTriangle" size={18} />
-              </div>
-              <div style={{ flex: 1, fontSize: '12.5px', lineHeight: '1.45' }}>
-                <b style={{ display: 'block', fontSize: '13px', color: '#b91c1c', marginBottom: '2px' }}>
-                  ⚠️ Peringatan: Kas Fisik Laci Kurang ({rupiah(cashDifference)})
-                </b>
-                <span>
-                  Uang fisik yang dihitung (<strong>{rupiah(physicalCash)}</strong>) lebih sedikit sebesar{' '}
-                  <strong style={{ color: '#dc2626' }}>{rupiah(Math.abs(cashDifference))}</strong> dibanding ekspektasi
-                  sistem (<strong>{rupiah(expectedCash)}</strong>).
-                </span>
-                <div style={{ marginTop: '6px', fontSize: '11.5px', color: '#7f1d1d', fontStyle: 'italic' }}>
-                  * Mohon periksa kembali laci kasir atau wajib berikan alasan selisih kas pada kolom Catatan di bawah.
-                </div>
-              </div>
-            </div>
-          ) : cashDifference === 0 ? (
-            <div
-              style={{
-                padding: '9px 12px',
-                backgroundColor: '#f0fdf4',
-                borderRadius: '8px',
-                border: '1px solid #86efac',
-                color: '#166534',
-                marginBottom: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '12px',
-              }}
-            >
-              <Icon name="checkCircle" size={15} />
-              <span>
-                <strong>Kas Fisik Seimbang (Rp 0):</strong> Jumlah uang fisik laci sesuai persis dengan ekspektasi sistem.
-              </span>
-            </div>
-          ) : (
-            <div
-              style={{
-                padding: '9px 12px',
-                backgroundColor: '#eff6ff',
-                borderRadius: '8px',
-                border: '1px solid #bfdbfe',
-                color: '#1e40af',
-                marginBottom: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '12px',
-              }}
-            >
-              <Icon name="info" size={15} />
-              <span>
-                <strong>Kas Fisik Lebih (+{rupiah(cashDifference)}):</strong> Uang fisik laci melebihi ekspektasi sistem ({rupiah(expectedCash)}).
-              </span>
+              <b style={{ fontSize: '12.5px', color: '#92400e', display: 'block', marginBottom: '4px' }}>
+                ⚠️ Otorisasi PIN Owner Diperlukan (Terdeteksi Selisih Kas)
+              </b>
+              <p style={{ fontSize: '11.5px', color: '#78350f', margin: '0 0 8px' }}>
+                Silakan cek kembali uang laci atau panggil Owner untuk memasukkan PIN 6-digit dan isi alasan selisih di bawah.
+              </p>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={managerPin}
+                onChange={(e) => setManagerPin(e.target.value)}
+                placeholder="Masukkan PIN Owner..."
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1.5px solid #d97706',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  letterSpacing: '2px',
+                  backgroundColor: '#ffffff',
+                  outline: 'none',
+                }}
+              />
             </div>
           )}
 
@@ -1646,39 +1581,39 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
               style={{
                 fontSize: '12px',
                 fontWeight: 600,
-                color: isShortage ? '#b91c1c' : '#444',
+                color: requiresPin ? '#b91c1c' : '#444',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 marginBottom: '4px',
               }}
             >
-              <span>{isShortage ? 'Catatan Tutup Sif (Wajib Diisi Karena Selisih Kurang)' : 'Catatan Tutup Sif (Opsional)'}</span>
-              {isShortage && <span style={{ color: '#dc2626', fontSize: '11px' }}>* Wajib isi alasan</span>}
+              <span>{requiresPin ? 'Catatan Alasan Selisih Kas (Wajib Diisi)' : 'Catatan Tutup Sif (Opsional)'}</span>
+              {requiresPin && <span style={{ color: '#dc2626', fontSize: '11px' }}>* Wajib isi alasan</span>}
             </span>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={
-                isShortage
-                  ? 'Contoh: Kurang Rp 10.000 karena salah kembalian saat jam ramai...'
+                requiresPin
+                  ? 'Contoh: Selisih kembalian saat jam ramai, sudah diverifikasi Owner'
                   : 'Contoh: pergantian sif aman, laci kas rapi'
               }
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                border: isShortage ? '1.5px solid #f87171' : '1px solid #d1d1d1',
+                border: requiresPin ? '1.5px solid #f87171' : '1px solid #d1d1d1',
                 borderRadius: '6px',
                 fontSize: '13px',
-                backgroundColor: isShortage ? '#fffbfb' : '#ffffff',
+                backgroundColor: requiresPin ? '#fffbfb' : '#ffffff',
                 outline: 'none',
               }}
             />
           </label>
 
           <p style={{ fontSize: '12px', color: '#777', margin: 0 }}>
-            * Setelah menekan tombol konfirmasi, laporan rekonsiliasi kas akan disimpan dan sesi kasir otomatis keluar.
+            * Setelah sif dikunci dan direkonsiliasi, hasil laporan akhir akan ditampilkan sebelum sesi keluar otomatis.
           </p>
         </div>
 
@@ -1692,7 +1627,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
             disabled={loading}
             onClick={handleClose}
           >
-            {loading ? 'Menutup Sif & Logout...' : 'Tutup Sif & Logout Otomatis'}
+            {loading ? 'Memverifikasi & Menutup Sif...' : requiresPin ? 'Verifikasi PIN & Tutup Sif' : 'Tutup Sif & Rekonsiliasi'}
           </button>
         </footer>
       </div>

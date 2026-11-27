@@ -3,6 +3,18 @@ import { eventBus } from '../../core/eventBus';
 import { ORDER_EVENTS, PreparedOrderItem } from './orderEvents';
 import { AuthUser } from '../../middlewares/auth';
 
+function toJakartaYmd(val: string | Date): string {
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val.trim())) return val.trim();
+    const parsed = new Date(val);
+    if (!isNaN(parsed.getTime())) {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(parsed);
+    }
+    return val.slice(0, 10);
+  }
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(val);
+}
+
 function generateOrderNumber(): string {
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const timeMs = Date.now().toString().slice(-4);
@@ -36,9 +48,12 @@ export interface DirectCheckoutInput {
   cashChange?: number;
   referenceNumber?: string;
   discountAmount?: number;
+  discountAuthorizerPin?: string | null;
+  managerPin?: string | null;
   claimedDownPayment?: number;
   promoId?: string | null;
   promoCode?: string | null;
+  redeemPoints?: number;
   notes?: string;
 }
 
@@ -60,9 +75,12 @@ export class OrderService {
         cashChange,
         referenceNumber,
         discountAmount = 0,
+        discountAuthorizerPin,
+        managerPin,
         claimedDownPayment = 0,
         promoId,
         promoCode,
+        redeemPoints = 0,
         notes,
       } = input;
 
@@ -78,7 +96,10 @@ export class OrderService {
 
       await client.query('BEGIN');
 
-      // 1. Verify active shift (with auto-fallback to cashier's active shift)
+      const isOfflineSyncOrder = Boolean(notes && notes.includes('[OFFLINE SYNC]'));
+      let offlineReroutedFromShiftId: string | null = null;
+
+      // 1. Verify active shift (with offline sync auto-reroute to current active shift when original shift closed)
       let effectiveShiftId = shiftId;
       if (!effectiveShiftId && user?.id) {
         const activeShift = await client.query(
@@ -90,12 +111,44 @@ export class OrderService {
         }
       }
 
-      const shiftRes = await client.query(
-        `SELECT id FROM cashier_shifts WHERE id = $1 AND status = 'OPEN'`,
-        [effectiveShiftId]
-      );
-      if (shiftRes.rows.length === 0) {
-        throw { statusCode: 400, message: 'Sif kasir tidak aktif atau sudah ditutup. Silakan buka sif terlebih dahulu.' };
+      const shiftRes = effectiveShiftId
+        ? await client.query(
+            `SELECT id, status FROM cashier_shifts WHERE id = $1 FOR SHARE`,
+            [effectiveShiftId]
+          )
+        : { rows: [] };
+
+      const shiftIsOpen = shiftRes.rows.length > 0 && shiftRes.rows[0].status === 'OPEN';
+
+      if (!shiftIsOpen) {
+        if (isOfflineSyncOrder) {
+          // Prefer syncing cashier's active shift first, then any open store shift
+          let rerouteRes = user?.id
+            ? await client.query(
+                `SELECT id FROM cashier_shifts WHERE cashier_id = $1 AND status = 'OPEN' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`,
+                [user.id]
+              )
+            : { rows: [] };
+
+          if (rerouteRes.rows.length === 0) {
+            rerouteRes = await client.query(
+              `SELECT id FROM cashier_shifts WHERE status = 'OPEN' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`
+            );
+          }
+
+          if (rerouteRes.rows.length > 0) {
+            offlineReroutedFromShiftId = effectiveShiftId || shiftId || null;
+            effectiveShiftId = rerouteRes.rows[0].id;
+            notes = `${notes} [Auto-Reroute: Dialihkan dari sif lama yang sudah tutup ke sif aktif]`;
+          } else {
+            throw {
+              statusCode: 400,
+              message: 'Sif asal transaksi offline sudah ditutup dan belum ada sif aktif saat ini. Silakan buka sif kasir terlebih dahulu lalu tekan Sinkronkan Ulang.',
+            };
+          }
+        } else {
+          throw { statusCode: 400, message: 'Sif kasir tidak aktif atau sudah ditutup. Silakan buka sif terlebih dahulu.' };
+        }
       }
 
       // 2. Prepare items & compute HPP
@@ -258,7 +311,7 @@ export class OrderService {
 
       let verifiedDiscountAmount = 0;
       let verifiedPromoId: string | null = null;
-      const isOfflineSyncOrder = Boolean(notes && notes.includes('[OFFLINE SYNC]'));
+      let manualDiscountAuthorizer: { id: string; name: string } | null = null;
 
       if (promoId || promoCode) {
         const promoRes = await client.query(
@@ -271,6 +324,8 @@ export class OrderService {
         if (promoRes.rows.length > 0) {
           const promo = promoRes.rows[0];
           const todayJakarta = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+          const startYmd = promo.start_date ? toJakartaYmd(promo.start_date) : null;
+          const endYmd = promo.end_date ? toJakartaYmd(promo.end_date) : null;
 
           let isPromoValid = true;
           let promoInvalidReason = '';
@@ -278,10 +333,10 @@ export class OrderService {
           if (!promo.is_active) {
             isPromoValid = false;
             promoInvalidReason = `Promo "${promo.code}" sedang tidak aktif.`;
-          } else if (promo.start_date && todayJakarta < promo.start_date) {
+          } else if (startYmd && todayJakarta < startYmd) {
             isPromoValid = false;
             promoInvalidReason = `Promo "${promo.code}" belum mulai berlaku.`;
-          } else if (promo.end_date && todayJakarta > promo.end_date) {
+          } else if (endYmd && todayJakarta > endYmd) {
             isPromoValid = false;
             promoInvalidReason = `Promo "${promo.code}" sudah kedaluwarsa.`;
           } else if (promo.quota !== null && promo.used_count >= promo.quota) {
@@ -322,11 +377,66 @@ export class OrderService {
           }
         } else if (isOfflineSyncOrder && Number(discountAmount) > 0) {
           verifiedDiscountAmount = Math.min(Number(discountAmount), subtotal);
+        } else {
+          throw { statusCode: 404, message: 'Kode promo tidak ditemukan di sistem.' };
         }
       } else if (Number(discountAmount) > 0) {
-        // Direct manual discount (capped at subtotal)
-        verifiedDiscountAmount = Math.min(Number(discountAmount), subtotal);
+        // Direct manual discount MUST be authorized by an active Owner PIN
+        const pinToVerify = String(discountAuthorizerPin || managerPin || '').trim();
+        if (!pinToVerify) {
+          throw { statusCode: 403, message: 'Diskon manual di luar kode promo wajib otorisasi PIN Owner.' };
+        }
+
+        const authOwnerRes = await client.query(
+          `SELECT id, name FROM users WHERE role = 'OWNER' AND pin_code = $1 AND is_active = TRUE`,
+          [pinToVerify]
+        );
+        if (authOwnerRes.rows.length === 0) {
+          throw { statusCode: 403, message: 'PIN Owner tidak valid untuk otorisasi diskon manual.' };
+        }
+        manualDiscountAuthorizer = authOwnerRes.rows[0];
+        verifiedDiscountAmount = Math.min(Math.round(Number(discountAmount)), subtotal);
       }
+
+      // 3b. Verify & apply loyalty point redemption (1 point = Rp 100)
+      let verifiedRedeemPoints = 0;
+      let pointsDiscountAmount = 0;
+      const requestedPoints = Math.max(0, Math.floor(Number(redeemPoints || 0)));
+
+      if (requestedPoints > 0) {
+        if (!customerId) {
+          throw {
+            statusCode: 400,
+            message: 'Penukaran poin loyalitas memerlukan data member pelanggan.',
+          };
+        }
+
+        const custLockRes = await client.query(
+          `SELECT id, name, loyalty_points, tier FROM customers WHERE id = $1 FOR UPDATE`,
+          [customerId]
+        );
+        if (custLockRes.rows.length === 0) {
+          throw { statusCode: 404, message: 'Data pelanggan tidak ditemukan.' };
+        }
+
+        const custRow = custLockRes.rows[0];
+        const availablePoints = Math.max(0, Number(custRow.loyalty_points || 0));
+
+        if (!isOfflineSyncOrder && requestedPoints > availablePoints) {
+          throw {
+            statusCode: 400,
+            message: `Saldo poin ${custRow.name} tidak mencukupi (tersedia ${availablePoints} poin).`,
+          };
+        }
+
+        const usableByBalance = Math.min(requestedPoints, availablePoints);
+        const remainingAfterPromo = Math.max(0, subtotal - verifiedDiscountAmount);
+        const maxPointsForBill = Math.floor(remainingAfterPromo / 100);
+        verifiedRedeemPoints = Math.min(usableByBalance, maxPointsForBill);
+        pointsDiscountAmount = verifiedRedeemPoints * 100;
+      }
+
+      const totalOrderDiscount = Math.min(subtotal, verifiedDiscountAmount + pointsDiscountAmount);
 
       // Fetch store settings for tax, service charge, and rounding
       const settingsRes = await client.query(`SELECT tax_rate, service_charge_rate, rounding_rule FROM store_settings LIMIT 1`);
@@ -336,17 +446,26 @@ export class OrderService {
       const serviceChargeRateNum = Number(storeSettings.service_charge_rate) || 0;
       const roundingRuleNum = Number(storeSettings.rounding_rule) || 1;
 
-      const netSubtotal = Math.max(0, subtotal - verifiedDiscountAmount - verifiedDownPayment);
-      
+      // Dasar Pengenaan Pajak (DPP / Net Revenue) = Subtotal - Total Diskon (TIDAK dikurangi DP karena DP adalah pelunasan muka)
+      const afterDiscountSubtotal = Math.max(0, subtotal - totalOrderDiscount);
+
       const serviceChargeAmount = serviceChargeRateNum > 0
-        ? Math.round((netSubtotal * serviceChargeRateNum) / 100)
+        ? Math.round((afterDiscountSubtotal * serviceChargeRateNum) / 100)
         : 0;
 
       const taxAmount = taxRateNum > 0
-        ? Math.round(((netSubtotal + serviceChargeAmount) * taxRateNum) / 100)
+        ? Math.round(((afterDiscountSubtotal + serviceChargeAmount) * taxRateNum) / 100)
         : 0;
 
-      const rawTotal = netSubtotal + serviceChargeAmount + taxAmount;
+      const grossBillBeforeDp = afterDiscountSubtotal + serviceChargeAmount + taxAmount;
+      const appliedDownPayment = Math.min(verifiedDownPayment, grossBillBeforeDp);
+      const unusedDownPayment = Math.max(0, verifiedDownPayment - appliedDownPayment);
+      if (unusedDownPayment > 0) {
+        notes = `${notes ? notes + ' ' : ''}[DP Reservasi Rp ${verifiedDownPayment.toLocaleString('id-ID')}: Terpakai Rp ${appliedDownPayment.toLocaleString('id-ID')}, Sisa DP Rp ${unusedDownPayment.toLocaleString('id-ID')}]`;
+      }
+      verifiedDownPayment = appliedDownPayment;
+
+      const rawTotal = Math.max(0, grossBillBeforeDp - verifiedDownPayment);
 
       let roundedTotal = rawTotal;
       let roundingAmount = 0;
@@ -357,10 +476,11 @@ export class OrderService {
 
       const totalAmount = Math.max(0, roundedTotal);
 
-      // 4. Verify payments
+      // 4. Verify & normalize payments so SUM(amount_paid) === totalAmount (prevent overpayment shift inflation)
       if ((!paymentsList || paymentsList.length === 0) && paymentMethod) {
-        const rec = cashReceived !== undefined ? Number(cashReceived) : totalAmount;
-        const chg = cashChange !== undefined ? Number(cashChange) : Math.max(0, rec - totalAmount);
+        const isCash = paymentMethod === 'CASH';
+        const rec = isCash && cashReceived !== undefined ? Math.max(totalAmount, Number(cashReceived)) : undefined;
+        const chg = isCash && rec !== undefined ? Math.max(0, rec - totalAmount) : 0;
         paymentsList = [{
           method: paymentMethod,
           amount: totalAmount,
@@ -370,13 +490,74 @@ export class OrderService {
         }];
       }
 
-      const totalPaid = paymentsList!.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+      const rawPayments = paymentsList!.map((p: any) => ({
+        ...p,
+        amount: Math.max(0, Number(p.amount || 0)),
+      }));
+
+      const nonCashTotal = rawPayments
+        .filter((p: any) => p.method !== 'CASH')
+        .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+      if (nonCashTotal > totalAmount) {
+        throw {
+          statusCode: 400,
+          message: `Nominal pembayaran non-tunai (Rp ${nonCashTotal.toLocaleString('id-ID')}) tidak boleh melebihi total tagihan (Rp ${totalAmount.toLocaleString('id-ID')}).`,
+        };
+      }
+
+      const totalPaid = rawPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
       if (totalPaid < totalAmount) {
         throw {
           statusCode: 400,
-          message: `Nominal pembayaran (Rp ${totalPaid.toLocaleString()}) kurang dari total tagihan (Rp ${totalAmount.toLocaleString()}).`,
+          message: `Nominal pembayaran (Rp ${totalPaid.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${totalAmount.toLocaleString('id-ID')}).`,
         };
       }
+
+      let remainingCashNeeded = Math.max(0, totalAmount - nonCashTotal);
+      const normalizedPayments: Array<{
+        method: 'CASH' | 'QRIS' | 'DEBIT_CARD' | 'BANK_TRANSFER';
+        amount: number;
+        cashReceived?: number;
+        cashChange?: number;
+        referenceNumber?: string;
+      }> = [];
+
+      for (const p of rawPayments) {
+        if (p.method !== 'CASH') {
+          if (p.amount > 0 || totalAmount === 0) {
+            normalizedPayments.push({
+              method: p.method,
+              amount: p.amount,
+              cashChange: 0,
+              referenceNumber: p.referenceNumber || undefined,
+            });
+          }
+        } else {
+          const tenderedRaw =
+            p.cashReceived !== undefined && p.cashReceived !== null
+              ? Math.max(Number(p.cashReceived), p.amount)
+              : p.amount;
+          const appliedCash = Math.min(remainingCashNeeded, p.amount);
+          remainingCashNeeded = Math.max(0, remainingCashNeeded - appliedCash);
+          const computedChange = Math.max(0, tenderedRaw - appliedCash);
+
+          if (appliedCash > 0 || tenderedRaw > 0 || normalizedPayments.length === 0) {
+            normalizedPayments.push({
+              method: 'CASH',
+              amount: appliedCash,
+              cashReceived: tenderedRaw,
+              cashChange: computedChange,
+            });
+          }
+        }
+      }
+
+      // Drop redundant 0-amount legs if totalAmount > 0 and other legs already cover it
+      paymentsList =
+        totalAmount > 0
+          ? normalizedPayments.filter((p) => p.amount > 0)
+          : normalizedPayments.slice(0, 1);
 
       // 5. Resolve Table ID if fallback string matches table_number
       let resolvedTableId = tableId || null;
@@ -404,10 +585,10 @@ export class OrderService {
       const orderRes = await client.query(
         `INSERT INTO orders (
           order_number, shift_id, cashier_id, table_id, customer_id, reservation_id, promo_id,
-          order_type, subtotal, discount_amount, claimed_down_payment,
+          order_type, subtotal, discount_amount, redeemed_points, points_discount_amount, claimed_down_payment,
           tax_rate, tax_amount, service_charge_rate, service_charge_amount, rounding_amount,
           total_amount, total_hpp, status, notes, paid_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'PAID', $19, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'PAID', $21, NOW())
         RETURNING *`,
         [
           orderNumber,
@@ -419,7 +600,9 @@ export class OrderService {
           verifiedPromoId,
           orderType,
           subtotal,
-          verifiedDiscountAmount,
+          totalOrderDiscount,
+          verifiedRedeemPoints,
+          pointsDiscountAmount,
           verifiedDownPayment,
           taxRateNum,
           taxAmount,
@@ -473,22 +656,48 @@ export class OrderService {
         );
       }
 
-      // 8. Deduct Ingredient Stock Atomically
+      // 8. Deduct Ingredient Stock Atomically (aggregated, sorted to avoid deadlocks, locked FOR UPDATE, zero negative balance allowed)
+      const aggregatedDeductions = new Map<string, number>();
       for (const ded of stockDeductions) {
-        const updateStockRes = await client.query(
-          `UPDATE ingredients 
-           SET stock_actual = stock_actual - $1, updated_at = NOW()
-           WHERE id = $2 
-           RETURNING stock_actual`,
-          [ded.quantity, ded.ingredientId]
+        const currentTotal = aggregatedDeductions.get(ded.ingredientId) || 0;
+        aggregatedDeductions.set(ded.ingredientId, Number((currentTotal + ded.quantity).toFixed(3)));
+      }
+
+      const sortedDeductions = Array.from(aggregatedDeductions.entries()).sort((a, b) =>
+        a[0].localeCompare(b[0])
+      );
+
+      for (const [ingredientId, totalQtyNeeded] of sortedDeductions) {
+        if (totalQtyNeeded <= 0) continue;
+
+        const ingLockRes = await client.query(
+          `SELECT id, name, stock_actual, usage_unit FROM ingredients WHERE id = $1 FOR UPDATE`,
+          [ingredientId]
         );
 
-        if (updateStockRes.rows.length > 0) {
+        if (ingLockRes.rows.length > 0) {
+          const ing = ingLockRes.rows[0];
+          const availableStock = Number(ing.stock_actual || 0);
+          if (availableStock < totalQtyNeeded) {
+            throw {
+              statusCode: 400,
+              message: `Stok bahan "${ing.name}" tidak mencukupi (tersedia ${availableStock.toLocaleString('id-ID')} ${ing.usage_unit}, dibutuhkan ${totalQtyNeeded.toLocaleString('id-ID')} ${ing.usage_unit}).`,
+            };
+          }
+
+          const updateStockRes = await client.query(
+            `UPDATE ingredients 
+             SET stock_actual = stock_actual - $1, updated_at = NOW()
+             WHERE id = $2 
+             RETURNING stock_actual`,
+            [totalQtyNeeded, ingredientId]
+          );
+
           const newBal = updateStockRes.rows[0].stock_actual;
           await client.query(
             `INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
              VALUES ($1, 'SALE', $2, $3, $4)`,
-            [ded.ingredientId, -ded.quantity, newBal, order.order_number]
+            [ingredientId, -totalQtyNeeded, newBal, order.order_number]
           );
         }
       }
@@ -516,15 +725,78 @@ export class OrderService {
         );
       }
 
-      // 11. Customer Loyalty Points (+1 point per Rp 10.000)
-      if (customerId && totalAmount > 0) {
-        const pointsEarned = Math.floor(totalAmount / 10000);
-        if (pointsEarned > 0) {
+      // 11. Customer Loyalty Points (+1 point per Rp 10.000 of pre-tax net spend, -redeemedPoints, and auto tier upgrade)
+      if (customerId) {
+        const custRes = await client.query(
+          `SELECT id, tier, loyalty_points FROM customers WHERE id = $1 FOR UPDATE`,
+          [customerId]
+        );
+        if (custRes.rows.length > 0) {
+          const cust = custRes.rows[0];
+          const pointsEarned = afterDiscountSubtotal > 0 ? Math.floor(afterDiscountSubtotal / 10000) : 0;
+          const netPointChange = pointsEarned - verifiedRedeemPoints;
+
+          const spendRes = await client.query(
+            `SELECT COALESCE(SUM(total_amount), 0) as lifetime_spend
+             FROM orders
+             WHERE customer_id = $1 AND status = 'PAID'`,
+            [customerId]
+          );
+          const lifetimeSpend = Number(spendRes.rows[0]?.lifetime_spend || 0);
+
+          let computedTier = 'CLASSIC';
+          if (lifetimeSpend >= 2000000) computedTier = 'PLATINUM';
+          else if (lifetimeSpend >= 750000) computedTier = 'GOLD';
+          else if (lifetimeSpend >= 250000) computedTier = 'SILVER';
+
+          const TIER_RANK: Record<string, number> = { CLASSIC: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
+          const currentTier = String(cust.tier || 'CLASSIC').toUpperCase();
+          const finalTier = (TIER_RANK[computedTier] || 1) > (TIER_RANK[currentTier] || 1) ? computedTier : currentTier;
+
           await client.query(
-            `UPDATE customers SET loyalty_points = loyalty_points + $1 WHERE id = $2`,
-            [pointsEarned, customerId]
+            `UPDATE customers
+             SET loyalty_points = GREATEST(0, loyalty_points + $1),
+                 tier = $2
+             WHERE id = $3`,
+            [netPointChange, finalTier, customerId]
           );
         }
+      }
+
+      // 11b. Audit log for authorized manual discount outside promo code
+      if (manualDiscountAuthorizer && verifiedDiscountAmount > 0) {
+        await client.query(
+          `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+           VALUES ($1, 'MANUAL_DISCOUNT', 'orders', $2, $3)`,
+          [
+            manualDiscountAuthorizer.id,
+            order.id,
+            JSON.stringify({
+              orderNumber: order.order_number,
+              subtotal,
+              discountAmount: verifiedDiscountAmount,
+              authorizedBy: manualDiscountAuthorizer.name,
+              cashierId: user?.id || null,
+            }),
+          ]
+        );
+      }
+
+      // 11c. Audit log when an offline sync order was rerouted to an active open shift
+      if (offlineReroutedFromShiftId) {
+        await client.query(
+          `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+           VALUES ($1, 'OFFLINE_SHIFT_REROUTE', 'orders', $2, $3)`,
+          [
+            user?.id || null,
+            order.id,
+            JSON.stringify({
+              orderNumber: order.order_number,
+              originalShiftId: offlineReroutedFromShiftId,
+              reroutedShiftId: effectiveShiftId,
+            }),
+          ]
+        );
       }
 
       await client.query('COMMIT');
@@ -557,7 +829,16 @@ export class OrderService {
           date: order.created_at,
           cashierName: user?.name || 'Kasir',
           subtotal,
-          discountAmount: verifiedDiscountAmount,
+          discountAmount: totalOrderDiscount,
+          promoDiscountAmount: verifiedDiscountAmount,
+          redeemedPoints: verifiedRedeemPoints,
+          pointsDiscountAmount,
+          netSalesAmount: afterDiscountSubtotal,
+          serviceChargeRate: serviceChargeRateNum,
+          serviceChargeAmount,
+          taxRate: taxRateNum,
+          taxAmount,
+          roundingAmount,
           claimedDownPayment: verifiedDownPayment,
           totalAmount,
           payments: paymentsList,
@@ -597,7 +878,7 @@ export class OrderService {
         `SELECT o.*, t.table_number
          FROM orders o
          LEFT JOIN dining_tables t ON o.table_id = t.id
-         WHERE o.id = $1`,
+         WHERE o.id = $1 FOR UPDATE OF o`,
         [id]
       );
 
@@ -608,6 +889,69 @@ export class OrderService {
       const order = orderRes.rows[0];
       if (order.status === 'CANCELLED') {
         throw { statusCode: 400, message: 'Pesanan ini sudah pernah dibatalkan.' };
+      }
+
+      // Check shift status & payment methods for cross-shift cash refund reconciliation
+      const shiftOriginRes = await client.query(
+        `SELECT id, status FROM cashier_shifts WHERE id = $1`,
+        [order.shift_id]
+      );
+      const originShiftStatus = shiftOriginRes.rows[0]?.status || 'OPEN';
+
+      const orderPayRes = await client.query(
+        `SELECT COALESCE(SUM(amount_paid), 0) as cash_paid
+         FROM order_payments
+         WHERE order_id = $1 AND payment_method = 'CASH'`,
+        [order.id]
+      );
+      const cashPaidAmount = Number(orderPayRes.rows[0]?.cash_paid || 0);
+      let refundMovementShiftId: string | null = null;
+      let crossShiftCashNote = '';
+
+      if (originShiftStatus === 'CLOSED' && cashPaidAmount > 0) {
+        // Record CASH_OUT refund on currently open cashier drawer if available & sufficient
+        const activeOpenShiftRes = await client.query(
+          `SELECT id, opening_cash FROM cashier_shifts WHERE status = 'OPEN' ORDER BY opened_at DESC LIMIT 1 FOR UPDATE`
+        );
+        if (activeOpenShiftRes.rows.length > 0) {
+          const activeShift = activeOpenShiftRes.rows[0];
+          const sCashRes = await client.query(
+            `SELECT COALESCE(SUM(op.amount_paid), 0) as cash_sales
+             FROM orders o JOIN order_payments op ON o.id = op.order_id
+             WHERE o.shift_id = $1 AND o.status = 'PAID' AND op.payment_method = 'CASH'`,
+            [activeShift.id]
+          );
+          const pCashRes = await client.query(
+            `SELECT
+               COALESCE(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END), 0) as cash_in,
+               COALESCE(SUM(CASE WHEN type = 'CASH_OUT' THEN amount ELSE 0 END), 0) as cash_out
+             FROM cash_movements WHERE shift_id = $1`,
+            [activeShift.id]
+          );
+          const drawerBalance =
+            Number(activeShift.opening_cash || 0) +
+            Number(sCashRes.rows[0].cash_sales || 0) +
+            Number(pCashRes.rows[0].cash_in || 0) -
+            Number(pCashRes.rows[0].cash_out || 0);
+
+          if (drawerBalance >= cashPaidAmount) {
+            await client.query(
+              `INSERT INTO cash_movements (shift_id, type, category, description, amount)
+               VALUES ($1, 'CASH_OUT', 'VOID_REFUND', $2, $3)`,
+              [
+                activeShift.id,
+                `Refund tunai VOID lintas sif (${order.order_number}): ${reason}`,
+                cashPaidAmount,
+              ]
+            );
+            refundMovementShiftId = activeShift.id;
+            crossShiftCashNote = 'Refund tunai dicatat pada mutasi kas keluar sif aktif.';
+          } else {
+            crossShiftCashNote = 'Saldo laci sif aktif tidak mencukupi untuk potong laci otomatis (dicatat di audit void sebagai pengembalian kas besar/transfer).';
+          }
+        } else {
+          crossShiftCashNote = 'Tidak ada sif aktif terbuka saat void; pengembalian dana ditangani dari kas besar/transfer.';
+        }
       }
 
       const itemsRes = await client.query(
@@ -639,13 +983,16 @@ export class OrderService {
         );
       }
 
-      // 3. Rollback earned loyalty points from customer
-      if (order.customer_id && Number(order.total_amount) > 0) {
-        const pointsToDeduct = Math.floor(Number(order.total_amount) / 10000);
-        if (pointsToDeduct > 0) {
+      // 3. Rollback earned loyalty points & restore any redeemed points on customer row lock
+      if (order.customer_id) {
+        await client.query(`SELECT id FROM customers WHERE id = $1 FOR UPDATE`, [order.customer_id]);
+        const orderNetSpend = Math.max(0, Number(order.subtotal || 0) - Number(order.discount_amount || 0));
+        const pointsEarnedToDeduct = Math.floor(orderNetSpend / 10000);
+        const pointsRedeemedToRefund = Math.max(0, Number(order.redeemed_points || 0));
+        if (pointsEarnedToDeduct > 0 || pointsRedeemedToRefund > 0) {
           await client.query(
-            `UPDATE customers SET loyalty_points = GREATEST(0, loyalty_points - $1) WHERE id = $2`,
-            [pointsToDeduct, order.customer_id]
+            `UPDATE customers SET loyalty_points = GREATEST(0, loyalty_points - $1 + $2) WHERE id = $3`,
+            [pointsEarnedToDeduct, pointsRedeemedToRefund, order.customer_id]
           );
         }
       }
@@ -743,6 +1090,12 @@ export class OrderService {
             restock: Boolean(restock),
             authorizedBy: manager.name,
             totalAmount: order.total_amount,
+            originShiftId: order.shift_id,
+            originShiftStatus,
+            crossShiftVoid: originShiftStatus === 'CLOSED',
+            cashRefundAmount: cashPaidAmount,
+            refundMovementShiftId,
+            crossShiftCashNote: crossShiftCashNote || undefined,
           }),
         ]
       );
@@ -780,35 +1133,9 @@ export class OrderService {
   }
 
   // 3. GET ORDERS LIST
-  async getOrders(filters: { date?: string; from?: string; to?: string; status?: string; limit?: number; offset?: number }) {
+  async getOrdersWithMeta(filters: { date?: string; from?: string; to?: string; status?: string; limit?: number; offset?: number }) {
     const { date, from, to, status, limit = 50, offset = 0 } = filters;
-    let query = `
-      SELECT o.*, t.table_number, u.name as cashier_name, c.name as customer_name,
-        COALESCE(
-          (SELECT json_agg(json_build_object(
-            'id', oi.id,
-            'productId', oi.product_id,
-            'productName', oi.product_name_snapshot,
-            'quantity', oi.quantity,
-            'unitPrice', oi.unit_price_snapshot,
-            'subtotal', oi.subtotal,
-            'printTarget', oi.print_target,
-            'notes', oi.item_notes,
-            'modifiers', oi.selected_modifiers
-          )) FROM order_items oi WHERE oi.order_id = o.id),
-          '[]'::json
-        ) as items,
-        COALESCE(
-          (SELECT json_agg(json_build_object(
-            'id', op.id,
-            'method', op.payment_method,
-            'amountPaid', op.amount_paid,
-            'cashReceived', op.cash_received,
-            'cashChange', op.cash_change,
-            'referenceNumber', op.reference_number
-          )) FROM order_payments op WHERE op.order_id = o.id),
-          '[]'::json
-        ) as payments
+    const baseFrom = `
       FROM orders o
       LEFT JOIN dining_tables t ON o.table_id = t.id
       LEFT JOIN users u ON o.cashier_id = u.id
@@ -838,15 +1165,79 @@ export class OrderService {
       params.push(status);
     }
 
-    if (conditions.length > 0) {
-      query += ` WHERE ` + conditions.join(' AND ');
-    }
+    const whereClause = conditions.length > 0 ? ` WHERE ` + conditions.join(' AND ') : '';
 
-    query += ` ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
+    const summaryRes = await pool.query(
+      `SELECT
+         COUNT(*)::int as total,
+         COUNT(*) FILTER (WHERE o.status = 'PAID')::int as paid_count,
+         COUNT(*) FILTER (WHERE o.status = 'CANCELLED')::int as void_count,
+         COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'PAID'), 0) as total_revenue,
+         COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'CANCELLED'), 0) as total_void_amount,
+         COUNT(*) FILTER (WHERE o.status = 'PAID' AND o.order_type = 'DINE_IN')::int as dine_in_count,
+         COUNT(*) FILTER (WHERE o.status = 'PAID' AND o.order_type = 'TAKEAWAY')::int as takeaway_count
+       ${baseFrom}${whereClause}`,
+      params
+    );
 
-    const result = await pool.query(query, params);
-    return result.rows;
+    const query = `
+      SELECT o.*, t.table_number, u.name as cashier_name, c.name as customer_name,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', oi.id,
+            'productId', oi.product_id,
+            'productName', oi.product_name_snapshot,
+            'quantity', oi.quantity,
+            'unitPrice', oi.unit_price_snapshot,
+            'subtotal', oi.subtotal,
+            'printTarget', oi.print_target,
+            'notes', oi.item_notes,
+            'modifiers', oi.selected_modifiers
+          )) FROM order_items oi WHERE oi.order_id = o.id),
+          '[]'::json
+        ) as items,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', op.id,
+            'method', op.payment_method,
+            'amountPaid', op.amount_paid,
+            'cashReceived', op.cash_received,
+            'cashChange', op.cash_change,
+            'referenceNumber', op.reference_number
+          )) FROM order_payments op WHERE op.order_id = o.id),
+          '[]'::json
+        ) as payments
+      ${baseFrom}${whereClause}
+      ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    const result = await pool.query(query, [...params, limit, offset]);
+    const s = summaryRes.rows[0] || {};
+    const paidCount = Number(s.paid_count || 0);
+    const totalRevenue = Number(s.total_revenue || 0);
+
+    return {
+      rows: result.rows,
+      meta: {
+        total: Number(s.total || 0),
+        limit,
+        offset,
+        summary: {
+          paidCount,
+          voidCount: Number(s.void_count || 0),
+          totalRevenue,
+          totalVoidAmount: Number(s.total_void_amount || 0),
+          dineInCount: Number(s.dine_in_count || 0),
+          takeawayCount: Number(s.takeaway_count || 0),
+          aov: paidCount > 0 ? Math.round(totalRevenue / paidCount) : 0,
+        },
+      },
+    };
+  }
+
+  async getOrders(filters: { date?: string; from?: string; to?: string; status?: string; limit?: number; offset?: number }) {
+    const { rows } = await this.getOrdersWithMeta(filters);
+    return rows;
   }
 }
 

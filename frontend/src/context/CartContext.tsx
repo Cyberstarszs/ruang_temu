@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CartItem, CartCustomization, Customer, DiningTable, HeldOrder, Product } from '@/types';
 import { api } from '@/lib/api';
 
@@ -13,9 +13,13 @@ interface CartContextValue {
   orderNote: string;
   takeawayName: string;
   discountAmount: number;
+  promoId: string | null;
   promoCode: string;
   promoError: string;
   promoSuccess: string;
+  redeemPoints: number;
+  pointsDiscountAmount: number;
+  maxRedeemablePoints: number;
   claimedDownPayment: number;
   reservationId: string | null;
   heldOrders: HeldOrder[];
@@ -27,6 +31,7 @@ interface CartContextValue {
   serviceChargeRate: number;
   serviceChargeAmount: number;
   roundingAmount: number;
+  effectiveDownPayment: number;
   grandTotal: number;
   itemCount: number;
 
@@ -38,9 +43,11 @@ interface CartContextValue {
   setOrderNote: React.Dispatch<React.SetStateAction<string>>;
   setTakeawayName: React.Dispatch<React.SetStateAction<string>>;
   setDiscountAmount: React.Dispatch<React.SetStateAction<number>>;
+  setPromoId: React.Dispatch<React.SetStateAction<string | null>>;
   setPromoCode: React.Dispatch<React.SetStateAction<string>>;
   setPromoError: React.Dispatch<React.SetStateAction<string>>;
   setPromoSuccess: React.Dispatch<React.SetStateAction<string>>;
+  setRedeemPoints: React.Dispatch<React.SetStateAction<number>>;
   setClaimedDownPayment: React.Dispatch<React.SetStateAction<number>>;
   setReservationId: React.Dispatch<React.SetStateAction<string | null>>;
 
@@ -61,6 +68,8 @@ interface CartContextValue {
   handleSetManualTable: (tableNumber: string, tables?: DiningTable[]) => void;
 }
 
+const ACTIVE_CART_STORAGE_KEY = 'ruang_temu_active_cart_v1';
+
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -71,24 +80,125 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [orderNote, setOrderNote] = useState('');
   const [takeawayName, setTakeawayName] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [promoId, setPromoId] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState('');
   const [promoSuccess, setPromoSuccess] = useState('');
+  const [redeemPoints, setRedeemPoints] = useState(0);
   const [claimedDownPayment, setClaimedDownPayment] = useState(0);
   const [reservationId, setReservationId] = useState<string | null>(null);
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
+  const [isCartHydrated, setIsCartHydrated] = useState(false);
+  const prevCustomerIdRef = useRef<string | undefined>(undefined);
 
-  // Load held orders from localStorage on initial client mount
+  // Load held orders & active cart from localStorage on initial client mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('ruang_temu_held_orders_v2');
-      if (saved) {
-        setHeldOrders(JSON.parse(saved));
+      const savedHeld = localStorage.getItem('ruang_temu_held_orders_v2');
+      if (savedHeld) {
+        setHeldOrders(JSON.parse(savedHeld));
       }
     } catch (e) {
       console.error('Error loading held orders:', e);
     }
+
+    try {
+      const savedCartRaw = localStorage.getItem(ACTIVE_CART_STORAGE_KEY);
+      if (savedCartRaw) {
+        const parsed = JSON.parse(savedCartRaw);
+        if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.cart)) setCart(parsed.cart);
+          if (parsed.orderType === 'DINE_IN' || parsed.orderType === 'TAKEAWAY') {
+            setOrderType(parsed.orderType);
+          }
+          if (parsed.selectedTable !== undefined) setSelectedTable(parsed.selectedTable);
+          if (parsed.customer !== undefined) {
+            setCustomer(parsed.customer);
+            prevCustomerIdRef.current = parsed.customer?.id;
+          }
+          if (typeof parsed.orderNote === 'string') setOrderNote(parsed.orderNote);
+          if (typeof parsed.takeawayName === 'string') setTakeawayName(parsed.takeawayName);
+          if (typeof parsed.discountAmount === 'number') setDiscountAmount(parsed.discountAmount);
+          if (parsed.promoId !== undefined) setPromoId(parsed.promoId);
+          if (typeof parsed.promoCode === 'string') setPromoCode(parsed.promoCode);
+          if (typeof parsed.promoSuccess === 'string') setPromoSuccess(parsed.promoSuccess);
+          if (typeof parsed.redeemPoints === 'number') setRedeemPoints(parsed.redeemPoints);
+          if (typeof parsed.claimedDownPayment === 'number') setClaimedDownPayment(parsed.claimedDownPayment);
+          if (parsed.reservationId !== undefined) setReservationId(parsed.reservationId);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading persisted cart:', e);
+    } finally {
+      setIsCartHydrated(true);
+    }
   }, []);
+
+  // Reset redeemed points only when the selected customer actually changes after hydration
+  useEffect(() => {
+    if (!isCartHydrated) return;
+    if (prevCustomerIdRef.current !== customer?.id) {
+      prevCustomerIdRef.current = customer?.id;
+      setRedeemPoints(0);
+    }
+  }, [customer?.id, isCartHydrated]);
+
+  // Persist active cart across browser refreshes
+  useEffect(() => {
+    if (!isCartHydrated) return;
+    try {
+      const hasContent =
+        cart.length > 0 ||
+        Boolean(selectedTable) ||
+        Boolean(customer) ||
+        Boolean(orderNote) ||
+        Boolean(takeawayName) ||
+        Boolean(promoCode) ||
+        claimedDownPayment > 0 ||
+        Boolean(reservationId);
+
+      if (!hasContent) {
+        localStorage.removeItem(ACTIVE_CART_STORAGE_KEY);
+        return;
+      }
+
+      localStorage.setItem(
+        ACTIVE_CART_STORAGE_KEY,
+        JSON.stringify({
+          cart,
+          orderType,
+          selectedTable,
+          customer,
+          orderNote,
+          takeawayName,
+          discountAmount,
+          promoId,
+          promoCode,
+          promoSuccess,
+          redeemPoints,
+          claimedDownPayment,
+          reservationId,
+        })
+      );
+    } catch (e) {
+      console.error('Error saving persisted cart:', e);
+    }
+  }, [
+    isCartHydrated,
+    cart,
+    orderType,
+    selectedTable,
+    customer,
+    orderNote,
+    takeawayName,
+    discountAmount,
+    promoId,
+    promoCode,
+    promoSuccess,
+    redeemPoints,
+    claimedDownPayment,
+    reservationId,
+  ]);
 
   const updateHeldOrders = useCallback((newOrders: HeldOrder[]) => {
     setHeldOrders(newOrders);
@@ -125,31 +235,51 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const serviceChargeRate = Number(storeSettings?.service_charge_rate) || 0;
   const roundingRule = Number(storeSettings?.rounding_rule) || 1;
 
-  // Price calculations
+  // Price calculations (DPP = Subtotal - Diskon - Poin; Servis & PB1 dihitung sebelum pemotongan DP)
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.itemSubtotal, 0);
   }, [cart]);
 
-  const netSubtotal = useMemo(() => {
-    return Math.max(0, subtotal - discountAmount - claimedDownPayment);
-  }, [subtotal, discountAmount, claimedDownPayment]);
+  const maxRedeemablePoints = useMemo(() => {
+    if (!customer || Number(customer.loyalty_points || 0) <= 0) return 0;
+    const remainingAfterPromo = Math.max(0, subtotal - discountAmount);
+    return Math.min(Number(customer.loyalty_points || 0), Math.floor(remainingAfterPromo / 100));
+  }, [customer, subtotal, discountAmount]);
+
+  const activeRedeemPoints = useMemo(() => {
+    return Math.min(Math.max(0, redeemPoints), maxRedeemablePoints);
+  }, [redeemPoints, maxRedeemablePoints]);
+
+  const pointsDiscountAmount = activeRedeemPoints * 100;
+
+  const afterDiscount = useMemo(() => {
+    return Math.max(0, subtotal - discountAmount - pointsDiscountAmount);
+  }, [subtotal, discountAmount, pointsDiscountAmount]);
 
   const serviceChargeAmount = useMemo(() => {
-    return serviceChargeRate > 0 ? Math.round((netSubtotal * serviceChargeRate) / 100) : 0;
-  }, [netSubtotal, serviceChargeRate]);
+    return serviceChargeRate > 0 ? Math.round((afterDiscount * serviceChargeRate) / 100) : 0;
+  }, [afterDiscount, serviceChargeRate]);
 
   const taxAmount = useMemo(() => {
-    return taxRate > 0 ? Math.round(((netSubtotal + serviceChargeAmount) * taxRate) / 100) : 0;
-  }, [netSubtotal, serviceChargeAmount, taxRate]);
+    return taxRate > 0 ? Math.round(((afterDiscount + serviceChargeAmount) * taxRate) / 100) : 0;
+  }, [afterDiscount, serviceChargeAmount, taxRate]);
+
+  const grossBillBeforeDp = useMemo(() => {
+    return afterDiscount + serviceChargeAmount + taxAmount;
+  }, [afterDiscount, serviceChargeAmount, taxAmount]);
+
+  const effectiveDownPayment = useMemo(() => {
+    return Math.min(claimedDownPayment, grossBillBeforeDp);
+  }, [claimedDownPayment, grossBillBeforeDp]);
 
   const { grandTotal, roundingAmount } = useMemo(() => {
-    const raw = netSubtotal + serviceChargeAmount + taxAmount;
+    const raw = Math.max(0, grossBillBeforeDp - effectiveDownPayment);
     if (roundingRule > 1 && raw > 0) {
       const rounded = Math.round(raw / roundingRule) * roundingRule;
       return { grandTotal: Math.max(0, rounded), roundingAmount: rounded - raw };
     }
     return { grandTotal: Math.max(0, raw), roundingAmount: 0 };
-  }, [netSubtotal, serviceChargeAmount, taxAmount, roundingRule]);
+  }, [grossBillBeforeDp, effectiveDownPayment, roundingRule]);
 
   const itemCount = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -230,11 +360,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setOrderNote('');
     setTakeawayName('');
     setDiscountAmount(0);
+    setPromoId(null);
     setPromoCode('');
     setPromoError('');
     setPromoSuccess('');
+    setRedeemPoints(0);
     setClaimedDownPayment(0);
     setReservationId(null);
+    try {
+      localStorage.removeItem(ACTIVE_CART_STORAGE_KEY);
+    } catch {}
   }, []);
 
   const handleHoldOrder = useCallback((): { success: boolean; message: string } => {
@@ -253,6 +388,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       items: [...cart],
       subtotal,
       discountAmount,
+      promoId,
       promoCode,
       claimedDownPayment,
       grandTotal,
@@ -261,7 +397,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     updateHeldOrders([newHeld, ...heldOrders]);
     handleClearCart();
     return { success: true, message: `Pesanan berhasil ditahan (${newHeld.id}).` };
-  }, [cart, orderType, selectedTable, customer, takeawayName, orderNote, subtotal, discountAmount, promoCode, claimedDownPayment, grandTotal, heldOrders, updateHeldOrders, handleClearCart]);
+  }, [cart, orderType, selectedTable, customer, takeawayName, orderNote, subtotal, discountAmount, promoId, promoCode, claimedDownPayment, grandTotal, heldOrders, updateHeldOrders, handleClearCart]);
 
   const handleRecallHeldOrder = useCallback((heldOrder: HeldOrder, confirmReplace = true): boolean => {
     if (cart.length > 0 && !confirmReplace) {
@@ -275,6 +411,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setTakeawayName(heldOrder.takeawayName || '');
     setOrderNote(heldOrder.orderNote || '');
     setDiscountAmount(heldOrder.discountAmount || 0);
+    setPromoId(heldOrder.promoId || null);
     setPromoCode(heldOrder.promoCode || '');
     setClaimedDownPayment(heldOrder.claimedDownPayment || 0);
 
@@ -322,9 +459,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         orderNote,
         takeawayName,
         discountAmount,
+        promoId,
         promoCode,
         promoError,
         promoSuccess,
+        redeemPoints: activeRedeemPoints,
+        pointsDiscountAmount,
+        maxRedeemablePoints,
         claimedDownPayment,
         reservationId,
         heldOrders,
@@ -335,6 +476,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         serviceChargeRate,
         serviceChargeAmount,
         roundingAmount,
+        effectiveDownPayment,
         grandTotal,
         itemCount,
 
@@ -345,9 +487,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setOrderNote,
         setTakeawayName,
         setDiscountAmount,
+        setPromoId,
         setPromoCode,
         setPromoError,
         setPromoSuccess,
+        setRedeemPoints,
         setClaimedDownPayment,
         setReservationId,
 

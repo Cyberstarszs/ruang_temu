@@ -1,13 +1,14 @@
 import { Router } from 'express';
-import { requireAuth } from '../../middlewares/auth';
-import { getReservations, createReservation } from './reservationController';
+import { requireAuth, requireRoles } from '../../middlewares/auth';
+import { getReservations, createReservation, cancelReservation } from './reservationController';
 
 const router = Router();
 
 // Public: Customers can make online table reservations from landing page
 router.post('/', createReservation);
 
-// Protected: Only logged-in staff can view reservation list & calendar
+// Protected: Only logged-in staff can view & cancel reservations
 router.get('/', requireAuth, getReservations);
+router.patch('/:id/cancel', requireAuth, requireRoles('OWNER', 'CASHIER'), cancelReservation);
 
 export default router;

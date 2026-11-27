@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Customer, CustomerStats, CustomerDetail, CustomerTier } from '@/types';
 import {
   Select,
@@ -36,6 +37,8 @@ import {
 } from 'lucide-react';
 
 export function AdminCustomersView() {
+  const { user } = useAuth();
+  const canDeleteCustomer = user?.role === 'OWNER';
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -956,26 +959,28 @@ export function AdminCustomersView() {
                             <Pencil size={14} />
                           </button>
 
-                          {/* Delete Button */}
-                          <button
-                            type="button"
-                            onClick={() => setDeletingCustomer(c)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '7px',
-                              background: '#fef2f2',
-                              color: '#dc2626',
-                              border: '1px solid #fecaca',
-                              cursor: 'pointer',
-                            }}
-                            title="Hapus pelanggan"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {/* Delete Button (Hanya Owner) */}
+                          {canDeleteCustomer && (
+                            <button
+                              type="button"
+                              onClick={() => setDeletingCustomer(c)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '7px',
+                                background: '#fef2f2',
+                                color: '#dc2626',
+                                border: '1px solid #fecaca',
+                                cursor: 'pointer',
+                              }}
+                              title="Hapus pelanggan"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

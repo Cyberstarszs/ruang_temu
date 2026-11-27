@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { rupiah, formatDateTime } from '@/lib/utils';
 import { Icon } from '@/components/common/Icons';
+import { api } from '@/lib/api';
+import { StoreSettings } from '@/types';
 
 interface ReceiptModalProps {
   orderData: {
@@ -24,10 +26,23 @@ interface ReceiptModalProps {
     subtotal: number;
     discountAmount: number;
     claimedDownPayment: number;
+    taxRate?: number;
+    taxAmount?: number;
+    serviceChargeRate?: number;
+    serviceChargeAmount?: number;
+    roundingAmount?: number;
     totalAmount: number;
     paymentMethod: string;
     cashReceived?: number | null;
     cashChange?: number | null;
+    payments?: Array<{
+      method: string;
+      amountPaid?: number;
+      amount?: number;
+      cashReceived?: number | null;
+      cashChange?: number | null;
+      referenceNumber?: string | null;
+    }>;
     isOffline?: boolean;
     notes?: string | null;
   };
@@ -36,6 +51,33 @@ interface ReceiptModalProps {
 
 export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
   const [activeTab, setActiveTab] = useState<'CUSTOMER' | 'BAR' | 'KITCHEN'>('CUSTOMER');
+  const [storeSettings, setStoreSettings] = useState<Partial<StoreSettings> | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem('ruang_temu_store_settings_cache');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    api.settings
+      .get()
+      .then((res) => {
+        if (isMounted && res.success && res.data) {
+          setStoreSettings(res.data);
+          try {
+            localStorage.setItem('ruang_temu_store_settings_cache', JSON.stringify(res.data));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const barItems = orderData.items.filter((i) => i.printTarget === 'BAR_PRINTER');
   const kitchenItems = orderData.items.filter((i) => i.printTarget === 'KITCHEN_PRINTER');
@@ -166,9 +208,22 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
             {activeTab === 'CUSTOMER' && (
               <>
                 <div style={{ textAlign: 'center', marginBottom: '14px' }}>
-                  <b style={{ fontSize: '16px', letterSpacing: '1px', display: 'block' }}>RUANG TEMU</b>
-                  <span style={{ fontSize: '11px', display: 'block' }}>Coffee, Eatery, Community</span>
-                  <span style={{ fontSize: '10px', color: '#555' }}>Jl. Ruang Temu No. 1</span>
+                  <b style={{ fontSize: '16px', letterSpacing: '1px', display: 'block' }}>
+                    {storeSettings?.store_name || 'RUANG TEMU'}
+                  </b>
+                  {(storeSettings?.tagline || !storeSettings) && (
+                    <span style={{ fontSize: '11px', display: 'block' }}>
+                      {storeSettings?.tagline || 'Coffee, Eatery, Community'}
+                    </span>
+                  )}
+                  <span style={{ fontSize: '10px', color: '#555', display: 'block' }}>
+                    {storeSettings?.address || 'Jl. Raya Pamekasan No. 24, Madura'}
+                  </span>
+                  {storeSettings?.phone && (
+                    <span style={{ fontSize: '10px', color: '#555', display: 'block' }}>
+                      Telp: {storeSettings.phone}
+                    </span>
+                  )}
                   {orderData.isOffline && (
                     <div
                       style={{
@@ -230,10 +285,31 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                       <span>− {rupiah(orderData.discountAmount)}</span>
                     </div>
                   )}
+                  {Number(orderData.serviceChargeAmount || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                      <span>Servis ({Number(orderData.serviceChargeRate ?? storeSettings?.service_charge_rate ?? 0)}%):</span>
+                      <span>{rupiah(Number(orderData.serviceChargeAmount))}</span>
+                    </div>
+                  )}
+                  {Number(orderData.taxAmount || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                      <span>PB1 ({Number(orderData.taxRate ?? storeSettings?.tax_rate ?? 0)}%):</span>
+                      <span>{rupiah(Number(orderData.taxAmount))}</span>
+                    </div>
+                  )}
                   {orderData.claimedDownPayment > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2d6a4f' }}>
                       <span>Potongan DP:</span>
                       <span>− {rupiah(orderData.claimedDownPayment)}</span>
+                    </div>
+                  )}
+                  {Number(orderData.roundingAmount || 0) !== 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                      <span>Pembulatan:</span>
+                      <span>
+                        {Number(orderData.roundingAmount) > 0 ? '+' : '− '}
+                        {rupiah(Math.abs(Number(orderData.roundingAmount)))}
+                      </span>
                     </div>
                   )}
                   <div
@@ -250,15 +326,48 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                     <span>TOTAL:</span>
                     <span>{rupiah(orderData.totalAmount)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                    <span>Bayar ({orderData.paymentMethod}):</span>
-                    <span>{rupiah(orderData.cashReceived || orderData.totalAmount)}</span>
-                  </div>
-                  {orderData.cashChange !== undefined && orderData.cashChange !== null && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Kembalian:</span>
-                      <span>{rupiah(orderData.cashChange)}</span>
+                  {orderData.payments && orderData.payments.length > 0 ? (
+                    <div style={{ marginTop: '6px' }}>
+                      {orderData.payments.map((p, pIdx) => {
+                        const legAmount = Number(p.amountPaid ?? p.amount ?? 0);
+                        return (
+                          <div key={pIdx} style={{ marginTop: pIdx > 0 ? '3px' : 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Bayar ({p.method}):</span>
+                              <span>{rupiah(legAmount)}</span>
+                            </div>
+                            {p.cashReceived !== undefined && p.cashReceived !== null && Number(p.cashReceived) > legAmount && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#555' }}>
+                                <span>Tunai Diterima:</span>
+                                <span>{rupiah(Number(p.cashReceived))}</span>
+                              </div>
+                            )}
+                            {p.cashChange !== undefined && p.cashChange !== null && Number(p.cashChange) > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Kembalian:</span>
+                                <span>{rupiah(Number(p.cashChange))}</span>
+                              </div>
+                            )}
+                            {p.referenceNumber && (
+                              <div style={{ fontSize: '10px', color: '#555' }}>Ref: {p.referenceNumber}</div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+                        <span>Bayar ({orderData.paymentMethod}):</span>
+                        <span>{rupiah(orderData.cashReceived || orderData.totalAmount)}</span>
+                      </div>
+                      {orderData.cashChange !== undefined && orderData.cashChange !== null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Kembalian:</span>
+                          <span>{rupiah(orderData.cashChange)}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div style={{ margin: '8px 0', borderBottom: '1px dashed #888' }} />
                 </div>
@@ -280,9 +389,21 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
                 )}
 
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>
-                  <div>Harga sudah bersih (0% Pajak, 0% Layanan)</div>
-                  <div>Terima kasih atas kunjungan Anda!</div>
-                  <div style={{ marginTop: '4px', fontWeight: 700 }}>WiFi: RuangTemuGuest / temu2026</div>
+                  <div>
+                    {Number(orderData.taxAmount || 0) > 0 || Number(orderData.serviceChargeAmount || 0) > 0
+                      ? `Harga termasuk PB1 ${Number(orderData.taxRate ?? storeSettings?.tax_rate ?? 0)}% & Servis ${Number(orderData.serviceChargeRate ?? storeSettings?.service_charge_rate ?? 0)}%`
+                      : 'Harga Nett (0% Pajak, 0% Layanan)'}
+                  </div>
+                  <div>{storeSettings?.receipt_footer || 'Terima kasih atas kunjungan Anda!'}</div>
+                  {storeSettings?.wifi_ssid && (
+                    <div style={{ marginTop: '4px', fontWeight: 700 }}>
+                      WiFi: {storeSettings.wifi_ssid}
+                      {storeSettings.wifi_password ? ` / ${storeSettings.wifi_password}` : ''}
+                    </div>
+                  )}
+                  {storeSettings?.instagram && (
+                    <div style={{ marginTop: '2px', color: '#666' }}>IG: {storeSettings.instagram}</div>
+                  )}
                 </div>
               </>
             )}

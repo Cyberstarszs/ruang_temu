@@ -611,6 +611,27 @@ export function AdminMenuMatrixView() {
         </div>
       ) : data ? (
         <>
+          {Number(data.benchmarks?.unrecipiedCount || 0) > 0 && (
+            <div
+              style={{
+                padding: '10px 14px',
+                backgroundColor: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: '10px',
+                fontSize: '12.5px',
+                color: '#92400e',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span style={{ fontWeight: 700 }}>Peringatan Akurasi HPP:</span>
+              <span>
+                Terdapat <strong>{data.benchmarks.unrecipiedCount}</strong> menu aktif tanpa resep bahan baku — nilai HPP menu tersebut menggunakan <strong>estimasi default 35%</strong> dari harga jual.
+              </span>
+            </div>
+          )}
+
           {/* Filter Pills & Search Bar */}
           <div
             style={{
@@ -895,7 +916,14 @@ export function AdminMenuMatrixView() {
                         </b>
                       </div>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>HPP Bahan Baku</span>
+                        <span style={{ fontSize: '11px', color: '#6b7280' }}>
+                          HPP Bahan Baku
+                          {selectedProduct.isEstimatedCost && (
+                            <span style={{ marginLeft: '4px', color: '#b45309', fontWeight: 700 }}>
+                              (Est. 35%)
+                            </span>
+                          )}
+                        </span>
                         <b style={{ fontSize: '14px', color: '#b91c1c', display: 'block', marginTop: '1px' }}>
                           {rupiah(selectedProduct.cost)}
                         </b>
@@ -1008,7 +1036,27 @@ export function AdminMenuMatrixView() {
                           </td>
                           <td style={{ padding: '12px 14px', color: '#4b5563' }}>{p.category}</td>
                           <td style={{ padding: '12px 14px', fontWeight: 600 }}>{rupiah(p.price)}</td>
-                          <td style={{ padding: '12px 14px', color: '#b91c1c' }}>{rupiah(p.cost)}</td>
+                          <td style={{ padding: '12px 14px', color: '#b91c1c' }}>
+                            <div>{rupiah(p.cost)}</div>
+                            {p.isEstimatedCost && (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  marginTop: '2px',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  backgroundColor: '#fef3c7',
+                                  color: '#92400e',
+                                  border: '1px solid #fde68a',
+                                }}
+                                title="Menu belum memiliki resep bahan baku; menggunakan asumsi 35% harga jual"
+                              >
+                                Estimasi 35% (Tanpa Resep)
+                              </span>
+                            )}
+                          </td>
                           <td style={{ padding: '12px 14px', fontWeight: 700, color: p.margin >= 70 ? '#2d6a4f' : '#b45309' }}>
                             {p.margin}%
                           </td>

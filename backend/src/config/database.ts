@@ -3,7 +3,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Kembalikan tipe DATE (OID 1082) sebagai string YYYY-MM-DD agar bebas pergeseran timezone saat dibandingkan dengan tanggal Asia/Jakarta
+types.setTypeParser(1082, (val: string) => val);
 
 export const pool = new Pool({
   host: process.env.DB_HOST || '127.0.0.1',

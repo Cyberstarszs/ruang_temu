@@ -96,46 +96,67 @@ export async function submitStocktake(req: Request, res: Response, next: NextFun
   const client = await getClient();
   try {
     const userId = req.user?.id;
-    const { items } = req.body; // array of { ingredientId, actualCount, notes }
+    const { items } = req.body; // array of { ingredientId, actualCount, systemCountSnapshot?, notes }
 
-    if (!items || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       res.status(400).json({ success: false, message: 'Daftar hitungan fisik stok opname tidak boleh kosong.' });
       return;
     }
+
+    // Sort deterministically by ingredientId to prevent lock-order deadlocks
+    const sortedItems = [...items].sort((a, b) =>
+      String(a.ingredientId || '').localeCompare(String(b.ingredientId || ''))
+    );
 
     await client.query('BEGIN');
 
     const adjustments: any[] = [];
 
-    for (const item of items) {
+    for (const item of sortedItems) {
+      const countedPhysical = Number(item.actualCount);
+      if (isNaN(countedPhysical) || countedPhysical < 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ success: false, message: 'Nilai hitungan fisik stok opname harus berupa angka >= 0.' });
+        return;
+      }
+
       const curRes = await client.query(
-        `SELECT id, name, usage_unit, stock_actual, unit_cost FROM ingredients WHERE id = $1`,
+        `SELECT id, name, usage_unit, stock_actual, unit_cost FROM ingredients WHERE id = $1 FOR UPDATE`,
         [item.ingredientId]
       );
 
       if (curRes.rows.length > 0) {
         const ing = curRes.rows[0];
-        const prev = Number(ing.stock_actual);
-        const actual = Number(item.actualCount);
-        const delta = actual - prev;
+        const liveStock = Number(ing.stock_actual);
 
-        await client.query(
-          `UPDATE ingredients SET stock_actual = $1, updated_at = NOW() WHERE id = $2`,
-          [actual, ing.id]
-        );
+        // Lindungi mutasi transaksi/PO yang terjadi bersamaan selama form opname dibuka
+        const hasSnapshot =
+          item.systemCountSnapshot !== undefined &&
+          item.systemCountSnapshot !== null &&
+          !isNaN(Number(item.systemCountSnapshot));
+        const concurrentDelta = hasSnapshot ? Number((liveStock - Number(item.systemCountSnapshot)).toFixed(3)) : 0;
+        const adjustedTarget = Math.max(0, Number((countedPhysical + concurrentDelta).toFixed(3)));
+        const delta = Number((adjustedTarget - liveStock).toFixed(3));
 
         if (delta !== 0) {
+          await client.query(
+            `UPDATE ingredients SET stock_actual = $1, updated_at = NOW() WHERE id = $2`,
+            [adjustedTarget, ing.id]
+          );
+
           await client.query(
             `INSERT INTO stock_movements (
               ingredient_id, movement_type, quantity_change, resulting_balance, reference_id
             ) VALUES ($1, 'STOCKTAKE', $2, $3, $4)`,
-            [ing.id, delta, actual, `OPNAME: ${item.notes || 'Penyesuaian Fisik'}`]
+            [ing.id, delta, adjustedTarget, `OPNAME: ${item.notes || 'Penyesuaian Fisik'}`]
           );
 
           adjustments.push({
             name: ing.name,
-            previousStock: prev,
-            physicalStock: actual,
+            previousStock: liveStock,
+            countedPhysical,
+            concurrentDelta,
+            physicalStock: adjustedTarget,
             difference: delta,
             unit: ing.usage_unit,
           });
@@ -157,7 +178,7 @@ export async function submitStocktake(req: Request, res: Response, next: NextFun
       data: adjustments,
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     next(err);
   } finally {
     client.release();
@@ -202,11 +223,40 @@ export async function createIngredient(req: Request, res: Response, next: NextFu
 }
 
 export async function updateIngredient(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await getClient();
   try {
+    const userId = req.user?.id;
     const { id } = req.params;
     const { code, name, usage_unit, purchase_unit, conversion_rate, safe_stock, unit_cost, stock_actual } = req.body;
 
-    const result = await pool.query(`
+    const convNum = conversion_rate !== undefined ? Number(conversion_rate) : null;
+    const safeNum = safe_stock !== undefined ? Number(safe_stock) : null;
+    const costNum = unit_cost !== undefined ? Number(unit_cost) : null;
+    const stockNum = stock_actual !== undefined ? Number(stock_actual) : null;
+
+    if (
+      (convNum !== null && (isNaN(convNum) || convNum <= 0)) ||
+      (safeNum !== null && (isNaN(safeNum) || safeNum < 0)) ||
+      (costNum !== null && (isNaN(costNum) || costNum < 0)) ||
+      (stockNum !== null && (isNaN(stockNum) || stockNum < 0))
+    ) {
+      res.status(400).json({ success: false, message: 'Nilai rasio konversi harus > 0 serta stok dan harga pokok tidak boleh negatif.' });
+      return;
+    }
+
+    await client.query('BEGIN');
+
+    const prevRes = await client.query(`SELECT * FROM ingredients WHERE id = $1 FOR UPDATE`, [id]);
+    if (prevRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ success: false, message: 'Bahan baku tidak ditemukan.' });
+      return;
+    }
+    const prev = prevRes.rows[0];
+    const oldStock = Number(prev.stock_actual || 0);
+    const oldCost = Number(prev.unit_cost || 0);
+
+    const result = await client.query(`
       UPDATE ingredients
       SET code = COALESCE($1, code),
           name = COALESCE($2, name),
@@ -224,29 +274,62 @@ export async function updateIngredient(req: Request, res: Response, next: NextFu
       name?.trim(),
       usage_unit,
       purchase_unit?.trim(),
-      conversion_rate !== undefined ? Number(conversion_rate) : null,
-      safe_stock !== undefined ? Number(safe_stock) : null,
-      unit_cost !== undefined ? Number(unit_cost) : null,
-      stock_actual !== undefined ? Number(stock_actual) : null,
+      convNum,
+      safeNum,
+      costNum,
+      stockNum,
       id,
     ]);
 
-    if (result.rows.length === 0) {
-      res.status(404).json({ success: false, message: 'Bahan baku tidak ditemukan.' });
-      return;
+    const updated = result.rows[0];
+    const newStock = Number(updated.stock_actual || 0);
+    const newCost = Number(updated.unit_cost || 0);
+    const stockDelta = Number((newStock - oldStock).toFixed(3));
+
+    if (stockDelta !== 0) {
+      await client.query(
+        `INSERT INTO stock_movements (ingredient_id, movement_type, quantity_change, resulting_balance, reference_id)
+         VALUES ($1, 'MANUAL_ADJUSTMENT', $2, $3, $4)`,
+        [id, stockDelta, newStock, `EDIT_MASTER: ${updated.code}`]
+      );
     }
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+       VALUES ($1, 'UPDATE_INGREDIENT', 'ingredients', $2, $3)`,
+      [
+        userId || null,
+        id,
+        JSON.stringify({
+          code: updated.code,
+          name: updated.name,
+          oldStock,
+          newStock,
+          stockDelta,
+          oldUnitCost: oldCost,
+          newUnitCost: newCost,
+          oldSafeStock: Number(prev.safe_stock || 0),
+          newSafeStock: Number(updated.safe_stock || 0),
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
 
     res.json({
       success: true,
-      message: `Bahan baku ${result.rows[0].name} berhasil diperbarui.`,
-      data: result.rows[0],
+      message: `Bahan baku ${updated.name} berhasil diperbarui.`,
+      data: updated,
     });
   } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') {
       res.status(409).json({ success: false, message: 'Kode bahan baku sudah digunakan oleh bahan lain.' });
       return;
     }
     next(err);
+  } finally {
+    client.release();
   }
 }
 

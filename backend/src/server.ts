@@ -14,6 +14,9 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 async function bootstrap() {
   const app = createApp();
   const server = http.createServer(app);
+  // Keep sockets alive longer than upstream proxy pools (avoids ECONNRESET on keep-alive reuse)
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 
   // Initialize Real-time WebSocket Service
   initializeWebSocket(server, FRONTEND_URL);

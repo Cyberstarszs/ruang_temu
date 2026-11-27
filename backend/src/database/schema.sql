@@ -143,6 +143,24 @@ CREATE TABLE IF NOT EXISTS reservations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 16. PROMOSI & VOUCHER LOYALITAS (Ditempatkan sebelum orders untuk relasi FK promo_id)
+CREATE TABLE IF NOT EXISTS promos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('PERCENT', 'FIXED_AMOUNT', 'BOGO')),
+    discount_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    min_spend NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    max_discount NUMERIC(12, 2) NULL,
+    quota INT NULL,
+    used_count INT NOT NULL DEFAULT 0,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 10. TRANSAKSI PESANAN
 DO $$ BEGIN
     CREATE TYPE order_type AS ENUM ('DINE_IN', 'TAKEAWAY');
@@ -159,10 +177,18 @@ CREATE TABLE IF NOT EXISTS orders (
     table_id UUID NULL REFERENCES dining_tables(id),
     customer_id UUID NULL REFERENCES customers(id),
     reservation_id UUID NULL REFERENCES reservations(id),
+    promo_id UUID NULL REFERENCES promos(id) ON DELETE SET NULL,
     order_type order_type NOT NULL DEFAULT 'DINE_IN',
     subtotal NUMERIC(12, 2) NOT NULL DEFAULT 0,
     discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    redeemed_points INT NOT NULL DEFAULT 0,
+    points_discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
     claimed_down_payment NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    tax_rate NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    tax_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    service_charge_rate NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    service_charge_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    rounding_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
     total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
     total_hpp NUMERIC(12, 2) NOT NULL DEFAULT 0,
     status order_status NOT NULL DEFAULT 'PENDING_PAYMENT_AT_CASHIER',
@@ -245,6 +271,7 @@ CREATE TABLE IF NOT EXISTS cash_movements (
     category VARCHAR(50) NOT NULL,
     description TEXT NOT NULL,
     amount NUMERIC(12, 2) NOT NULL,
+    receipt_url TEXT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -259,23 +286,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 16. PROMOSI & VOUCHER LOYALITAS
-CREATE TABLE IF NOT EXISTS promos (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    code VARCHAR(50) UNIQUE NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('PERCENT', 'FIXED_AMOUNT', 'BOGO')),
-    discount_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    min_spend NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    max_discount NUMERIC(12, 2) NULL,
-    quota INT NULL,
-    used_count INT NOT NULL DEFAULT 0,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 17. PEMASOK & PEMBELIAN (PURCHASING)
 CREATE TABLE IF NOT EXISTS suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -285,7 +295,8 @@ CREATE TABLE IF NOT EXISTS suppliers (
     address TEXT NULL,
     payment_terms VARCHAR(50) DEFAULT 'CASH',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -295,6 +306,10 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     status VARCHAR(20) NOT NULL DEFAULT 'ORDERED' CHECK (status IN ('DRAFT', 'ORDERED', 'RECEIVED', 'CANCELLED')),
     total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
     payment_status VARCHAR(20) NOT NULL DEFAULT 'UNPAID' CHECK (payment_status IN ('UNPAID', 'PAID')),
+    paid_at TIMESTAMP WITH TIME ZONE NULL,
+    payment_method VARCHAR(30) NULL,
+    paid_by_user_id UUID NULL REFERENCES users(id),
+    payment_notes TEXT NULL,
     notes TEXT NULL,
     ordered_by_user_id UUID NOT NULL REFERENCES users(id),
     received_at TIMESTAMP WITH TIME ZONE NULL,
@@ -307,7 +322,10 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     ingredient_id UUID NOT NULL REFERENCES ingredients(id),
     quantity NUMERIC(10, 3) NOT NULL,
     unit_cost NUMERIC(12, 4) NOT NULL,
-    subtotal NUMERIC(12, 2) NOT NULL
+    subtotal NUMERIC(12, 2) NOT NULL,
+    unit_type VARCHAR(20) NOT NULL DEFAULT 'PURCHASE_UNIT',
+    conversion_rate NUMERIC(10, 4) NOT NULL DEFAULT 1,
+    conversion_rate_snapshot NUMERIC(10, 4) NOT NULL DEFAULT 1
 );
 
 -- 18. ABSENSI KARYAWAN
@@ -357,6 +375,21 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS service_charge_rate NUMERIC(
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auto_print_receipt BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auto_print_bar BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auto_print_kitchen BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE cash_movements ADD COLUMN IF NOT EXISTS receipt_url TEXT NULL;
+ALTER TABLE promos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_id UUID NULL REFERENCES promos(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5, 2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_charge_rate NUMERIC(5, 2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_charge_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS rounding_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE NULL;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NULL;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS paid_by_user_id UUID NULL REFERENCES users(id);
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS payment_notes TEXT NULL;
+ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS unit_type VARCHAR(20) NOT NULL DEFAULT 'PURCHASE_UNIT';
+ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS conversion_rate NUMERIC(10, 4) NOT NULL DEFAULT 1;
+ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS conversion_rate_snapshot NUMERIC(10, 4) NOT NULL DEFAULT 1;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS cashier_printer_name VARCHAR(100) DEFAULT 'Printer Kasir';
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS bar_printer_name VARCHAR(100) DEFAULT 'Printer Bar Checker';
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS kitchen_printer_name VARCHAR(100) DEFAULT 'Printer Dapur Checker';
@@ -370,3 +403,15 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS rounding_amount NUMERIC(12, 2) NOT N
 
 ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS unit_type VARCHAR(20) NOT NULL DEFAULT 'PURCHASE_UNIT';
 ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS conversion_rate NUMERIC(10, 3) NOT NULL DEFAULT 1;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS redeemed_points INT NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS points_discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0;
+
+-- Guard against duplicate concurrent OPEN shifts per cashier while staying safe on legacy DBs
+DO $$ BEGIN
+    CREATE UNIQUE INDEX idx_cashier_shifts_one_open_per_cashier
+        ON cashier_shifts (cashier_id)
+        WHERE status = 'OPEN';
+EXCEPTION
+    WHEN duplicate_table OR duplicate_object THEN null;
+    WHEN unique_violation THEN null;
+END $$;

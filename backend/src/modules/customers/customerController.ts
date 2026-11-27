@@ -90,7 +90,9 @@ export async function getCustomerStats(req: Request, res: Response, next: NextFu
 
     const orderStatsQuery = `
       SELECT
-        COUNT(DISTINCT customer_id)::int AS active_customers_30d,
+        COUNT(DISTINCT customer_id) FILTER (
+          WHERE COALESCE(paid_at, created_at) >= (NOW() - INTERVAL '30 days')
+        )::int AS active_customers_30d,
         COALESCE(SUM(total_amount), 0)::numeric AS total_customer_revenue,
         COUNT(id)::int AS total_customer_orders
       FROM orders
@@ -299,24 +301,55 @@ export async function updateCustomer(req: Request, res: Response, next: NextFunc
 }
 
 export async function deleteCustomer(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const client = await pool.connect();
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
-    // Unlink customer from historical orders to keep financial reports clean
-    await pool.query(`UPDATE orders SET customer_id = NULL WHERE customer_id = $1`, [id]);
+    await client.query('BEGIN');
 
-    const result = await pool.query(`DELETE FROM customers WHERE id = $1 RETURNING id, name`, [id]);
-    if (result.rows.length === 0) {
+    const custRes = await client.query(
+      `SELECT id, name, phone_number, tier, loyalty_points FROM customers WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (custRes.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, message: 'Pelanggan tidak ditemukan.' });
       return;
     }
 
+    const cust = custRes.rows[0];
+
+    // Unlink customer from historical orders to keep financial reports clean
+    await client.query(`UPDATE orders SET customer_id = NULL WHERE customer_id = $1`, [id]);
+
+    await client.query(`DELETE FROM customers WHERE id = $1`, [id]);
+
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, target_table, target_id, details)
+       VALUES ($1, 'DELETE_CUSTOMER', 'customers', $2, $3)`,
+      [
+        req.user?.id || null,
+        id,
+        JSON.stringify({
+          deletedName: cust.name,
+          deletedPhone: cust.phone_number,
+          tier: cust.tier,
+          loyaltyPoints: cust.loyalty_points,
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
+
     res.json({
       success: true,
-      message: `Pelanggan ${result.rows[0].name} berhasil dihapus.`,
-      data: result.rows[0],
+      message: `Pelanggan ${cust.name} berhasil dihapus.`,
+      data: { id: cust.id, name: cust.name },
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     next(err);
+  } finally {
+    client.release();
   }
 }
