@@ -96,12 +96,9 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="bo-modal-head">
-          <div>
-            <h2>Struk Transaksi Selesai</h2>
-            <p>ID Transaksi: {orderData.orderNumber}</p>
-          </div>
+          <h2>Struk #{orderData.orderNumber}</h2>
           <button onClick={onClose} aria-label="Tutup">
-            <Icon name="close" size={20} />
+            <Icon name="close" size={18} />
           </button>
         </header>
 
@@ -109,23 +106,17 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
         {orderData.isOffline && (
           <div
             style={{
-              margin: '12px 20px 0',
-              padding: '10px 14px',
+              margin: '12px 18px 0',
+              padding: '8px 12px',
               backgroundColor: '#fffbeb',
               border: '1px solid #fde68a',
               borderRadius: '8px',
               color: '#92400e',
               fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
               lineHeight: 1.4,
             }}
           >
-            <Icon name="circleAlert" size={18} />
-            <span>
-              <strong>Mode Offline:</strong> Transaksi tersimpan lokal di kasir (IndexedDB). Struk tetap dapat dicetak dan transaksi akan otomatis disinkronkan ke server pusat saat koneksi pulih.
-            </span>
+            <strong>Mode Offline:</strong> tersimpan lokal, otomatis sinkron saat online.
           </div>
         )}
 
@@ -133,26 +124,20 @@ export function ReceiptModal({ orderData, onClose }: ReceiptModalProps) {
         {orderData.notes && (
           <div
             style={{
-              margin: '12px 20px 0',
-              padding: '10px 14px',
+              margin: '12px 18px 0',
+              padding: '8px 12px',
               backgroundColor: '#fefce8',
               border: '1px solid #fef08a',
               borderRadius: '8px',
               color: '#854d0e',
-              fontSize: '12.5px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '8px',
+              fontSize: '12px',
               lineHeight: 1.4,
             }}
           >
-            <Icon name="stickyNote" size={16} />
-            <div>
-              <strong style={{ display: 'block', fontSize: '11px', color: '#a16207', textTransform: 'uppercase' }}>
-                Catatan Pesanan:
-              </strong>
-              <span>"{orderData.notes}"</span>
-            </div>
+            <strong style={{ fontSize: '11px', color: '#a16207', textTransform: 'uppercase' }}>
+              Catatan:{' '}
+            </strong>
+            <span>&quot;{orderData.notes}&quot;</span>
           </div>
         )}
 

@@ -1,4 +1,4 @@
-export type UserRole = 'OWNER' | 'CASHIER' | 'MANAGER' | 'STAFF';
+export type UserRole = 'OWNER' | 'CASHIER' | 'EMPLOYEE' | 'MANAGER' | 'STAFF';
 
 export interface User {
   id: string;
@@ -6,6 +6,8 @@ export interface User {
   username: string;
   role: UserRole;
   hasPin?: boolean;
+  hasFace?: boolean;
+  facePhotoUrl?: string | null;
 }
 
 export interface AuthState {
@@ -66,11 +68,31 @@ export interface ProductRecipeSummary {
   is_packaging_only: boolean;
 }
 
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  name: string;
+  price: number;
+  sort_order: number;
+  is_active: boolean;
+  recipe_hpp?: number;
+  recipe_count?: number;
+  is_auto_sold_out?: boolean;
+  recipes?: ProductRecipeSummary[];
+}
+
+export interface ProductCategoryItem {
+  id?: string;
+  name: string;
+  default_print_target?: 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE';
+  sort_order?: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
   name: string;
-  category: 'Kopi' | 'Non-Kopi' | 'Makanan' | 'Camilan' | 'Add-on';
+  category: string;
   price: number;
   original_price?: number;
   has_promo?: boolean;
@@ -78,6 +100,7 @@ export interface Product {
   recipe_hpp?: number;
   recipe_count?: number;
   recipes?: ProductRecipeSummary[];
+  variants?: ProductVariant[];
   image_url?: string | null;
   print_target: 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE';
   is_active: boolean;
@@ -187,7 +210,10 @@ export interface Promo {
 }
 
 export interface CartCustomization {
-  size: 'Reguler' | 'Besar';
+  variantId?: string;
+  variantName?: string;
+  variantPrice?: number;
+  size: 'Reguler' | 'Besar' | string;
   unitPriceAdjustment: number;
   sugarLevel?: 'Normal (100%)' | 'Less Sugar (70%)' | 'Half Sugar (50%)' | 'No Sugar (0%)';
   iceLevel?: 'Normal Ice' | 'Less Ice' | 'No Ice' | 'Hot';
@@ -207,6 +233,8 @@ export interface CartItem {
 export interface OrderItem {
   id: string;
   productId: string;
+  variantId?: string | null;
+  variantName?: string | null;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -307,6 +335,8 @@ export interface DirectCheckoutPayload {
   reservationId?: string | null;
   items: Array<{
     productId: string;
+    variantId?: string | null;
+    variantName?: string;
     quantity: number;
     notes?: string;
     modifiers?: string[];
@@ -414,6 +444,7 @@ export interface Ingredient {
 export interface ProductRecipeItem {
   id: string;
   product_id: string;
+  variant_id?: string | null;
   ingredient_id: string;
   ingredient_name: string;
   ingredient_code: string;
@@ -427,6 +458,7 @@ export interface ProductRecipeItem {
 export interface ProductRecipesResponse {
   recipes: ProductRecipeItem[];
   totalHpp: number;
+  variantId?: string | null;
 }
 
 export interface Supplier {
@@ -497,6 +529,12 @@ export interface StoreSettings {
   wifi_ssid?: string;
   wifi_password?: string;
   instagram?: string;
+  attendance_lat?: number | null;
+  attendance_lng?: number | null;
+  attendance_radius_meters?: number;
+  attendance_clock_in_time?: string;
+  attendance_clock_out_time?: string;
+  attendance_late_tolerance_minutes?: number;
   updated_at?: string;
 }
 
@@ -543,7 +581,47 @@ export interface StaffUser {
   username: string;
   role: UserRole;
   has_pin: boolean;
+  has_face?: boolean;
+  face_photo_url?: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+export interface AttendanceConfig {
+  storeName: string;
+  lat: number;
+  lng: number;
+  radiusMeters: number;
+  clockInTime: string;
+  clockOutTime: string;
+  lateToleranceMinutes: number;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  user_id: string;
+  employee_name?: string;
+  employee_username?: string;
+  employee_role?: UserRole;
+  registered_face_url?: string | null;
+  work_date: string;
+  clock_in: string;
+  clock_out?: string | null;
+  total_hours?: number | null;
+  status: 'PRESENT' | 'LATE' | 'PERMIT' | 'SICK';
+  late_minutes?: number;
+  notes?: string | null;
+  clock_in_photo?: string | null;
+  clock_out_photo?: string | null;
+  clock_in_lat?: number | null;
+  clock_in_lng?: number | null;
+  clock_out_lat?: number | null;
+  clock_out_lng?: number | null;
+  clock_in_distance_meters?: number | null;
+  clock_out_distance_meters?: number | null;
+  clock_in_within_radius?: boolean;
+  clock_out_within_radius?: boolean | null;
+  face_match_score?: number | null;
+  clock_out_face_match_score?: number | null;
 }
 

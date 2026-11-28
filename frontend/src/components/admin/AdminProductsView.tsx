@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Product, Ingredient, ProductRecipeItem } from '@/types';
+import { Product, Ingredient, ProductRecipeItem, ProductVariant } from '@/types';
 import {
   Select,
   SelectContent,
@@ -16,16 +16,13 @@ import {
   Coffee,
   Plus,
   Search,
-  Check,
   X,
   AlertCircle,
   Pencil,
   Trash2,
-  Boxes,
   UploadCloud,
   Loader2,
   ChevronDown,
-  TrendingUp,
 } from 'lucide-react';
 
 export function AdminProductsView() {
@@ -42,8 +39,9 @@ export function AdminProductsView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeRecipePopover, setActiveRecipePopover] = useState<string | null>(null);
 
-  // Recipe Formulation Modal
+  // Recipe Formulation & Variant Modal
   const [formulatingProduct, setFormulatingProduct] = useState<Product | null>(null);
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [currentRecipes, setCurrentRecipes] = useState<ProductRecipeItem[]>([]);
   const [recipeTotalHpp, setRecipeTotalHpp] = useState(0);
   const [isRecipeLoading, setIsRecipeLoading] = useState(false);
@@ -53,14 +51,27 @@ export function AdminProductsView() {
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isIngredientDropdownOpen, setIsIngredientDropdownOpen] = useState(false);
   const [recipeError, setRecipeError] = useState('');
+  const [recipeSavedBanner, setRecipeSavedBanner] = useState('');
   const qtyInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Variant inline form inside Recipe modal
+  const [isVariantFormOpen, setIsVariantFormOpen] = useState(false);
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [variantFormName, setVariantFormName] = useState('');
+  const [variantFormPrice, setVariantFormPrice] = useState('');
+  const [isSavingVariant, setIsSavingVariant] = useState(false);
+  const [confirmDeleteVariantId, setConfirmDeleteVariantId] = useState<string | null>(null);
+
   // Add / Edit Product Modal
+  const [categoryItems, setCategoryItems] = useState<Array<{ name: string; default_print_target?: 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE' }>>([]);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formSku, setFormSku] = useState('');
   const [formName, setFormName] = useState('');
-  const [formCategory, setFormCategory] = useState<'Kopi' | 'Non-Kopi' | 'Makanan' | 'Camilan' | 'Add-on'>('Kopi');
+  const [formCategory, setFormCategory] = useState<string>('Kopi');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [formPrice, setFormPrice] = useState('');
   const [formPrintTarget, setFormPrintTarget] = useState<'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE'>('BAR_PRINTER');
   const [formIsFavorite, setFormIsFavorite] = useState(false);
@@ -76,6 +87,10 @@ export function AdminProductsView() {
 
   // Auto-detect printer station from category
   const getAutoStation = (category: string): 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE' => {
+    const matched = categoryItems.find((c) => c.name === category);
+    if (matched?.default_print_target) {
+      return matched.default_print_target;
+    }
     if (category === 'Makanan' || category === 'Camilan') {
       return 'KITCHEN_PRINTER';
     }
@@ -86,15 +101,19 @@ export function AdminProductsView() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [prodRes, ingRes] = await Promise.all([
+      const [prodRes, ingRes, catRes] = await Promise.all([
         api.products.getAll(),
         api.inventory.getAll(),
+        api.products.getCategories().catch(() => ({ success: false, data: [] })),
       ]);
       if (prodRes.success && prodRes.data) {
         setProducts(prodRes.data);
       }
       if (ingRes.success && ingRes.data) {
         setIngredients(ingRes.data);
+      }
+      if (catRes.success && Array.isArray(catRes.data)) {
+        setCategoryItems(catRes.data);
       }
     } catch (err) {
       console.error('Failed to load products/ingredients:', err);
@@ -129,9 +148,9 @@ export function AdminProductsView() {
     }
   };
 
-  // Recipe Formulation Handlers
-  const openRecipeModal = async (product: Product) => {
-    setFormulatingProduct(product);
+  // Recipe Formulation & Variant Handlers
+  const loadRecipeForTarget = async (productId: string, variantId: string | null) => {
+    setActiveVariantId(variantId);
     setIsRecipeLoading(true);
     setNewIngredientId('');
     setNewIngredientQty('');
@@ -139,8 +158,10 @@ export function AdminProductsView() {
     setIngredientSearch('');
     setIsIngredientDropdownOpen(false);
     setRecipeError('');
+    setRecipeSavedBanner('');
+    setConfirmDeleteVariantId(null);
     try {
-      const res = await api.products.getRecipes(product.id);
+      const res = await api.products.getRecipes(productId, variantId);
       if (res.success && res.data) {
         setCurrentRecipes(res.data.recipes);
         setRecipeTotalHpp(res.data.totalHpp);
@@ -149,6 +170,118 @@ export function AdminProductsView() {
       console.error('Failed to fetch recipes:', err);
     } finally {
       setIsRecipeLoading(false);
+    }
+  };
+
+  const openRecipeModal = async (product: Product) => {
+    setFormulatingProduct(product);
+    setIsVariantFormOpen(false);
+    setEditingVariantId(null);
+    setVariantFormName('');
+    setVariantFormPrice('');
+    const initialVariantId =
+      (product.recipe_count || 0) === 0 && product.variants && product.variants.length > 0
+        ? product.variants[0].id
+        : null;
+    await loadRecipeForTarget(product.id, initialVariantId);
+  };
+
+  const handleOpenAddVariant = () => {
+    setEditingVariantId(null);
+    setVariantFormName('');
+    setVariantFormPrice(formulatingProduct ? String(formulatingProduct.price) : '');
+    setIsVariantFormOpen(true);
+    setRecipeError('');
+    setRecipeSavedBanner('');
+    setConfirmDeleteVariantId(null);
+  };
+
+  const handleOpenEditVariant = (variant: ProductVariant) => {
+    setEditingVariantId(variant.id);
+    setVariantFormName(variant.name);
+    setVariantFormPrice(String(variant.price));
+    setIsVariantFormOpen(true);
+    setRecipeError('');
+    setRecipeSavedBanner('');
+    setConfirmDeleteVariantId(null);
+  };
+
+  const handleSaveVariant = async () => {
+    if (!formulatingProduct) return;
+    const trimmedName = variantFormName.trim();
+    const numericPrice = Number(variantFormPrice);
+    if (!trimmedName) {
+      setRecipeError('Nama varian wajib diisi.');
+      return;
+    }
+    if (!variantFormPrice || Number.isNaN(numericPrice) || numericPrice < 0) {
+      setRecipeError('Harga jual varian tidak valid.');
+      return;
+    }
+
+    setIsSavingVariant(true);
+    setRecipeError('');
+    try {
+      if (editingVariantId) {
+        const res = await api.products.updateVariant(formulatingProduct.id, editingVariantId, {
+          name: trimmedName,
+          price: numericPrice,
+        });
+        if (res.success && res.data) {
+          const updatedVariants = (formulatingProduct.variants || []).map((v) =>
+            v.id === editingVariantId ? { ...v, name: trimmedName, price: numericPrice } : v
+          );
+          setFormulatingProduct({ ...formulatingProduct, variants: updatedVariants });
+          setIsVariantFormOpen(false);
+          setEditingVariantId(null);
+          setRecipeSavedBanner(`Varian "${trimmedName}" diperbarui.`);
+          loadData();
+        }
+      } else {
+        const res = await api.products.createVariant(formulatingProduct.id, {
+          name: trimmedName,
+          price: numericPrice,
+        });
+        if (res.success && res.data) {
+          const newVar: ProductVariant = res.data;
+          const updatedVariants = [...(formulatingProduct.variants || []), newVar];
+          setFormulatingProduct({ ...formulatingProduct, variants: updatedVariants });
+          setIsVariantFormOpen(false);
+          setActiveVariantId(newVar.id);
+          setCurrentRecipes([]);
+          setRecipeTotalHpp(0);
+          setRecipeSavedBanner(`Varian "${newVar.name}" dibuat. Silakan isi resepnya.`);
+          loadData();
+        }
+      }
+    } catch (err: any) {
+      setRecipeError(err.message || 'Gagal menyimpan varian.');
+    } finally {
+      setIsSavingVariant(false);
+    }
+  };
+
+  const handleDeleteVariant = async (variantId: string) => {
+    if (!formulatingProduct) return;
+    setIsSavingVariant(true);
+    setRecipeError('');
+    try {
+      const res = await api.products.deleteVariant(formulatingProduct.id, variantId);
+      if (res.success) {
+        const remaining = (formulatingProduct.variants || []).filter((v) => v.id !== variantId);
+        setFormulatingProduct({ ...formulatingProduct, variants: remaining });
+        setConfirmDeleteVariantId(null);
+        setIsVariantFormOpen(false);
+        const nextTargetId = remaining.length > 0 && (formulatingProduct.recipe_count || 0) === 0
+          ? remaining[0].id
+          : null;
+        await loadRecipeForTarget(formulatingProduct.id, nextTargetId);
+        loadData();
+      }
+    } catch (err: any) {
+      setRecipeError(err.message || 'Gagal menghapus varian.');
+    } finally {
+      setIsSavingVariant(false);
     }
   };
 
@@ -202,10 +335,12 @@ export function AdminProductsView() {
     setIngredientSearch('');
     setIsIngredientDropdownOpen(false);
     setRecipeError('');
+    setRecipeSavedBanner('');
   };
 
   const handleRemoveRecipeIngredient = (ingredientId: string) => {
     setCurrentRecipes(currentRecipes.filter((r) => r.ingredient_id !== ingredientId));
+    setRecipeSavedBanner('');
   };
 
   const handleSaveRecipes = async () => {
@@ -217,11 +352,37 @@ export function AdminProductsView() {
         is_packaging_only: Boolean(r.is_packaging_only),
       }));
 
-      const res = await api.products.updateRecipes(formulatingProduct.id, payload);
+      const res = await api.products.updateRecipes(formulatingProduct.id, payload, activeVariantId);
       if (res.success) {
-        setFormulatingProduct(null);
+        const savedHpp = Math.round(currentRecipes.reduce((sum, r) => sum + Number(r.item_hpp || 0), 0));
+        const savedCount = payload.filter((r) => r.quantity > 0).length;
+
+        if (activeVariantId) {
+          const updatedVariants = (formulatingProduct.variants || []).map((v) =>
+            v.id === activeVariantId
+              ? { ...v, recipe_hpp: savedHpp, recipe_count: savedCount }
+              : v
+          );
+          setFormulatingProduct({ ...formulatingProduct, variants: updatedVariants });
+        } else {
+          setFormulatingProduct({
+            ...formulatingProduct,
+            recipe_hpp: savedHpp,
+            recipe_count: savedCount,
+          });
+        }
+
         setRecipeError('');
         loadData();
+
+        if ((formulatingProduct.variants?.length || 0) > 0) {
+          const targetLabel = activeVariantId
+            ? formulatingProduct.variants?.find((v) => v.id === activeVariantId)?.name || 'Varian'
+            : 'Standar';
+          setRecipeSavedBanner(`Resep "${targetLabel}" tersimpan.`);
+        } else {
+          setFormulatingProduct(null);
+        }
       }
     } catch (err: any) {
       setRecipeError(err.message || 'Gagal menyimpan resep.');
@@ -233,9 +394,12 @@ export function AdminProductsView() {
     setEditingProduct(null);
     setFormSku(`SKU-${Date.now().toString().slice(-4)}`);
     setFormName('');
-    setFormCategory('Kopi');
+    const defaultCat = availableCategories[0] || 'Kopi';
+    setFormCategory(defaultCat);
+    setIsAddingCategory(false);
+    setNewCategoryName('');
     setFormPrice('');
-    setFormPrintTarget(getAutoStation('Kopi')); // Otomatis Bar untuk Kopi
+    setFormPrintTarget(getAutoStation(defaultCat));
     setFormIsFavorite(false);
     setFormImageUrl('');
     setShowManualUrlInput(false);
@@ -247,7 +411,9 @@ export function AdminProductsView() {
     setEditingProduct(product);
     setFormSku(product.sku);
     setFormName(product.name);
-    setFormCategory(product.category as any);
+    setFormCategory(product.category);
+    setIsAddingCategory(false);
+    setNewCategoryName('');
     setFormPrice(product.price.toString());
     setFormPrintTarget((product.print_target as any) || getAutoStation(product.category));
     setFormIsFavorite(Boolean(product.is_favorite));
@@ -258,9 +424,63 @@ export function AdminProductsView() {
   };
 
   // Saat kategori diubah, otomatis perbarui target cetak checker
-  const handleCategoryChange = (newCat: 'Kopi' | 'Non-Kopi' | 'Makanan' | 'Camilan' | 'Add-on') => {
+  const handleCategoryChange = (newCat: string) => {
+    if (newCat === '__ADD_CATEGORY__') {
+      setIsAddingCategory(true);
+      setNewCategoryName('');
+      setModalError('');
+      return;
+    }
     setFormCategory(newCat);
     setFormPrintTarget(getAutoStation(newCat));
+  };
+
+  const handleSaveNewCategory = async () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      setModalError('Nama kategori baru wajib diisi.');
+      return;
+    }
+    if (trimmed.length > 50) {
+      setModalError('Nama kategori maksimal 50 karakter.');
+      return;
+    }
+
+    const existing = availableCategories.find(
+      (c) => c.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) {
+      handleCategoryChange(existing);
+      setIsAddingCategory(false);
+      setNewCategoryName('');
+      setModalError('');
+      return;
+    }
+
+    setIsSavingCategory(true);
+    setModalError('');
+    try {
+      const res = await api.products.createCategory({
+        name: trimmed,
+        default_print_target: formPrintTarget,
+      });
+      if (res.success && res.data) {
+        const createdName = res.data.name || trimmed;
+        setCategoryItems((prev) => [
+          ...prev.filter((c) => c.name.toLowerCase() !== createdName.toLowerCase()),
+          res.data,
+        ]);
+        setFormCategory(createdName);
+        setIsAddingCategory(false);
+        setNewCategoryName('');
+      } else {
+        setModalError(res.message || 'Gagal menyimpan kategori baru.');
+      }
+    } catch (err: any) {
+      setModalError(err.message || 'Gagal menyimpan kategori baru.');
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,24 +580,32 @@ export function AdminProductsView() {
     }
   };
 
+  const hasAnyRecipe = (p: Product) =>
+    (p.recipe_count || 0) > 0 || Boolean(p.variants?.some((v) => (v.recipe_count || 0) > 0));
+
   // KPI Calculations
   const totalProducts = products.length;
   const availableCount = products.filter((p) => !p.isSoldOut).length;
   const soldOutCount = products.filter((p) => p.isSoldOut).length;
-  const formulatedCount = products.filter((p) => (p.recipe_count || 0) > 0).length;
+  const formulatedCount = products.filter((p) => hasAnyRecipe(p)).length;
   const unformulatedCount = totalProducts - formulatedCount;
 
   // Average margin of formulated products with valid HPP
-  const formulatedWithCost = products.filter(
-    (p) => (p.recipe_count || 0) > 0 && (p.recipe_hpp || 0) > 0 && p.price > 0
-  );
+  const formulatedWithCost = products.filter((p) => {
+    if ((p.recipe_count || 0) > 0 && (p.recipe_hpp || 0) > 0 && p.price > 0) return true;
+    return Boolean(p.variants?.some((v) => (v.recipe_count || 0) > 0 && (v.recipe_hpp || 0) > 0 && v.price > 0));
+  });
   const avgMargin =
     formulatedWithCost.length > 0
       ? Math.round(
-          formulatedWithCost.reduce(
-            (sum, p) => sum + ((p.price - (p.recipe_hpp || 0)) / p.price) * 100,
-            0
-          ) / formulatedWithCost.length
+          formulatedWithCost.reduce((sum, p) => {
+            if ((p.recipe_count || 0) > 0 && p.price > 0) {
+              return sum + ((p.price - (p.recipe_hpp || 0)) / p.price) * 100;
+            }
+            const firstVar = p.variants?.find((v) => (v.recipe_count || 0) > 0 && v.price > 0);
+            if (!firstVar) return sum;
+            return sum + ((firstVar.price - (firstVar.recipe_hpp || 0)) / firstVar.price) * 100;
+          }, 0) / formulatedWithCost.length
         )
       : 0;
 
@@ -386,25 +614,40 @@ export function AdminProductsView() {
       ? Math.round(products.reduce((sum, p) => sum + p.price, 0) / totalProducts)
       : 0;
 
+  // Dynamic categories list (seeded defaults + persisted + used by products)
+  const availableCategories = useMemo(() => {
+    const base =
+      categoryItems.length > 0
+        ? categoryItems.map((c) => c.name)
+        : ['Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'];
+    const merged = [...base, ...products.map((p) => p.category)];
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const c of merged) {
+      const clean = c?.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+        unique.push(clean);
+      }
+    }
+    return unique;
+  }, [categoryItems, products]);
+
   // Category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {
       ALL: products.length,
-      Kopi: 0,
-      'Non-Kopi': 0,
-      Makanan: 0,
-      Camilan: 0,
-      'Add-on': 0,
     };
+    for (const cat of availableCategories) {
+      counts[cat] = 0;
+    }
     for (const p of products) {
-      if (counts[p.category] !== undefined) {
-        counts[p.category]++;
-      }
+      counts[p.category] = (counts[p.category] || 0) + 1;
     }
     return counts;
-  }, [products]);
+  }, [products, availableCategories]);
 
-  const categories = ['ALL', 'Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'] as const;
+  const categories = useMemo(() => ['ALL', ...availableCategories], [availableCategories]);
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
@@ -412,8 +655,8 @@ export function AdminProductsView() {
       if (selectedCategory !== 'ALL' && p.category !== selectedCategory) return false;
       if (availabilityFilter === 'AVAILABLE' && p.isSoldOut) return false;
       if (availabilityFilter === 'SOLDOUT' && !p.isSoldOut) return false;
-      if (recipeFilter === 'HAS_RECIPE' && (p.recipe_count || 0) === 0) return false;
-      if (recipeFilter === 'NO_RECIPE' && (p.recipe_count || 0) > 0) return false;
+      if (recipeFilter === 'HAS_RECIPE' && !hasAnyRecipe(p)) return false;
+      if (recipeFilter === 'NO_RECIPE' && hasAnyRecipe(p)) return false;
       if (stationFilter !== 'ALL' && p.print_target !== stationFilter) return false;
 
       if (searchQuery.trim()) {
@@ -603,23 +846,18 @@ export function AdminProductsView() {
               type="button"
               onClick={() => router.push('/matriks')}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
                 padding: '7px 14px',
-                background: '#eef6ef',
-                color: '#2d6a4f',
-                border: '1.5px solid #2d6a4f',
+                background: '#f2f4ef',
+                color: '#57695b',
+                border: '1px solid #dcdfd5',
                 borderRadius: '8px',
                 fontWeight: 700,
                 fontSize: '12px',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
               }}
-              title="Buka Halaman Analisis Matriks Menu BCG Lengkap"
+              title="Buka Halaman Analisis Matriks Menu (BCG)"
             >
-              <TrendingUp size={14} />
-              Matriks Menu (BCG)
+              Matriks Menu
             </button>
 
             {/* Tombol Tambah Menu */}
@@ -814,11 +1052,23 @@ export function AdminProductsView() {
               ) : (
                 filteredProducts.map((p) => {
                   const isSoldOut = Boolean(p.is_force_sold_out || p.is_auto_sold_out);
-                  const hasRecipe = (p.recipe_count || 0) > 0;
-                  const hpp = p.recipe_hpp || 0;
+                  const variants = p.variants || [];
+                  const hasBaseRecipe = (p.recipe_count || 0) > 0;
+                  const variantsWithRecipe = variants.filter((v) => (v.recipe_count || 0) > 0);
+                  const hasRecipe = hasBaseRecipe || variantsWithRecipe.length > 0;
+                  const hpp = hasBaseRecipe
+                    ? (p.recipe_hpp || 0)
+                    : variantsWithRecipe.length > 0
+                    ? (variantsWithRecipe[0].recipe_hpp || 0)
+                    : 0;
+                  const refPrice = hasBaseRecipe
+                    ? Number(p.price)
+                    : variantsWithRecipe.length > 0
+                    ? Number(variantsWithRecipe[0].price)
+                    : Number(p.price);
                   const marginPct =
-                    hasRecipe && hpp > 0 && p.price > 0
-                      ? Math.round(((p.price - hpp) / p.price) * 100)
+                    hasRecipe && hpp > 0 && refPrice > 0
+                      ? Math.round(((refPrice - hpp) / refPrice) * 100)
                       : null;
 
                   return (
@@ -915,8 +1165,28 @@ export function AdminProductsView() {
                       </td>
 
                       {/* Harga Jual */}
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
-                        Rp {Number(p.price).toLocaleString('id-ID')}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+                        {variants.length > 0 ? (() => {
+                          const prices = variants.map((v) => Number(v.price));
+                          const minP = Math.min(...prices);
+                          const maxP = Math.max(...prices);
+                          return (
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
+                                {minP === maxP
+                                  ? `Rp ${minP.toLocaleString('id-ID')}`
+                                  : `Rp ${minP.toLocaleString('id-ID')} – ${maxP.toLocaleString('id-ID')}`}
+                              </div>
+                              <div style={{ fontSize: '10.5px', color: '#64746b', marginTop: '1px' }}>
+                                {variants.length} varian
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          <span style={{ fontWeight: 700, color: '#1c2826', fontSize: '12px' }}>
+                            Rp {Number(p.price).toLocaleString('id-ID')}
+                          </span>
+                        )}
                       </td>
 
                       {/* Resep & HPP Bahan */}
@@ -940,8 +1210,8 @@ export function AdminProductsView() {
                                     }}
                                     title={
                                       marginPct < 0
-                                        ? `Defisit: Biaya HPP (Rp ${hpp.toLocaleString('id-ID')}) melebihi harga jual (Rp ${Number(p.price).toLocaleString('id-ID')})`
-                                        : `Laba Kotor: Rp ${(p.price - hpp).toLocaleString('id-ID')}`
+                                        ? `Defisit: Biaya HPP (Rp ${hpp.toLocaleString('id-ID')}) melebihi harga jual (Rp ${refPrice.toLocaleString('id-ID')})`
+                                        : `Laba Kotor: Rp ${(refPrice - hpp).toLocaleString('id-ID')}`
                                     }
                                   >
                                     {marginPct < 0 ? `${marginPct}% Rugi` : `${marginPct}% Laba`}
@@ -974,7 +1244,11 @@ export function AdminProductsView() {
                                 }}
                                 title="Klik untuk melihat rincian bahan resep"
                               >
-                                <span>{p.recipe_count} Bahan</span>
+                                <span>
+                                  {variants.length > 0
+                                    ? `${variants.length} Varian`
+                                    : `${p.recipe_count} Bahan`}
+                                </span>
                                 <ChevronDown size={11} />
                               </button>
 
@@ -1000,10 +1274,10 @@ export function AdminProductsView() {
                                       boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                                       padding: '10px 12px',
                                       zIndex: 999,
-                                      minWidth: '240px',
+                                      minWidth: '250px',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '6px',
+                                      gap: '8px',
                                     }}
                                   >
                                     <div
@@ -1016,7 +1290,7 @@ export function AdminProductsView() {
                                       }}
                                     >
                                       <span style={{ fontSize: '11px', fontWeight: 700, color: '#1c2826' }}>
-                                        Komposisi Resep ({p.recipe_count} Bahan)
+                                        Komposisi Resep
                                       </span>
                                       <button
                                         type="button"
@@ -1035,13 +1309,18 @@ export function AdminProductsView() {
                                           padding: 0,
                                         }}
                                       >
-                                        Edit
+                                        Atur Resep & Varian
                                       </button>
                                     </div>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      {p.recipes && p.recipes.length > 0 ? (
-                                        p.recipes.map((r, idx) => (
+                                    {p.recipes && p.recipes.length > 0 && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        {variants.length > 0 && (
+                                          <div style={{ fontSize: '10px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+                                            Standar · Rp {Number(p.price).toLocaleString('id-ID')}
+                                          </div>
+                                        )}
+                                        {p.recipes.map((r, idx) => (
                                           <div
                                             key={idx}
                                             style={{
@@ -1064,29 +1343,52 @@ export function AdminProductsView() {
                                               {Number(r.quantity).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {r.unit}
                                             </span>
                                           </div>
-                                        ))
-                                      ) : (
-                                        <div style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
-                                          Belum ada rincian bahan.
-                                        </div>
-                                      )}
-                                    </div>
+                                        ))}
+                                      </div>
+                                    )}
 
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        paddingTop: '6px',
-                                        borderTop: '1px solid #f0f0eb',
-                                        fontSize: '11px',
-                                      }}
-                                    >
-                                      <span style={{ color: '#71717a' }}>Total HPP:</span>
-                                      <strong style={{ color: '#1c2826' }}>
-                                        Rp {hpp.toLocaleString('id-ID')}
-                                      </strong>
-                                    </div>
+                                    {variants.map((v) => (
+                                      <div
+                                        key={v.id}
+                                        style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '3px',
+                                          paddingTop: '4px',
+                                          borderTop: '1px dashed #eeece6',
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px' }}>
+                                          <strong style={{ color: '#1c2826' }}>{v.name}</strong>
+                                          <span style={{ color: '#57695b', fontWeight: 600 }}>
+                                            HPP Rp {(v.recipe_hpp || 0).toLocaleString('id-ID')} / Rp {Number(v.price).toLocaleString('id-ID')}
+                                          </span>
+                                        </div>
+                                        {v.recipes && v.recipes.length > 0 ? (
+                                          v.recipes.map((r, idx) => (
+                                            <div
+                                              key={idx}
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '8px',
+                                                fontSize: '11px',
+                                              }}
+                                            >
+                                              <span style={{ color: '#4b5563' }}>{r.name}</span>
+                                              <span style={{ color: '#57695b', fontWeight: 600 }}>
+                                                {Number(r.quantity).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {r.unit}
+                                              </span>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <span style={{ fontSize: '10.5px', color: '#9ca3af', fontStyle: 'italic' }}>
+                                            Ikut resep standar
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 </>
                               )}
@@ -1144,15 +1446,9 @@ export function AdminProductsView() {
                               : 'Klik untuk mengubah ketersediaan di kasir'
                           }
                         >
-                          {isSoldOut ? (
-                            <>
-                              <X size={11} /> {p.is_auto_sold_out && !p.is_force_sold_out ? 'Habis (Stok)' : 'Habis'}
-                            </>
-                          ) : (
-                            <>
-                              <Check size={11} /> Tersedia
-                            </>
-                          )}
+                          {isSoldOut
+                            ? (p.is_auto_sold_out && !p.is_force_sold_out ? 'Habis (Stok)' : 'Habis')
+                            : 'Tersedia'}
                         </button>
                       </td>
 
@@ -1162,10 +1458,7 @@ export function AdminProductsView() {
                           <button
                             onClick={() => openRecipeModal(p)}
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
+                              padding: '3px 9px',
                               background: '#f2f4ef',
                               color: '#57695b',
                               border: '1px solid #dcdfd5',
@@ -1176,7 +1469,7 @@ export function AdminProductsView() {
                             }}
                             title="Aturan Resep & HPP"
                           >
-                            <Boxes size={12} /> Resep
+                            Resep
                           </button>
 
                           <button
@@ -1229,8 +1522,8 @@ export function AdminProductsView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1241,14 +1534,15 @@ export function AdminProductsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '640px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '620px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             {/* Modal Header */}
@@ -1258,27 +1552,31 @@ export function AdminProductsView() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '14px 18px',
-                borderBottom: '1px solid #e7e8e3',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  Resep & HPP: {formulatingProduct.name}
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  Resep & Varian: {formulatingProduct.name}
                 </h3>
                 <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
-                  SKU: {formulatingProduct.sku} • Harga Jual: Rp{' '}
+                  {formulatingProduct.sku} · Harga dasar Rp{' '}
                   {Number(formulatingProduct.price).toLocaleString('id-ID')}
                 </div>
               </div>
               <button
                 onClick={() => setFormulatingProduct(null)}
                 style={{
-                  background: '#f7f7f5',
+                  background: 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '5px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
@@ -1287,19 +1585,293 @@ export function AdminProductsView() {
 
             {/* Modal Content */}
             <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Ringkasan Biaya Compact (1 Baris Rapi) */}
+              {/* Bar Varian / Porsi Minimalis */}
               {(() => {
-                const totalHpp = Math.round(currentRecipes.reduce((sum, r) => sum + r.item_hpp, 0));
-                const grossProfit = formulatingProduct.price - totalHpp;
+                const productVariants = formulatingProduct.variants || [];
+                const activeVariant = activeVariantId
+                  ? productVariants.find((v) => v.id === activeVariantId) || null
+                  : null;
+                const activeSellingPrice = activeVariant
+                  ? Number(activeVariant.price)
+                  : Number(formulatingProduct.price);
+
+                const totalHpp = Math.round(currentRecipes.reduce((sum, r) => sum + Number(r.item_hpp || 0), 0));
+                const grossProfit = activeSellingPrice - totalHpp;
                 const isLoss = grossProfit < 0;
                 const marginPct =
-                  formulatingProduct.price > 0
-                    ? ((grossProfit / formulatingProduct.price) * 100).toFixed(1)
+                  activeSellingPrice > 0
+                    ? ((grossProfit / activeSellingPrice) * 100).toFixed(1)
                     : '0';
                 const zeroCostItems = currentRecipes.filter((r) => Number(r.unit_cost) === 0);
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Pill Tabs Varian */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => loadRecipeForTarget(formulatingProduct.id, null)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '7px',
+                            border: activeVariantId === null ? '1.5px solid #57695b' : '1px solid #e2e4dc',
+                            background: activeVariantId === null ? '#eef3ef' : '#ffffff',
+                            color: activeVariantId === null ? '#2b3b2e' : '#4b5563',
+                            fontSize: '11.5px',
+                            fontWeight: activeVariantId === null ? 700 : 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Standar · Rp {Number(formulatingProduct.price).toLocaleString('id-ID')}
+                        </button>
+
+                        {productVariants.map((v) => {
+                          const isActive = activeVariantId === v.id;
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => loadRecipeForTarget(formulatingProduct.id, v.id)}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: '7px',
+                                border: isActive ? '1.5px solid #57695b' : '1px solid #e2e4dc',
+                                background: isActive ? '#eef3ef' : '#ffffff',
+                                color: isActive ? '#2b3b2e' : '#4b5563',
+                                fontSize: '11.5px',
+                                fontWeight: isActive ? 700 : 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                              }}
+                            >
+                              <span>{v.name} · Rp {Number(v.price).toLocaleString('id-ID')}</span>
+                              {(v.recipe_count || 0) > 0 && (
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: '#57695b',
+                                  }}
+                                  title={`${v.recipe_count} bahan`}
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={handleOpenAddVariant}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '7px',
+                            border: '1px dashed #b9c1b9',
+                            background: '#fbfbf9',
+                            color: '#57695b',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Plus size={12} />
+                          Varian
+                        </button>
+                      </div>
+
+                      {/* Aksi Ubah / Hapus untuk Varian Aktif */}
+                      {activeVariant && !isVariantFormOpen && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '5px 10px',
+                            background: '#f7f8f5',
+                            borderRadius: '6px',
+                            fontSize: '11.5px',
+                            color: '#4b5563',
+                          }}
+                        >
+                          <span>
+                            Varian: <strong style={{ color: '#1c2826' }}>{activeVariant.name}</strong> (Harga Rp {Number(activeVariant.price).toLocaleString('id-ID')})
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {confirmDeleteVariantId === activeVariant.id ? (
+                              <>
+                                <span style={{ color: '#b91c1c', fontWeight: 600 }}>Hapus varian?</span>
+                                <button
+                                  type="button"
+                                  disabled={isSavingVariant}
+                                  onClick={() => handleDeleteVariant(activeVariant.id)}
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    background: '#dc2626',
+                                    color: '#ffffff',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Ya
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteVariantId(null)}
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #d1d5db',
+                                    background: '#ffffff',
+                                    color: '#4b5563',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Batal
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditVariant(activeVariant)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#57695b',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: 0,
+                                  }}
+                                >
+                                  <Pencil size={11} />
+                                  Ubah
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteVariantId(activeVariant.id)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#b91c1c',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: 0,
+                                  }}
+                                >
+                                  <Trash2 size={11} />
+                                  Hapus
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Form Inline Tambah / Ubah Varian */}
+                      {isVariantFormOpen && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 10px',
+                            background: '#f7f8f5',
+                            border: '1px solid #dce0d6',
+                            borderRadius: '8px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <input
+                            type="text"
+                            placeholder="Nama varian (cth: Besar 16oz / Jumbo)"
+                            value={variantFormName}
+                            onChange={(e) => setVariantFormName(e.target.value)}
+                            maxLength={60}
+                            autoFocus
+                            style={{
+                              flex: 1,
+                              minWidth: '170px',
+                              height: '32px',
+                              padding: '0 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #ccd1c4',
+                              background: '#ffffff',
+                              fontSize: '12px',
+                              outline: 'none',
+                            }}
+                          />
+                          <div style={{ width: '130px' }}>
+                            <NumberInput
+                              placeholder="Harga jual (Rp)"
+                              min={0}
+                              value={variantFormPrice}
+                              onValueChange={(val) => setVariantFormPrice(val)}
+                              style={{ height: '32px', fontSize: '12px' }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isSavingVariant}
+                            onClick={handleSaveVariant}
+                            style={{
+                              height: '32px',
+                              padding: '0 12px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: '#57695b',
+                              color: '#ffffff',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {isSavingVariant ? '...' : editingVariantId ? 'Perbarui' : 'Simpan'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsVariantFormOpen(false);
+                              setEditingVariantId(null);
+                            }}
+                            style={{
+                              height: '32px',
+                              width: '30px',
+                              borderRadius: '6px',
+                              border: '1px solid #dcdfd5',
+                              background: '#ffffff',
+                              color: '#6b7280',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}
+                            aria-label="Batal varian"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ringkasan Biaya Compact (1 Baris Rapi, mengikuti harga varian aktif) */}
                     <div
                       style={{
                         display: 'flex',
@@ -1358,7 +1930,7 @@ export function AdminProductsView() {
                       >
                         <AlertCircle size={14} color="#b91c1c" style={{ flexShrink: 0 }} />
                         <span>
-                          <strong>Peringatan Defisit:</strong> Total HPP bahan (Rp {totalHpp.toLocaleString('id-ID')}) melebihi harga jual menu (Rp {Number(formulatingProduct.price).toLocaleString('id-ID')}). Setiap porsi merugi Rp {Math.abs(grossProfit).toLocaleString('id-ID')}.
+                          <strong>Peringatan Defisit:</strong> Total HPP bahan (Rp {totalHpp.toLocaleString('id-ID')}) melebihi harga jual {activeVariant ? activeVariant.name : 'menu'} (Rp {activeSellingPrice.toLocaleString('id-ID')}). Setiap porsi merugi Rp {Math.abs(grossProfit).toLocaleString('id-ID')}.
                         </span>
                       </div>
                     )}
@@ -1386,6 +1958,33 @@ export function AdminProductsView() {
                   </div>
                 );
               })()}
+
+              {/* Saved confirmation pill */}
+              {recipeSavedBanner && (
+                <div
+                  style={{
+                    padding: '6px 10px',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '7px',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    color: '#15803d',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>{recipeSavedBanner}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRecipeSavedBanner('')}
+                    style={{ background: 'transparent', border: 'none', color: '#15803d', cursor: 'pointer', padding: 0 }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
 
               {/* Recipe Error Banner */}
               {recipeError && (
@@ -1794,7 +2393,7 @@ export function AdminProductsView() {
                   cursor: 'pointer',
                 }}
               >
-                Batal
+                {(formulatingProduct.variants?.length || 0) > 0 ? 'Tutup' : 'Batal'}
               </button>
               <button
                 onClick={handleSaveRecipes}
@@ -1809,7 +2408,9 @@ export function AdminProductsView() {
                   cursor: 'pointer',
                 }}
               >
-                Simpan Resep & HPP
+                {activeVariantId
+                  ? `Simpan Resep ${formulatingProduct.variants?.find((v) => v.id === activeVariantId)?.name || 'Varian'}`
+                  : 'Simpan Resep & HPP'}
               </button>
             </div>
           </div>
@@ -1822,8 +2423,8 @@ export function AdminProductsView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1834,14 +2435,15 @@ export function AdminProductsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '14px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
               maxWidth: '460px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             <div
@@ -1850,21 +2452,25 @@ export function AdminProductsView() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '14px 18px',
-                borderBottom: '1px solid #e7e8e3',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                {editingProduct ? 'Edit Data Menu' : 'Tambah Menu Baru'}
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                {editingProduct ? 'Edit Menu' : 'Tambah Menu'}
               </h3>
               <button
                 onClick={() => setIsProductModalOpen(false)}
                 style={{
-                  background: '#f7f7f5',
+                  background: 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '5px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
@@ -2053,18 +2659,128 @@ export function AdminProductsView() {
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '3px' }}>
                     Kategori
                   </label>
-                  <Select value={formCategory} onValueChange={(val) => handleCategoryChange(val as any)}>
-                    <SelectTrigger style={{ width: '100%', height: '34px', background: '#ffffff', borderRadius: '6px', border: '1px solid #d1d5db' }}>
-                      <SelectValue placeholder="Pilih Kategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Kopi">Kopi</SelectItem>
-                      <SelectItem value="Non-Kopi">Non-Kopi</SelectItem>
-                      <SelectItem value="Makanan">Makanan</SelectItem>
-                      <SelectItem value="Camilan">Camilan</SelectItem>
-                      <SelectItem value="Add-on">Add-on</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {isAddingCategory ? (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        autoFocus
+                        maxLength={50}
+                        placeholder="Kategori baru..."
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSaveNewCategory();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setIsAddingCategory(false);
+                            setNewCategoryName('');
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          height: '34px',
+                          padding: '0 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #57695b',
+                          fontSize: '12px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={isSavingCategory}
+                        onClick={handleSaveNewCategory}
+                        style={{
+                          height: '34px',
+                          padding: '0 9px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: '#57695b',
+                          color: '#ffffff',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          cursor: isSavingCategory ? 'wait' : 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {isSavingCategory ? '...' : 'Simpan'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSavingCategory}
+                        onClick={() => {
+                          setIsAddingCategory(false);
+                          setNewCategoryName('');
+                        }}
+                        title="Batal"
+                        style={{
+                          width: '30px',
+                          height: '34px',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          background: '#f7f7f5',
+                          color: '#6b7280',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Select value={formCategory} onValueChange={handleCategoryChange}>
+                          <SelectTrigger style={{ width: '100%', height: '34px', background: '#ffffff', borderRadius: '6px', border: '1px solid #d1d5db' }}>
+                            <SelectValue placeholder="Pilih Kategori" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableCategories.map((cat) => (
+                              <SelectItem key={cat} value={cat}>
+                                {cat}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__ADD_CATEGORY__">
+                              + Tambah Kategori
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingCategory(true);
+                          setNewCategoryName('');
+                          setModalError('');
+                        }}
+                        title="Tambah kategori baru"
+                        aria-label="Tambah kategori baru"
+                        style={{
+                          width: '34px',
+                          height: '34px',
+                          flexShrink: 0,
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          background: '#f7f7f5',
+                          color: '#57695b',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2095,7 +2811,7 @@ export function AdminProductsView() {
                     Cetak Pesanan (Station)
                   </label>
                   <span style={{ fontSize: '10.5px', color: '#57695b', fontWeight: 600 }}>
-                    {formCategory === 'Makanan' || formCategory === 'Camilan'
+                    {getAutoStation(formCategory) === 'KITCHEN_PRINTER'
                       ? 'Otomatis: Dapur'
                       : 'Otomatis: Bar'}
                   </span>
@@ -2177,8 +2893,8 @@ export function AdminProductsView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2189,41 +2905,20 @@ export function AdminProductsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '14px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
               maxWidth: '380px',
               width: '100%',
-              padding: '18px',
+              padding: '20px',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: '#fee2e2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#b91c1c',
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={16} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
-                  Nonaktifkan Menu?
-                </h4>
-                <div style={{ fontSize: '11.5px', color: '#71717a' }}>
-                  Menu tidak akan muncul lagi di kasir.
-                </div>
-              </div>
-            </div>
+            <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700, color: '#1c2826' }}>
+              Nonaktifkan Menu?
+            </h4>
 
             <div
               style={{

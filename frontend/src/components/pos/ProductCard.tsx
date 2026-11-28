@@ -234,46 +234,48 @@ export function ProductCard({
             zIndex: 4,
           }}
         >
-          {/* Star Favorite Button */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite?.(product);
-            }}
-            title={isFavorite ? 'Hapus dari menu favorit' : 'Tandai sebagai menu favorit'}
-            aria-label={isFavorite ? 'Hapus favorit' : 'Tandai favorit'}
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              border: isFavorite ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid rgba(255, 255, 255, 0.35)',
-              backgroundColor: isFavorite ? 'rgba(255, 251, 235, 0.95)' : 'rgba(18, 18, 18, 0.42)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              boxShadow: isFavorite ? '0 2px 8px rgba(245, 158, 11, 0.35)' : '0 2px 6px rgba(0, 0, 0, 0.25)',
-              color: isFavorite ? '#f59e0b' : '#ffffff',
-              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-              padding: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            <Star
-              size={14}
-              fill={isFavorite ? '#f59e0b' : 'none'}
-              stroke={isFavorite ? '#d97706' : '#ffffff'}
-              strokeWidth={2}
-            />
-          </button>
+          {/* Star Favorite Button (Only shown on favorite products) */}
+          {isFavorite && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite?.(product);
+              }}
+              title="Menu Favorit (Klik untuk hapus dari favorit)"
+              aria-label="Hapus favorit"
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
+                backgroundColor: 'rgba(255, 251, 235, 0.95)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
+                color: '#f59e0b',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                padding: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <Star
+                size={14}
+                fill="#f59e0b"
+                stroke="#d97706"
+                strokeWidth={2}
+              />
+            </button>
+          )}
 
           {/* In-Cart Counter Badge */}
           {quantityInCart > 0 && !isSoldOut && (
@@ -342,20 +344,33 @@ export function ProductCard({
           }}
         >
           {/* Price Container */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', minWidth: 0, overflow: 'hidden' }}>
-            {hasPromo && originalPrice ? (
-              <>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    color: '#9ca3af',
-                    textDecoration: 'line-through',
-                    fontWeight: 500,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {rupiah(originalPrice)}
-                </span>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', minWidth: 0, overflow: 'hidden' }}>
+              {hasPromo && originalPrice && !(product.variants && product.variants.length > 0) ? (
+                <>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#9ca3af',
+                      textDecoration: 'line-through',
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {rupiah(originalPrice)}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#1c2826',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {rupiah(product.price)}
+                  </span>
+                </>
+              ) : (
                 <span
                   style={{
                     fontSize: '14px',
@@ -364,19 +379,23 @@ export function ProductCard({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {rupiah(product.price)}
+                  {product.variants && product.variants.length > 0
+                    ? rupiah(Math.min(...product.variants.map((v) => Number(v.price))))
+                    : rupiah(product.price)}
                 </span>
-              </>
-            ) : (
+              )}
+            </div>
+            {product.variants && product.variants.length > 0 && (
               <span
                 style={{
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  color: '#1c2826',
+                  fontSize: '10.5px',
+                  color: '#57695b',
+                  fontWeight: 600,
+                  lineHeight: 1.15,
                   whiteSpace: 'nowrap',
                 }}
               >
-                {rupiah(product.price)}
+                {product.variants.length} varian porsi
               </span>
             )}
           </div>

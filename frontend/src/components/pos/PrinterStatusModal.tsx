@@ -72,32 +72,27 @@ export function PrinterStatusModal({ onClose }: PrinterStatusModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="bo-modal-head">
-          <div>
-            <h2>Status Stasiun Cetak & Print Queue</h2>
-            <p>Pemantauan koneksi printer thermal Bar, Dapur, dan antrean cetak tahan-gagal.</p>
-          </div>
+          <h2>Status Printer & Antrean</h2>
           <button onClick={onClose} aria-label="Tutup">
-            <Icon name="close" size={20} />
+            <Icon name="close" size={18} />
           </button>
         </header>
 
-        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 20px' }}>
+        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px' }}>
           {actionMessage && (
             <div
               style={{
-                padding: '10px 14px',
-                backgroundColor: '#eef6ef',
-                color: '#2d6a4f',
+                padding: '9px 12px',
+                backgroundColor: '#f0fdf4',
+                color: '#15803d',
+                border: '1px solid #bbf7d0',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: '12.5px',
+                fontWeight: 600,
                 marginBottom: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
               }}
             >
-              <Icon name="check" size={16} />
-              <span>{actionMessage}</span>
+              {actionMessage}
             </div>
           )}
 

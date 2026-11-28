@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -112,6 +113,20 @@ export function LoginForm() {
               <span>Masuk</span>
             )}
           </button>
+
+          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+            <Link
+              href="/absensi/login"
+              style={{
+                fontSize: '12px',
+                color: '#57695b',
+                textDecoration: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Masuk Halaman Absensi Karyawan →
+            </Link>
+          </div>
         </form>
       </section>
     </main>

@@ -224,7 +224,7 @@ export async function runSeed() {
     for (const p of products) {
       const pr = await client.query(`
         INSERT INTO products (sku, name, category, price, print_target, is_favorite, is_active)
-        VALUES ($1, $2, $3::product_category, $4, $5::target_station_printer, $6, TRUE)
+        VALUES ($1, $2, $3, $4, $5::target_station_printer, $6, TRUE)
         RETURNING id;
       `, [p.sku, p.name, p.cat, p.price, p.station, p.fav]);
       prodMap[p.sku] = { id: pr.rows[0].id, name: p.name, price: p.price, cat: p.cat, station: p.station };

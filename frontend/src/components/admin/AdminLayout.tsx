@@ -257,16 +257,31 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         >
           {!isSidebarCollapsed ? (
             <>
-              <span
+              <Link
+                href="/dashboard"
+                aria-label="RUANG TEMU Dashboard"
                 style={{
-                  fontSize: '15px',
-                  fontWeight: 800,
-                  color: '#ffffff',
-                  letterSpacing: '-0.2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  minWidth: 0,
+                  flex: 1,
+                  marginRight: '8px',
+                  textDecoration: 'none',
                 }}
               >
-                RUANG TEMU
-              </span>
+                <img
+                  src="/brand/ruang-temu-navbar.png"
+                  alt="RUANG TEMU"
+                  style={{
+                    height: '38px',
+                    width: 'auto',
+                    maxWidth: '100%',
+                    objectFit: 'contain',
+                    objectPosition: 'left center',
+                    display: 'block',
+                  }}
+                />
+              </Link>
               <button
                 onClick={toggleSidebar}
                 title="Tutup / Ciutkan Sidebar"
@@ -698,14 +713,32 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.2px' }}>
-                    RUANG TEMU
-                  </span>
-                  <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 500 }}>
-                    Panel Pemilik (Owner)
-                  </span>
-                </div>
+                <Link
+                  href="/dashboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  aria-label="RUANG TEMU Dashboard"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    minWidth: 0,
+                    flex: 1,
+                    marginRight: '10px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <img
+                    src="/brand/ruang-temu-navbar.png"
+                    alt="RUANG TEMU"
+                    style={{
+                      height: '38px',
+                      width: 'auto',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      objectPosition: 'left center',
+                      display: 'block',
+                    }}
+                  />
+                </Link>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
                   style={{

@@ -31,6 +31,8 @@ export interface DirectCheckoutInput {
   reservationId?: string | null;
   items: Array<{
     productId: string;
+    variantId?: string | null;
+    variantName?: string;
     quantity: number;
     notes?: string;
     modifiers?: string[];
@@ -173,7 +175,25 @@ export class OrderService {
           throw { statusCode: 400, message: `Menu "${product.name}" sedang habis (Force Sold Out).` };
         }
 
-        let itemFinalUnitPrice = Number(product.price);
+        let resolvedVariantId: string | null = null;
+        let resolvedVariantName: string | null = item.variantName?.trim() || null;
+        let baseUnitPrice = Number(product.price);
+
+        if (item.variantId) {
+          const variantRes = await client.query(
+            `SELECT id, name, price FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = TRUE`,
+            [item.variantId, product.id]
+          );
+          if (variantRes.rows.length === 0) {
+            throw { statusCode: 404, message: `Varian untuk menu "${product.name}" tidak ditemukan atau tidak aktif.` };
+          }
+          const variant = variantRes.rows[0];
+          resolvedVariantId = variant.id;
+          resolvedVariantName = variant.name;
+          baseUnitPrice = Number(variant.price);
+        }
+
+        let itemFinalUnitPrice = baseUnitPrice;
         let itemBaseHpp = 0;
         const selectedModifiersJson: any[] = [];
         let parsedTextModifierDeltaSum = 0;
@@ -205,6 +225,16 @@ export class OrderService {
                 }
               }
             } else {
+              // Variant label passed in modifiers array uses variant's DB price, not regex adjustment
+              if (resolvedVariantName && modId === resolvedVariantName) {
+                selectedModifiersJson.push({
+                  name: modId,
+                  price: 0,
+                  isVariant: true,
+                });
+                continue;
+              }
+
               // Custom text modifier (e.g., "Ukuran Besar (+Rp 8.000)", "Oat Milk (+Rp 6.000)", "Extra Shot (+Rp 5.000)")
               let modPrice = 0;
               const match = modId.match(/\(\+Rp\s*([\d\.,]+)\)/i);
@@ -220,9 +250,17 @@ export class OrderService {
           }
         }
 
-        // Apply price adjustment: use explicit unitPriceAdjustment if provided, or fallback to parsed custom modifier deltas
+        if (resolvedVariantName && !selectedModifiersJson.some((m) => m.name === resolvedVariantName)) {
+          selectedModifiersJson.unshift({
+            name: resolvedVariantName,
+            price: 0,
+            isVariant: true,
+          });
+        }
+
+        // Apply price adjustment: use explicit unitPriceAdjustment relative to baseUnitPrice if provided, or fallback to parsed deltas
         if (item.unitPriceAdjustment !== undefined && item.unitPriceAdjustment !== null) {
-          itemFinalUnitPrice = Number(product.price) + Number(item.unitPriceAdjustment);
+          itemFinalUnitPrice = baseUnitPrice + Number(item.unitPriceAdjustment);
         } else {
           itemFinalUnitPrice += parsedTextModifierDeltaSum;
         }
@@ -230,14 +268,26 @@ export class OrderService {
         const itemSubtotal = itemFinalUnitPrice * item.quantity;
         subtotal += itemSubtotal;
 
-        // Recipes
-        const recipesRes = await client.query(
-          `SELECT pr.*, i.unit_cost, i.name as ing_name 
-           FROM product_recipes pr
-           JOIN ingredients i ON pr.ingredient_id = i.id
-           WHERE pr.product_id = $1`,
-          [product.id]
-        );
+        // Recipes: prioritize variant recipe if variantId exists; fallback to base product recipe (variant_id IS NULL)
+        let recipesRes = resolvedVariantId
+          ? await client.query(
+              `SELECT pr.*, i.unit_cost, i.name as ing_name 
+               FROM product_recipes pr
+               JOIN ingredients i ON pr.ingredient_id = i.id
+               WHERE pr.product_id = $1 AND pr.variant_id = $2`,
+              [product.id, resolvedVariantId]
+            )
+          : null;
+
+        if (!recipesRes || recipesRes.rows.length === 0) {
+          recipesRes = await client.query(
+            `SELECT pr.*, i.unit_cost, i.name as ing_name 
+             FROM product_recipes pr
+             JOIN ingredients i ON pr.ingredient_id = i.id
+             WHERE pr.product_id = $1 AND pr.variant_id IS NULL`,
+            [product.id]
+          );
+        }
 
         for (const rec of recipesRes.rows) {
           // REAL-WORLD CAFE FILTER: Packaging only deducted if TAKEAWAY!
@@ -257,6 +307,8 @@ export class OrderService {
 
         preparedItems.push({
           productId: product.id,
+          variantId: resolvedVariantId,
+          variantName: resolvedVariantName,
           productName: product.name,
           quantity: item.quantity,
           unitPrice: itemFinalUnitPrice,
@@ -621,12 +673,14 @@ export class OrderService {
       for (const pi of preparedItems) {
         await client.query(
           `INSERT INTO order_items (
-            order_id, product_id, product_name_snapshot, quantity, unit_price_snapshot, unit_hpp_snapshot,
+            order_id, product_id, variant_id, variant_name_snapshot, product_name_snapshot, quantity, unit_price_snapshot, unit_hpp_snapshot,
             subtotal, print_target, item_notes, selected_modifiers
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
             order.id,
             pi.productId,
+            pi.variantId || null,
+            pi.variantName || null,
             pi.productName,
             pi.quantity,
             pi.unitPrice,
@@ -1000,11 +1054,20 @@ export class OrderService {
       // 4. Restock ingredients if requested
       if (restock) {
         for (const item of itemsRes.rows) {
-          // Base recipe ingredients
-          const recRes = await client.query(
-            `SELECT ingredient_id, quantity, is_packaging_only FROM product_recipes WHERE product_id = $1`,
-            [item.product_id]
-          );
+          // Variant recipe if recorded (fallback to base product recipe)
+          let recRes = item.variant_id
+            ? await client.query(
+                `SELECT ingredient_id, quantity, is_packaging_only FROM product_recipes WHERE product_id = $1 AND variant_id = $2`,
+                [item.product_id, item.variant_id]
+              )
+            : null;
+
+          if (!recRes || recRes.rows.length === 0) {
+            recRes = await client.query(
+              `SELECT ingredient_id, quantity, is_packaging_only FROM product_recipes WHERE product_id = $1 AND variant_id IS NULL`,
+              [item.product_id]
+            );
+          }
 
           for (const rec of recRes.rows) {
             if (rec.is_packaging_only && order.order_type !== 'TAKEAWAY') continue;
@@ -1186,6 +1249,8 @@ export class OrderService {
           (SELECT json_agg(json_build_object(
             'id', oi.id,
             'productId', oi.product_id,
+            'variantId', oi.variant_id,
+            'variantName', oi.variant_name_snapshot,
             'productName', oi.product_name_snapshot,
             'quantity', oi.quantity,
             'unitPrice', oi.unit_price_snapshot,

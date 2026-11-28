@@ -13,26 +13,13 @@ import {
 } from '@/components/ui/select';
 import { NumberInput } from '@/components/ui/number-input';
 import {
-  Users,
   Search,
   Plus,
   RotateCcw,
-  Download,
-  Award,
-  Coins,
-  TrendingUp,
-  ShoppingBag,
-  ExternalLink,
   Pencil,
   Trash2,
   X,
-  Check,
   AlertCircle,
-  Phone,
-  Calendar,
-  ChevronRight,
-  Clock,
-  Sparkles,
   MessageCircle,
 } from 'lucide-react';
 
@@ -311,9 +298,9 @@ export function AdminCustomersView() {
         };
       default:
         return {
-          bg: '#eef6ef',
-          text: '#2d6a4f',
-          border: '#c2e0c7',
+          bg: '#f2f4ef',
+          text: '#57695b',
+          border: '#dcdfd5',
           label: 'Classic',
           glow: 'transparent',
         };
@@ -338,349 +325,293 @@ export function AdminCustomersView() {
   };
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Toast Alert */}
       {toastMessage && (
         <div
           style={{
             position: 'fixed',
-            bottom: '24px',
+            top: '20px',
             right: '24px',
             background: '#1c2826',
             color: '#ffffff',
-            padding: '12px 20px',
-            borderRadius: '10px',
+            padding: '10px 16px',
+            borderRadius: '8px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            zIndex: 9999,
-            fontSize: '13.5px',
+            zIndex: 99999,
+            fontSize: '12.5px',
             fontWeight: 600,
-            animation: 'fadeIn 0.2s ease',
           }}
         >
-          <Sparkles size={16} color="#d4a373" />
-          {toastMessage}
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Header Section */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
-                background: '#eef6ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#2d6a4f',
-              }}
-            >
-              <Users size={20} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826', margin: 0, letterSpacing: '-0.3px' }}>
-                Data Pelanggan & CRM
-              </h1>
-              <p style={{ fontSize: '13px', color: '#71717a', margin: '2px 0 0 0' }}>
-                Direktori loyalitas pelanggan, riwayat belanja, dan analisis nilai pelanggan Ruang Temu.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              background: '#ffffff',
-              color: '#3f3f46',
-              border: '1px solid #e4e4e7',
-              borderRadius: '9px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            title="Muat ulang data"
-          >
-            <RotateCcw size={14} className={isRefreshing ? 'spin' : ''} />
-            Segarkan
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              background: '#ffffff',
-              color: '#2d6a4f',
-              border: '1.5px solid #2d6a4f',
-              borderRadius: '9px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            title="Unduh data dalam format file Excel/CSV"
-          >
-            <Download size={14} />
-            Export CSV
-          </button>
-
-          <button
-            type="button"
-            onClick={handleOpenAdd}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 18px',
-              background: '#2d6a4f',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '9px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(45, 106, 79, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Plus size={16} />
-            Tambah Pelanggan
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards (4 Cards) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        {/* Card 1: Total Pelanggan */}
+      {/* 4 KPI Cards Minimalis */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: '12px' }}>
         <div
           style={{
             background: '#ffffff',
-            borderRadius: '14px',
-            padding: '20px',
-            border: '1px solid #e8e8e4',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>Total Pelanggan</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#eef6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2d6a4f' }}>
-              <Users size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#1c2826' }}>
-            {stats ? stats.totalCustomers.toLocaleString('id-ID') : '...'}
-          </div>
-          <div style={{ fontSize: '12px', color: '#57695b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-            {stats ? `${stats.activeCustomers30d} aktif 30 hari terakhir` : 'Memuat data...'}
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Pelanggan</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {stats ? stats.totalCustomers.toLocaleString('id-ID') : '—'}
           </div>
         </div>
 
-        {/* Card 2: Poin Loyalitas Beredar */}
         <div
           style={{
             background: '#ffffff',
-            borderRadius: '14px',
-            padding: '20px',
-            border: '1px solid #e8e8e4',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>Poin Loyalitas Beredar</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b45309' }}>
-              <Coins size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#1c2826' }}>
-            {stats ? stats.totalLoyaltyPoints.toLocaleString('id-ID') : '...'} <span style={{ fontSize: '14px', fontWeight: 600, color: '#a1a1aa' }}>Pts</span>
-          </div>
-          <div style={{ fontSize: '12px', color: '#71717a', fontWeight: 500 }}>
-            {stats ? `Gold: ${stats.tierCounts.GOLD} • Silver: ${stats.tierCounts.SILVER}` : 'Memuat tier...'}
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Poin</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {stats ? stats.totalLoyaltyPoints.toLocaleString('id-ID') : '—'}
           </div>
         </div>
 
-        {/* Card 3: Total Omzet dari Member */}
         <div
           style={{
             background: '#ffffff',
-            borderRadius: '14px',
-            padding: '20px',
-            border: '1px solid #e8e8e4',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>Total Omzet Pelanggan</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#1c2826' }}>
-            {stats ? formatRupiah(stats.totalCustomerRevenue) : '...'}
-          </div>
-          <div style={{ fontSize: '12px', color: '#71717a', fontWeight: 500 }}>
-            {stats ? `Dari ${stats.totalCustomerOrders} transaksi member` : 'Memuat transaksi...'}
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Omzet Member</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#15803d' }}>
+            {stats ? formatRupiah(stats.totalCustomerRevenue) : '—'}
           </div>
         </div>
 
-        {/* Card 4: Rata-rata Belanja (AOV) */}
         <div
           style={{
             background: '#ffffff',
-            borderRadius: '14px',
-            padding: '20px',
-            border: '1px solid #e8e8e4',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#71717a' }}>Rata-rata Belanja (AOV)</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#52525b' }}>
-              <ShoppingBag size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: '#1c2826' }}>
-            {stats ? formatRupiah(stats.averageOrderValue) : '...'}
-          </div>
-          <div style={{ fontSize: '12px', color: '#71717a', fontWeight: 500 }}>
-            Rata-rata per transaksi member
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Rata-rata Belanja</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {stats ? formatRupiah(stats.averageOrderValue) : '—'}
           </div>
         </div>
       </div>
 
-      {/* Filter, Search & Sorting Controls */}
+      {/* Search, Filter & Action Bar */}
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '14px',
-          padding: '16px 20px',
-          border: '1px solid #e8e8e4',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          border: '1px solid #e7e8e3',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '14px',
+          flexDirection: 'column',
+          gap: '10px',
         }}
       >
-        {/* Search Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px', minWidth: '240px' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 14px',
-              background: '#f8f8f6',
-              border: '1px solid #e4e4e7',
-              borderRadius: '9px',
-              width: '100%',
-            }}
-          >
-            <Search size={16} color="#71717a" />
-            <input
-              type="text"
-              placeholder="Cari nama pelanggan atau nomor WhatsApp..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 300px', flexWrap: 'wrap' }}>
+            <div
               style={{
-                border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                fontSize: '13px',
-                width: '100%',
-                color: '#1c2826',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0 10px',
+                background: '#fbfbf9',
+                border: '1px solid #dcdfd5',
+                borderRadius: '8px',
+                height: '34px',
+                flex: '1 1 200px',
+                maxWidth: '300px',
+                minWidth: '170px',
               }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#a1a1aa' }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Tier Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          {(['ALL', 'CLASSIC', 'SILVER', 'GOLD', 'PLATINUM'] as const).map((t) => {
-            const isActive = tierFilter === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTierFilter(t)}
+            >
+              <Search size={14} color="#71717a" style={{ flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="Cari nama / WhatsApp..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
-                  padding: '6px 12px',
-                  borderRadius: '7px',
-                  border: isActive ? '1px solid #2d6a4f' : '1px solid #e4e4e7',
-                  background: isActive ? '#eef6ef' : '#ffffff',
-                  color: isActive ? '#2d6a4f' : '#71717a',
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
                   fontSize: '12px',
-                  fontWeight: isActive ? 700 : 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease',
+                  width: '100%',
+                  color: '#1c2826',
                 }}
-              >
-                {t === 'ALL' ? 'Semua Tier' : t.charAt(0) + t.slice(1).toLowerCase()}
-              </button>
-            );
-          })}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#9ca3af', padding: 0 }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            <div style={{ width: '170px' }}>
+              <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
+                <SelectTrigger style={{ height: '34px', background: '#f7f7f5', fontSize: '12px', fontWeight: 600 }}>
+                  <SelectValue placeholder="Urutkan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="spent">Belanja Terbanyak</SelectItem>
+                  <SelectItem value="visits">Kunjungan Terbanyak</SelectItem>
+                  <SelectItem value="points">Poin Terbanyak</SelectItem>
+                  <SelectItem value="recent">Kunjungan Terbaru</SelectItem>
+                  <SelectItem value="newest">Terbaru Terdaftar</SelectItem>
+                  <SelectItem value="name">Nama (A-Z)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0 12px',
+                height: '34px',
+                background: '#f7f7f5',
+                color: '#374151',
+                border: '1px solid #dcdfd5',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              title="Ekspor CSV"
+            >
+              Ekspor CSV
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Muat ulang"
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
+                border: '1px solid #dcdfd5',
+                background: '#fbfbf9',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#4b5563',
+                cursor: 'pointer',
+              }}
+            >
+              <RotateCcw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '0 14px',
+                height: '34px',
+                background: '#57695b',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#46554a')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#57695b')}
+            >
+              <Plus size={14} />
+              Tambah
+            </button>
+          </div>
         </div>
 
-        {/* Sort By Dropdown (Shadcn UI Select seragam seperti halaman lainnya) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#71717a', whiteSpace: 'nowrap' }}>Urutkan:</span>
-          <div style={{ width: '185px' }}>
-            <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
-              <SelectTrigger style={{ height: '34px', background: '#f7f7f5', fontSize: '12px', fontWeight: 600 }}>
-                <SelectValue placeholder="Pilih Urutan" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="spent">Belanja Terbanyak</SelectItem>
-                <SelectItem value="visits">Kunjungan Terbanyak</SelectItem>
-                <SelectItem value="points">Poin Loyalitas Terbanyak</SelectItem>
-                <SelectItem value="recent">Kunjungan Terbaru</SelectItem>
-                <SelectItem value="newest">Paling Baru Terdaftar</SelectItem>
-                <SelectItem value="name">Nama (A-Z)</SelectItem>
-              </SelectContent>
-            </Select>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '8px',
+            paddingTop: '8px',
+            borderTop: '1px solid #f0f0eb',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '3px', background: '#f5f6f2', padding: '3px', borderRadius: '8px', flexWrap: 'wrap' }}>
+            {(['ALL', 'CLASSIC', 'SILVER', 'GOLD', 'PLATINUM'] as const).map((t) => {
+              const isActive = tierFilter === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTierFilter(t)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: isActive ? '#ffffff' : 'transparent',
+                    color: isActive ? '#1c2826' : '#64746b',
+                    fontSize: '11.5px',
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: 'pointer',
+                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.1s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t === 'ALL' ? 'Semua' : t.charAt(0) + t.slice(1).toLowerCase()}
+                </button>
+              );
+            })}
           </div>
+
+          <span style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 500 }}>
+            {isLoading ? 'Memuat...' : `${customers.length} data`}
+          </span>
         </div>
       </div>
 
@@ -688,35 +619,37 @@ export function AdminCustomersView() {
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '14px',
-          border: '1px solid #e8e8e4',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          borderRadius: '12px',
+          border: '1px solid #e7e8e3',
           overflow: 'hidden',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', whiteSpace: 'nowrap' }}>
             <thead>
-              <tr style={{ background: '#fcfcfb', borderBottom: '1px solid #e8e8e4' }}>
-                <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+              <tr style={{ background: '#fafbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a', height: '40px' }}>
+                <th style={{ padding: '0 12px 0 16px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   Pelanggan
                 </th>
-                <th style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-                  Tier Member
+                <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  WhatsApp
                 </th>
-                <th style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-                  Poin Loyalitas
+                <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Tier
                 </th>
-                <th style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-                  Frekuensi Belanja
+                <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>
+                  Poin
                 </th>
-                <th style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
-                  Total Kontribusi
+                <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>
+                  Pesanan
                 </th>
-                <th style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>
+                <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>
+                  Total Belanja
+                </th>
+                <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   Kunjungan Terakhir
                 </th>
-                <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', textAlign: 'right' }}>
+                <th style={{ padding: '0 16px 0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>
                   Aksi
                 </th>
               </tr>
@@ -724,56 +657,36 @@ export function AdminCustomersView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: '#71717a' }}>
-                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <RotateCcw size={24} className="spin" color="#2d6a4f" />
-                      <span style={{ fontSize: '13px', fontWeight: 600 }}>Memuat daftar pelanggan...</span>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64746b' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <RotateCcw size={16} className="animate-spin" color="#57695b" />
+                      <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Memuat data...</span>
                     </div>
                   </td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '56px 20px', textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                      <div
-                        style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '50%',
-                          background: '#f4f4f5',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#a1a1aa',
-                        }}
-                      >
-                        <Users size={24} />
-                      </div>
-                      <span style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826' }}>
-                        Tidak Ada Pelanggan Ditemukan
+                  <td colSpan={8} style={{ padding: '40px 20px', textAlign: 'center', color: '#64746b', whiteSpace: 'normal' }}>
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600 }}>
+                        {searchQuery || tierFilter !== 'ALL' ? 'Pelanggan tidak ditemukan.' : 'Belum ada data pelanggan.'}
                       </span>
-                      <p style={{ fontSize: '13px', color: '#71717a', margin: 0, maxWidth: '360px' }}>
-                        {searchQuery || tierFilter !== 'ALL'
-                          ? 'Coba sesuaikan kata kunci pencarian atau filter tier Anda.'
-                          : 'Belum ada data pelanggan yang terdaftar. Klik tombol Tambah Pelanggan di atas untuk mulai mencatat member.'}
-                      </p>
                       {(!searchQuery && tierFilter === 'ALL') && (
                         <button
                           type="button"
                           onClick={handleOpenAdd}
                           style={{
-                            marginTop: '8px',
-                            padding: '8px 16px',
-                            background: '#2d6a4f',
+                            padding: '6px 12px',
+                            background: '#57695b',
                             color: '#ffffff',
                             borderRadius: '8px',
                             border: 'none',
-                            fontSize: '12.5px',
-                            fontWeight: 700,
+                            fontSize: '12px',
+                            fontWeight: 600,
                             cursor: 'pointer',
                           }}
                         >
-                          + Tambah Pelanggan Pertama
+                          + Tambah Pelanggan
                         </button>
                       )}
                     </div>
@@ -788,111 +701,105 @@ export function AdminCustomersView() {
                     <tr
                       key={c.id}
                       style={{
-                        borderBottom: '1px solid #f4f4f5',
-                        background: isSelected ? '#f7faf7' : 'transparent',
-                        transition: 'background 0.15s ease',
+                        borderBottom: '1px solid #f0f0eb',
+                        height: '46px',
+                        backgroundColor: isSelected ? '#f4f7f4' : '#ffffff',
+                        transition: 'background-color 0.1s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.backgroundColor = '#fafafa';
+                        if (!isSelected) e.currentTarget.style.backgroundColor = '#fafbf9';
                       }}
                       onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                        if (!isSelected) e.currentTarget.style.backgroundColor = '#ffffff';
                       }}
                     >
-                      {/* Customer Info */}
-                      <td style={{ padding: '14px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div
+                      {/* Pelanggan */}
+                      <td style={{ padding: '8px 12px 8px 16px', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <span
                             style={{
-                              width: '38px',
-                              height: '38px',
+                              width: '26px',
+                              height: '26px',
                               borderRadius: '50%',
-                              background: '#eef6ef',
-                              color: '#2d6a4f',
-                              display: 'flex',
+                              background: '#f2f4ef',
+                              color: '#57695b',
+                              display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontWeight: 800,
-                              fontSize: '13px',
+                              fontWeight: 700,
+                              fontSize: '10.5px',
                               flexShrink: 0,
                             }}
                           >
                             {getInitials(c.name)}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#1c2826' }}>
-                              {c.name}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                              <Phone size={11} />
-                              {c.phone_number}
-                            </div>
-                          </div>
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: '#1c2826',
+                              maxWidth: '180px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title={c.name}
+                          >
+                            {c.name}
+                          </span>
                         </div>
                       </td>
 
+                      {/* WhatsApp */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#4b5563', fontVariantNumeric: 'tabular-nums' }}>
+                        {c.phone_number}
+                      </td>
+
                       {/* Tier */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 9px',
-                            borderRadius: '6px',
-                            fontSize: '11.5px',
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            fontSize: '11px',
                             fontWeight: 700,
                             background: badge.bg,
                             color: badge.text,
                             border: `1px solid ${badge.border}`,
                           }}
                         >
-                          <Award size={12} />
                           {badge.label}
                         </span>
                       </td>
 
-                      {/* Loyalty Points */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Coins size={14} color="#b45309" />
-                          <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#1c2826' }}>
-                            {c.loyalty_points.toLocaleString('id-ID')}
-                          </span>
-                          <span style={{ fontSize: '11px', color: '#a1a1aa' }}>pts</span>
-                        </div>
+                      {/* Poin */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ fontWeight: 700, color: '#1c2826' }}>
+                          {c.loyalty_points.toLocaleString('id-ID')}
+                        </span>{' '}
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>pts</span>
                       </td>
 
-                      {/* Frequency */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1c2826' }}>
-                          {c.total_orders ? `${c.total_orders}x Pesanan` : '0x'}
-                        </div>
-                        <span style={{ fontSize: '11px', color: '#71717a' }}>Transaksi Lunas</span>
+                      {/* Pesanan */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>
+                        {c.total_orders ? `${c.total_orders}x` : '0x'}
                       </td>
 
-                      {/* Total Spent */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#2d6a4f' }}>
-                          {formatRupiah(c.total_spent)}
-                        </div>
-                        <span style={{ fontSize: '11px', color: '#71717a' }}>Akumulasi Belanja</span>
+                      {/* Total Belanja */}
+                      <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontWeight: 700, color: '#15803d', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatRupiah(c.total_spent)}
                       </td>
 
-                      {/* Last Visit */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1c2826' }}>
-                          {formatDate(c.last_visit)}
-                        </div>
-                        <span style={{ fontSize: '11px', color: '#a1a1aa' }}>
-                          Gabung: {new Date(c.created_at).toLocaleDateString('id-ID')}
-                        </span>
+                      {/* Kunjungan Terakhir */}
+                      <td
+                        style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#52525b' }}
+                        title={`Bergabung: ${new Date(c.created_at).toLocaleDateString('id-ID')}`}
+                      >
+                        {formatDate(c.last_visit)}
                       </td>
 
-                      {/* Actions */}
-                      <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          {/* WhatsApp Chat Button */}
+                      {/* Aksi */}
+                      <td style={{ padding: '8px 16px 8px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                           <a
                             href={getWhatsAppLink(c.phone_number, c.name)}
                             target="_blank"
@@ -901,44 +808,41 @@ export function AdminCustomersView() {
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '7px',
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
                               background: '#f0fdf4',
-                              color: '#16a34a',
+                              color: '#15803d',
                               border: '1px solid #bbf7d0',
                               cursor: 'pointer',
                               textDecoration: 'none',
                             }}
                             title={`Kirim pesan WhatsApp ke ${c.name}`}
                           >
-                            <MessageCircle size={15} />
+                            <MessageCircle size={13} />
                           </a>
 
-                          {/* Detail Button */}
                           <button
                             type="button"
                             onClick={() => handleOpenDetail(c)}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              padding: '6px 12px',
-                              background: '#eef6ef',
-                              color: '#2d6a4f',
-                              border: '1px solid #c2e0c7',
-                              borderRadius: '7px',
-                              fontSize: '12px',
-                              fontWeight: 700,
+                              height: '26px',
+                              padding: '0 9px',
+                              background: '#f2f4ef',
+                              color: '#57695b',
+                              border: '1px solid #dcdfd5',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
                               cursor: 'pointer',
                             }}
                             title="Lihat riwayat transaksi belanja"
                           >
                             Riwayat
-                            <ChevronRight size={14} />
                           </button>
 
-                          {/* Edit Button */}
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(c)}
@@ -946,20 +850,19 @@ export function AdminCustomersView() {
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '7px',
-                              background: '#f4f4f5',
-                              color: '#52525b',
-                              border: '1px solid #e4e4e7',
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              background: '#fbfbf9',
+                              color: '#57695b',
+                              border: '1px solid #dcdfd5',
                               cursor: 'pointer',
                             }}
                             title="Edit data pelanggan"
                           >
-                            <Pencil size={14} />
+                            <Pencil size={12} />
                           </button>
 
-                          {/* Delete Button (Hanya Owner) */}
                           {canDeleteCustomer && (
                             <button
                               type="button"
@@ -968,17 +871,17 @@ export function AdminCustomersView() {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '7px',
+                                width: '26px',
+                                height: '26px',
+                                borderRadius: '6px',
                                 background: '#fef2f2',
-                                color: '#dc2626',
+                                color: '#b91c1c',
                                 border: '1px solid #fecaca',
                                 cursor: 'pointer',
                               }}
                               title="Hapus pelanggan"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={12} />
                             </button>
                           )}
                         </div>
@@ -1001,11 +904,11 @@ export function AdminCustomersView() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             display: 'flex',
             justifyContent: 'flex-end',
             zIndex: 1000,
-            backdropFilter: 'blur(3px)',
+            backdropFilter: 'blur(2px)',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedCustomer(null);
@@ -1014,32 +917,30 @@ export function AdminCustomersView() {
           <div
             style={{
               width: '100%',
-              maxWidth: '560px',
+              maxWidth: '520px',
               height: '100%',
               background: '#ffffff',
+              borderLeft: '1px solid #e7e8e3',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.15)',
-              animation: 'slideInRight 0.25s ease',
+              boxShadow: '-8px 0 28px rgba(0, 0, 0, 0.12)',
+              animation: 'slideInRight 0.2s ease',
             }}
           >
             {/* Drawer Header */}
             <div
               style={{
-                padding: '20px 24px',
-                borderBottom: '1px solid #e8e8e4',
+                padding: '14px 20px',
+                borderBottom: '1px solid #f0f0eb',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                background: '#fafafa',
+                background: '#ffffff',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShoppingBag size={20} color="#2d6a4f" />
-                <span style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826' }}>
-                  Profil & Riwayat Transaksi
-                </span>
-              </div>
+              <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826' }}>
+                Detail Pelanggan
+              </span>
               <button
                 type="button"
                 onClick={() => setSelectedCustomer(null)}
@@ -1048,19 +949,23 @@ export function AdminCustomersView() {
                   background: 'transparent',
                   cursor: 'pointer',
                   color: '#71717a',
-                  padding: '4px',
+                  width: '28px',
+                  height: '28px',
                   borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
 
             {/* Drawer Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {isLoadingDetail || !selectedCustomer ? (
-                <div style={{ padding: '60px', textAlign: 'center', color: '#71717a' }}>
-                  <RotateCcw size={28} className="spin" color="#2d6a4f" />
+                <div style={{ padding: '60px', textAlign: 'center', color: '#64746b' }}>
+                  <RotateCcw size={26} className="animate-spin" color="#57695b" />
                   <p style={{ marginTop: '12px', fontSize: '13px', fontWeight: 600 }}>Memuat riwayat transaksi...</p>
                 </div>
               ) : (
@@ -1068,10 +973,10 @@ export function AdminCustomersView() {
                   {/* Customer Identity Card */}
                   <div
                     style={{
-                      background: '#f8f8f6',
+                      background: '#fafaf8',
                       borderRadius: '12px',
                       padding: '16px',
-                      border: '1px solid #e8e8e4',
+                      border: '1px solid #e7e8e3',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '12px',
@@ -1081,16 +986,16 @@ export function AdminCustomersView() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div
                           style={{
-                            width: '46px',
-                            height: '46px',
+                            width: '44px',
+                            height: '44px',
                             borderRadius: '50%',
-                            background: '#2d6a4f',
+                            background: '#57695b',
                             color: '#ffffff',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 800,
-                            fontSize: '16px',
+                            fontSize: '15px',
                           }}
                         >
                           {getInitials(selectedCustomer.name)}
@@ -1099,8 +1004,8 @@ export function AdminCustomersView() {
                           <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
                             {selectedCustomer.name}
                           </h2>
-                          <span style={{ fontSize: '12.5px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                            <Phone size={12} /> {selectedCustomer.phone_number}
+                          <span style={{ fontSize: '12.5px', color: '#64746b', display: 'block', marginTop: '2px' }}>
+                            {selectedCustomer.phone_number}
                           </span>
                         </div>
                       </div>
@@ -1120,28 +1025,27 @@ export function AdminCustomersView() {
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingTop: '8px', borderTop: '1px solid #e8e8e4' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingTop: '8px', borderTop: '1px solid #e7e8e3' }}>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#71717a' }}>Poin Reward</span>
+                        <span style={{ fontSize: '11px', color: '#64746b' }}>Poin Reward</span>
                         <div style={{ fontSize: '14px', fontWeight: 800, color: '#b45309', marginTop: '2px' }}>
-                          ⭐ {selectedCustomer.loyalty_points} pts
+                          {selectedCustomer.loyalty_points} pts
                         </div>
                       </div>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#71717a' }}>Total Pesanan</span>
+                        <span style={{ fontSize: '11px', color: '#64746b' }}>Total Pesanan</span>
                         <div style={{ fontSize: '14px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
                           {selectedCustomer.total_orders || 0}x
                         </div>
                       </div>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#71717a' }}>Total Belanja</span>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#2d6a4f', marginTop: '2px' }}>
+                        <span style={{ fontSize: '11px', color: '#64746b' }}>Total Belanja</span>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#15803d', marginTop: '2px' }}>
                           {formatRupiah(selectedCustomer.total_spent)}
                         </div>
                       </div>
                     </div>
 
-                    {/* WhatsApp Fast Contact */}
                     <div style={{ paddingTop: '6px' }}>
                       <a
                         href={getWhatsAppLink(selectedCustomer.phone_number, selectedCustomer.name)}
@@ -1151,7 +1055,6 @@ export function AdminCustomersView() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
                           padding: '7px 12px',
                           background: '#f0fdf4',
                           color: '#16a34a',
@@ -1162,29 +1065,23 @@ export function AdminCustomersView() {
                           textDecoration: 'none',
                         }}
                       >
-                        <MessageCircle size={14} />
-                        Kirim Pesan Promo / Sapaan WhatsApp
+                        Chat WhatsApp
                       </a>
                     </div>
                   </div>
 
                   {/* Order History Timeline */}
                   <div>
-                    <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#1c2826', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={16} color="#71717a" />
-                      Riwayat Transaksi Terakhir ({selectedCustomer.recentOrders?.length || 0})
+                    <h3 style={{ fontSize: '13.5px', fontWeight: 800, color: '#1c2826', marginBottom: '12px' }}>
+                      Riwayat Transaksi ({selectedCustomer.recentOrders?.length || 0})
                     </h3>
 
                     {!selectedCustomer.recentOrders || selectedCustomer.recentOrders.length === 0 ? (
-                      <div style={{ padding: '32px', textAlign: 'center', background: '#fafafa', borderRadius: '10px', color: '#71717a' }}>
-                        <ShoppingBag size={24} style={{ margin: '0 auto 8px', color: '#a1a1aa' }} />
-                        <div style={{ fontSize: '13px', fontWeight: 600 }}>Belum ada riwayat pesanan</div>
-                        <span style={{ fontSize: '11.5px', color: '#a1a1aa' }}>
-                          Pesanan kasir yang terhubung dengan pelanggan ini akan muncul di sini.
-                        </span>
+                      <div style={{ padding: '24px', textAlign: 'center', background: '#fafafa', borderRadius: '10px', color: '#71717a', fontSize: '12.5px' }}>
+                        Belum ada riwayat transaksi.
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {selectedCustomer.recentOrders.map((ord) => (
                           <div
                             key={ord.id}
@@ -1192,10 +1089,10 @@ export function AdminCustomersView() {
                               background: '#ffffff',
                               border: '1px solid #e8e8e4',
                               borderRadius: '10px',
-                              padding: '14px',
+                              padding: '12px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '10px',
+                              gap: '8px',
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1208,7 +1105,7 @@ export function AdminCustomersView() {
                                 </div>
                               </div>
                               <div style={{ textAlign: 'right' }}>
-                                <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#2d6a4f' }}>
+                                <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#15803d' }}>
                                   {formatRupiah(ord.total_amount)}
                                 </span>
                                 <div style={{ fontSize: '10.5px', fontWeight: 700, color: ord.status === 'PAID' ? '#16a34a' : '#ea580c' }}>
@@ -1249,17 +1146,14 @@ export function AdminCustomersView() {
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.45)',
+            inset: 0,
+            background: 'rgba(17, 24, 22, 0.42)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
             padding: '16px',
-            backdropFilter: 'blur(3px)',
+            backdropFilter: 'blur(2px)',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget && !isSubmitting) {
@@ -1271,30 +1165,28 @@ export function AdminCustomersView() {
           <div
             style={{
               width: '100%',
-              maxWidth: '460px',
+              maxWidth: '440px',
               background: '#ffffff',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.2)',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              gap: '18px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eef6ef', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2d6a4f' }}>
-                  {editingCustomer ? <Pencil size={18} /> : <Plus size={18} />}
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                    {editingCustomer ? 'Edit Data Pelanggan' : 'Daftarkan Pelanggan Baru'}
-                  </h2>
-                  <span style={{ fontSize: '12px', color: '#71717a' }}>
-                    {editingCustomer ? 'Perbarui informasi profil dan tier member' : 'Catat profil member baru Ruang Temu'}
-                  </span>
-                </div>
-              </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+              }}
+            >
+              <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                {editingCustomer ? 'Edit Pelanggan' : 'Tambah Pelanggan'}
+              </h2>
               <button
                 type="button"
                 onClick={() => {
@@ -1302,36 +1194,47 @@ export function AdminCustomersView() {
                   setEditingCustomer(null);
                 }}
                 disabled={isSubmitting}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#71717a' }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#71717a',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
 
-            {formError && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '8px',
-                  color: '#dc2626',
-                  fontSize: '12.5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <AlertCircle size={16} />
-                {formError}
-              </div>
-            )}
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {formError && (
+                <div
+                  style={{
+                    padding: '9px 12px',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  {formError}
+                </div>
+              )}
 
-            <form onSubmit={handleSubmitForm} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Nama */}
+              <form onSubmit={handleSubmitForm} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#3f3f46' }}>
-                  Nama Lengkap Pelanggan *
+                <label style={{ fontSize: '12px', fontWeight: 700, color: '#3f3f46' }}>
+                  Nama *
                 </label>
                 <input
                   type="text"
@@ -1340,7 +1243,7 @@ export function AdminCustomersView() {
                   onChange={(e) => setFormName(e.target.value)}
                   required
                   style={{
-                    padding: '9px 14px',
+                    padding: '9px 12px',
                     borderRadius: '8px',
                     border: '1px solid #e4e4e7',
                     fontSize: '13px',
@@ -1350,47 +1253,40 @@ export function AdminCustomersView() {
                 />
               </div>
 
-              {/* No WhatsApp / Telepon */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#3f3f46' }}>
-                  Nomor WhatsApp / Telepon *
+                <label style={{ fontSize: '12px', fontWeight: 700, color: '#3f3f46' }}>
+                  No. WhatsApp *
                 </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="tel"
-                    placeholder="Contoh: 081234567890"
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    required
-                    style={{
-                      padding: '9px 14px',
-                      borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      fontSize: '13px',
-                      outline: 'none',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      color: '#1c2826',
-                    }}
-                  />
-                </div>
-                <span style={{ fontSize: '11px', color: '#71717a' }}>
-                  Gunakan nomor WhatsApp aktif untuk kemudahan pengiriman struk digital & promo.
-                </span>
+                <input
+                  type="tel"
+                  placeholder="081234567890"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  required
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e4e4e7',
+                    fontSize: '13px',
+                    outline: 'none',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    color: '#1c2826',
+                  }}
+                />
               </div>
 
-              {/* Tier & Poin */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#3f3f46' }}>
-                    Tier Keanggotaan
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#3f3f46' }}>
+                    Tier
                   </label>
                   <Select value={formTier} onValueChange={(val: any) => setFormTier(val)}>
                     <SelectTrigger style={{ width: '100%', height: '38px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '13px', fontWeight: 600 }}>
                       <SelectValue placeholder="Pilih Tier" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CLASSIC">Classic (Standar)</SelectItem>
+                      <SelectItem value="CLASSIC">Classic</SelectItem>
                       <SelectItem value="SILVER">Silver</SelectItem>
                       <SelectItem value="GOLD">Gold</SelectItem>
                       <SelectItem value="PLATINUM">Platinum</SelectItem>
@@ -1399,8 +1295,8 @@ export function AdminCustomersView() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#3f3f46' }}>
-                    Poin Loyalitas
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#3f3f46' }}>
+                    Poin
                   </label>
                   <NumberInput
                     value={formPoints}
@@ -1443,11 +1339,11 @@ export function AdminCustomersView() {
                   type="submit"
                   disabled={isSubmitting}
                   style={{
-                    padding: '8px 20px',
+                    padding: '8px 18px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: '#2d6a4f',
-                    fontSize: '13px',
+                    background: '#57695b',
+                    fontSize: '12.5px',
                     fontWeight: 700,
                     color: '#ffffff',
                     cursor: 'pointer',
@@ -1462,14 +1358,12 @@ export function AdminCustomersView() {
                       Menyimpan...
                     </>
                   ) : (
-                    <>
-                      <Check size={16} />
-                      {editingCustomer ? 'Perbarui Data' : 'Simpan Pelanggan'}
-                    </>
+                    <span>{editingCustomer ? 'Perbarui Data' : 'Simpan Pelanggan'}</span>
                   )}
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
@@ -1479,17 +1373,14 @@ export function AdminCustomersView() {
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.45)',
+            inset: 0,
+            background: 'rgba(17, 24, 22, 0.42)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
             padding: '16px',
-            backdropFilter: 'blur(3px)',
+            backdropFilter: 'blur(2px)',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget && !isDeleting) setDeletingCustomer(null);
@@ -1498,56 +1389,41 @@ export function AdminCustomersView() {
           <div
             style={{
               width: '100%',
-              maxWidth: '420px',
+              maxWidth: '380px',
               background: '#ffffff',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.2)',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              padding: '20px',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '14px',
               textAlign: 'center',
             }}
           >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: '#fef2f2',
-                color: '#dc2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto',
-              }}
-            >
-              <Trash2 size={24} />
-            </div>
-
             <div>
-              <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                Hapus Data Pelanggan?
+              <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Hapus Pelanggan?
               </h2>
-              <p style={{ fontSize: '13px', color: '#71717a', margin: '6px 0 0 0', lineHeight: 1.5 }}>
-                Apakah Anda yakin ingin menghapus data <strong>{deletingCustomer.name}</strong> ({deletingCustomer.phone_number})?
-                Riwayat transaksi masa lalu tetap tersimpan secara aman dalam rekap keuangan.
+              <p style={{ fontSize: '12.5px', color: '#71717a', margin: '6px 0 0 0', lineHeight: 1.45 }}>
+                <strong>{deletingCustomer.name}</strong> ({deletingCustomer.phone_number}) akan dihapus permanen.
               </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               <button
                 type="button"
                 onClick={() => setDeletingCustomer(null)}
                 disabled={isDeleting}
                 style={{
-                  padding: '9px 18px',
+                  height: '36px',
+                  padding: '0 14px',
                   borderRadius: '8px',
-                  border: '1px solid #e4e4e7',
+                  border: '1px solid #dcdfd5',
                   background: '#ffffff',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
-                  color: '#71717a',
+                  color: '#4b5563',
                   cursor: 'pointer',
                   flex: 1,
                 }}
@@ -1559,12 +1435,13 @@ export function AdminCustomersView() {
                 onClick={handleDeleteCustomer}
                 disabled={isDeleting}
                 style={{
-                  padding: '9px 18px',
+                  height: '36px',
+                  padding: '0 14px',
                   borderRadius: '8px',
                   border: 'none',
                   background: '#dc2626',
-                  fontSize: '13px',
-                  fontWeight: 700,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
                   color: '#ffffff',
                   cursor: 'pointer',
                   flex: 1,

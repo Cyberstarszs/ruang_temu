@@ -6,7 +6,7 @@ export interface AuthUser {
   id: string;
   name: string;
   username: string;
-  role: 'OWNER' | 'CASHIER';
+  role: 'OWNER' | 'CASHIER' | 'EMPLOYEE';
 }
 
 declare global {
@@ -55,7 +55,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export function requireRoles(...roles: Array<'OWNER' | 'CASHIER'>) {
+export function requireRoles(...roles: Array<'OWNER' | 'CASHIER' | 'EMPLOYEE'>) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({ success: false, message: 'Autentikasi diperlukan.' });

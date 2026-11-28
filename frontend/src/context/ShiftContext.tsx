@@ -40,7 +40,7 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const refreshShift = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || user?.role === 'EMPLOYEE') {
       setShift(null);
       setSummary(null);
       return;
@@ -55,14 +55,16 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
         setShift(null);
         setSummary(null);
       }
-    } catch (err) {
-      console.error('Error fetching current shift:', err);
+    } catch (err: any) {
+      if (err?.statusCode !== 401 && err?.statusCode !== 403) {
+        console.warn('Unable to fetch current shift:', err?.message || err);
+      }
       setShift(null);
       setSummary(null);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.role]);
 
   useEffect(() => {
     refreshShift();

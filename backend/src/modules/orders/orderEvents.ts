@@ -7,6 +7,8 @@ export const ORDER_EVENTS = {
 
 export interface PreparedOrderItem {
   productId: string;
+  variantId?: string | null;
+  variantName?: string | null;
   productName: string;
   quantity: number;
   unitPrice: number;

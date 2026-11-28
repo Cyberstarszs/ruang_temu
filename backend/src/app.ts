@@ -56,11 +56,13 @@ export function createApp(): Application {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Static files for product image uploads
+  // Static files for uploads (products, receipts, faces, attendances)
   const uploadsDir = path.resolve(__dirname, '..', 'uploads');
-  const productsUploadsDir = path.join(uploadsDir, 'products');
-  if (!fs.existsSync(productsUploadsDir)) {
-    fs.mkdirSync(productsUploadsDir, { recursive: true });
+  for (const sub of ['products', 'faces', 'attendances']) {
+    const dir = path.join(uploadsDir, sub);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
   app.use('/uploads', express.static(uploadsDir));
 

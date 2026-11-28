@@ -78,12 +78,9 @@ export function CustomerModal({ onSelectCustomer, onClose }: CustomerModalProps)
         onClick={(e) => e.stopPropagation()}
       >
         <header className="bo-modal-head">
-          <div>
-            <h2>Data Pelanggan (CRM)</h2>
-            <p>Terapkan keanggotaan untuk akumulasi poin loyalitas dan promo.</p>
-          </div>
+          <h2>Pilih Pelanggan</h2>
           <button onClick={onClose} aria-label="Tutup">
-            <Icon name="close" size={20} />
+            <Icon name="close" size={18} />
           </button>
         </header>
 

@@ -13,22 +13,12 @@ import {
 import { Combobox } from '@/components/ui/combobox';
 import { NumberInput } from '@/components/ui/number-input';
 import {
-  Truck,
   Plus,
   Search,
-  PackageCheck,
   CheckCircle2,
-  Clock,
-  Phone,
-  FileText,
   X,
   AlertCircle,
   Building2,
-  Receipt,
-  Mail,
-  MapPin,
-  RefreshCw,
-  Ban,
   Pencil,
   Trash2,
 } from 'lucide-react';
@@ -470,35 +460,18 @@ export function AdminPurchasingView() {
           gap: '14px',
         }}
       >
-        {/* Card 1: Total PO */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Pengadaan</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <Truck size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Pengadaan</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             {metrics.totalPoCount} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>PO</span>
           </div>
@@ -507,35 +480,18 @@ export function AdminPurchasingView() {
           </div>
         </div>
 
-        {/* Card 2: Menunggu Kiriman */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Menunggu Kiriman</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: metrics.pendingPoCount > 0 ? '#fef3c7' : '#dcfce7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: metrics.pendingPoCount > 0 ? '#b45309' : '#15803d',
-              }}
-            >
-              <Clock size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Menunggu Kiriman</span>
           <div
             style={{
               fontSize: '22px',
@@ -545,88 +501,48 @@ export function AdminPurchasingView() {
           >
             {metrics.pendingPoCount}{' '}
             <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>
-              {metrics.pendingPoCount > 0 ? 'Perlu Diterima' : 'Semua Diterima'}
+              {metrics.pendingPoCount > 0 ? 'Pending' : 'Selesai'}
             </span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f' }}>
-            Menunggu konfirmasi kedatangan barang fisik
           </div>
         </div>
 
-        {/* Card 3: Total Belanja PO */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Belanja Selesai</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <Receipt size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Belanja Selesai</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             Rp {Math.round(metrics.totalSpend).toLocaleString('id-ID')}
           </div>
-          <div style={{ fontSize: '11px', color: metrics.unpaidCount > 0 ? '#b45309' : '#8b968f', fontWeight: metrics.unpaidCount > 0 ? 600 : 400 }}>
-            {metrics.unpaidCount > 0
-              ? `Hutang PO belum lunas (${metrics.unpaidCount}): Rp ${Math.round(metrics.unpaidAmount).toLocaleString('id-ID')}`
-              : 'Semua tagihan PO telah lunas'}
-          </div>
+          {metrics.unpaidCount > 0 && (
+            <div style={{ fontSize: '11px', color: '#b45309', fontWeight: 600 }}>
+              Hutang ({metrics.unpaidCount}): Rp {Math.round(metrics.unpaidAmount).toLocaleString('id-ID')}
+            </div>
+          )}
         </div>
 
-        {/* Card 4: Mitra Supplier */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Mitra Supplier</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <Building2 size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Mitra Supplier</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             {metrics.supplierCount}{' '}
             <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Pemasok</span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f' }}>
-            Pemasok bahan baku aktif terdaftar
           </div>
         </div>
       </div>
@@ -1017,10 +933,7 @@ export function AdminPurchasingView() {
                                 type="button"
                                 onClick={() => openPayPoModal(po)}
                                 style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '4px 8px',
+                                  padding: '4px 9px',
                                   background: '#eff6ff',
                                   color: '#1d4ed8',
                                   border: '1px solid #bfdbfe',
@@ -1031,7 +944,6 @@ export function AdminPurchasingView() {
                                 }}
                                 title="Catat pelunasan hutang/pembayaran PO ini"
                               >
-                                <Receipt size={11} />
                                 Bayar
                               </button>
                             )}
@@ -1041,10 +953,7 @@ export function AdminPurchasingView() {
                                 type="button"
                                 onClick={() => handleReceivePo(po.id)}
                                 style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '4px 9px',
+                                  padding: '4px 10px',
                                   background: '#57695b',
                                   color: '#ffffff',
                                   border: 'none',
@@ -1053,9 +962,8 @@ export function AdminPurchasingView() {
                                   fontSize: '11px',
                                   cursor: 'pointer',
                                 }}
-                                title="Klik untuk mengonfirmasi penerimaan barang dan menambah stok ke /stok"
+                                title="Konfirmasi penerimaan barang"
                               >
-                                <PackageCheck size={12} />
                                 Terima
                               </button>
                             )}
@@ -1200,7 +1108,7 @@ export function AdminPurchasingView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1212,12 +1120,13 @@ export function AdminPurchasingView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '580px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '560px',
               width: '100%',
               maxHeight: '88vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             <div
@@ -1225,35 +1134,45 @@ export function AdminPurchasingView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  Rincian {selectedPo.po_number}
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  {selectedPo.po_number}
                 </h3>
-                <span style={{ fontSize: '11.5px', color: '#64746b' }}>
-                  Supplier: <strong>{selectedPo.supplier_name}</strong> ({selectedPo.supplier_phone || '-'})
+                <span style={{ fontSize: '11.5px', color: '#71717a' }}>
+                  {selectedPo.supplier_name} ({selectedPo.supplier_phone || '-'})
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedPo(null)}
-                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
+                  display: 'inline-block',
+                  alignSelf: 'flex-start',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
                   background:
                     selectedPo.status === 'RECEIVED'
                       ? '#dcfce7'
@@ -1266,27 +1185,15 @@ export function AdminPurchasingView() {
                       : selectedPo.status === 'CANCELLED'
                       ? '#b91c1c'
                       : '#b45309',
-                  fontSize: '12px',
-                  fontWeight: 600,
+                  fontSize: '11.5px',
+                  fontWeight: 700,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {selectedPo.status === 'RECEIVED' ? (
-                    <CheckCircle2 size={15} />
-                  ) : selectedPo.status === 'CANCELLED' ? (
-                    <Ban size={15} />
-                  ) : (
-                    <Clock size={15} />
-                  )}
-                  <span>
-                    Status:{' '}
-                    {selectedPo.status === 'RECEIVED'
-                      ? `Telah Diterima (${selectedPo.received_at ? new Date(selectedPo.received_at).toLocaleDateString('id-ID') : 'Selesai'})`
-                      : selectedPo.status === 'CANCELLED'
-                      ? 'Dibatalkan (Pesanan tidak diproses)'
-                      : 'Menunggu Kiriman Barang dari Supplier'}
-                  </span>
-                </div>
+                {selectedPo.status === 'RECEIVED'
+                  ? `Diterima (${selectedPo.received_at ? new Date(selectedPo.received_at).toLocaleDateString('id-ID') : 'Selesai'})`
+                  : selectedPo.status === 'CANCELLED'
+                  ? 'Dibatalkan'
+                  : 'Menunggu Kiriman'}
               </div>
 
               {/* Items Table */}
@@ -1470,7 +1377,7 @@ export function AdminPurchasingView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1482,12 +1389,13 @@ export function AdminPurchasingView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '620px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '600px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             <div
@@ -1495,23 +1403,34 @@ export function AdminPurchasingView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                Buat Purchase Order Baru
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Buat Purchase Order
               </h3>
               <button
                 type="button"
                 onClick={() => setIsCreatePoOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreatePo} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleCreatePo} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {poError && (
                 <div style={{ padding: '8px 12px', borderRadius: '7px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px' }}>
                   {poError}
@@ -1823,7 +1742,7 @@ export function AdminPurchasingView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1835,10 +1754,11 @@ export function AdminPurchasingView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '460px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '440px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
               overflow: 'hidden',
             }}
           >
@@ -1847,23 +1767,34 @@ export function AdminPurchasingView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                {editingSupplier ? 'Edit Data Supplier' : 'Tambah Supplier Baru'}
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                {editingSupplier ? 'Edit Supplier' : 'Tambah Supplier'}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsSupplierModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveSupplier} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSaveSupplier} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {supError && (
                 <div style={{ padding: '8px 12px', borderRadius: '7px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px' }}>
                   {supError}
@@ -2018,7 +1949,7 @@ export function AdminPurchasingView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -2030,10 +1961,11 @@ export function AdminPurchasingView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '460px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '440px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
               overflow: 'hidden',
             }}
           >
@@ -2042,28 +1974,39 @@ export function AdminPurchasingView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
                   Pelunasan {payPoTarget.po_number}
                 </h3>
-                <span style={{ fontSize: '11.5px', color: '#64746b' }}>
-                  Supplier: {payPoTarget.supplier_name} · Rp {Number(payPoTarget.total_amount).toLocaleString('id-ID')}
+                <span style={{ fontSize: '11.5px', color: '#71717a' }}>
+                  {payPoTarget.supplier_name} · Rp {Number(payPoTarget.total_amount).toLocaleString('id-ID')}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setPayPoTarget(null)}
-                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleConfirmPayPo} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleConfirmPayPo} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {payError && (
                 <div style={{ padding: '8px 12px', borderRadius: '7px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px' }}>
                   {payError}

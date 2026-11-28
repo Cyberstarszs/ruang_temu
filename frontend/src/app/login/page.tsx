@@ -11,7 +11,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      if (user.role === 'CASHIER') {
+      if (user.role === 'EMPLOYEE') {
+        router.replace('/absensi');
+      } else if (user.role === 'CASHIER') {
         router.replace('/pos');
       } else {
         const savedMode = localStorage.getItem('ruang_temu_view_mode');

@@ -150,83 +150,54 @@ export function PaymentModal({
         onClick={(e) => e.stopPropagation()}
       >
         <header className="bo-modal-head">
-          <div>
-            <h2>Penyelesaian Pembayaran</h2>
-            <p>Pilih metode pembayaran pelanggan RUANG TEMU (Pay-First).</p>
-          </div>
+          <h2>Pembayaran</h2>
           <button onClick={onClose} aria-label="Tutup">
-            <Icon name="close" size={20} />
+            <Icon name="close" size={18} />
           </button>
         </header>
 
-        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 20px' }}>
+        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px' }}>
           {/* Total Tagihan */}
           <div
             style={{
-              padding: '16px',
-              backgroundColor: '#f3f6f3',
+              padding: '14px 16px',
+              backgroundColor: '#f6f8f5',
               borderRadius: '10px',
-              border: '1px solid #d4e0d5',
+              border: '1px solid #dcdfd5',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '16px',
+              marginBottom: '14px',
             }}
           >
             <div>
-              <span style={{ fontSize: '12px', color: '#57695b', fontWeight: 600 }}>TOTAL HARUS DIBAYAR</span>
+              <span style={{ fontSize: '11.5px', color: '#57695b', fontWeight: 700, letterSpacing: '0.03em' }}>TOTAL BAYAR</span>
               {claimedDownPayment > 0 && (
-                <small style={{ display: 'block', color: '#2d6a4f', fontSize: '11px' }}>
-                  (Telah dipotong DP Reservasi: {rupiah(claimedDownPayment)})
+                <small style={{ display: 'block', color: '#15803d', fontSize: '11px', marginTop: '2px' }}>
+                  Potongan DP: {rupiah(claimedDownPayment)}
                 </small>
               )}
             </div>
-            <b style={{ fontSize: '26px', color: '#57695b', fontWeight: 700 }}>{rupiah(grandTotal)}</b>
+            <b style={{ fontSize: '24px', color: '#1c2826', fontWeight: 800 }}>{rupiah(grandTotal)}</b>
           </div>
 
           {/* Catatan Khusus Pesanan (Global Order Note) */}
           {orderNote && (
             <div
               style={{
-                padding: '10px 14px',
-                backgroundColor: '#fefce8',
-                border: '1.5px solid #fde047',
+                padding: '9px 12px',
+                backgroundColor: '#fffbeb',
+                border: '1px solid #fde68a',
                 borderRadius: '8px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px',
+                marginBottom: '14px',
               }}
             >
-              <div style={{ color: '#ca8a04', marginTop: '1px', flexShrink: 0 }}>
-                <Icon name="stickyNote" size={18} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    color: '#854d0e',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  Catatan Pesanan {orderType === 'TAKEAWAY' ? '(Takeaway)' : tableNumber ? `(Meja ${tableNumber})` : ''}:
-                </span>
-                <p
-                  style={{
-                    margin: '2px 0 0',
-                    fontSize: '13px',
-                    color: '#713f12',
-                    fontWeight: 600,
-                    lineHeight: 1.4,
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  "{orderNote}"
-                </p>
-              </div>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase' }}>
+                Catatan {orderType === 'TAKEAWAY' ? '(Takeaway)' : tableNumber ? `(Meja ${tableNumber})` : ''}:{' '}
+              </span>
+              <span style={{ fontSize: '12.5px', color: '#78350f', fontWeight: 600 }}>
+                &quot;{orderNote}&quot;
+              </span>
             </div>
           )}
 
@@ -234,40 +205,35 @@ export function PaymentModal({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))',
-              gap: '8px',
-              marginBottom: '18px',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))',
+              gap: '6px',
+              marginBottom: '16px',
             }}
           >
             {[
-              { id: 'CASH', label: 'Tunai', icon: 'wallet' },
-              { id: 'QRIS', label: 'QRIS', icon: 'qrCode' },
-              { id: 'DEBIT_CARD', label: 'Debit EDC', icon: 'creditCard' },
-              { id: 'BANK_TRANSFER', label: 'Transfer', icon: 'send' },
-              { id: 'SPLIT', label: 'Gabungan', icon: 'split' },
+              { id: 'CASH', label: 'Tunai' },
+              { id: 'QRIS', label: 'QRIS' },
+              { id: 'DEBIT_CARD', label: 'Debit EDC' },
+              { id: 'BANK_TRANSFER', label: 'Transfer' },
+              { id: 'SPLIT', label: 'Gabungan' },
             ].map((m) => (
               <button
                 key={m.id}
                 type="button"
                 onClick={() => setMethod(m.id as any)}
                 style={{
-                  padding: '12px 6px',
+                  padding: '10px 8px',
                   borderRadius: '8px',
-                  border: method === m.id ? '2px solid #57695b' : '1px solid #d1d1d1',
+                  border: method === m.id ? '1.5px solid #57695b' : '1px solid #dcdfd5',
                   backgroundColor: method === m.id ? '#57695b' : '#ffffff',
-                  color: method === m.id ? '#ffffff' : '#333333',
+                  color: method === m.id ? '#ffffff' : '#374151',
                   cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '6px',
                   fontWeight: 600,
-                  fontSize: '12px',
-                  transition: 'all 0.15s ease',
+                  fontSize: '12.5px',
+                  transition: 'all 0.12s ease',
                 }}
               >
-                <Icon name={m.icon} size={20} />
-                <span>{m.label}</span>
+                {m.label}
               </button>
             ))}
           </div>

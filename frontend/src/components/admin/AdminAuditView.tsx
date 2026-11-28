@@ -4,11 +4,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { AuditLog } from '@/types';
 import {
-  ShieldCheck,
   Search,
   RotateCcw,
   Clock,
-  User,
   X,
   AlertTriangle,
   ClipboardCheck,
@@ -16,13 +14,9 @@ import {
   PackageCheck,
   ShoppingCart,
   Sliders,
-  FileText,
-  Boxes,
   BadgePercent,
   Coffee,
   CheckCircle2,
-  ArrowRight,
-  Eye,
   Info,
 } from 'lucide-react';
 
@@ -360,139 +354,68 @@ export function AdminAuditView() {
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Catatan Aktivitas</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <ShieldCheck size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Catatan</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
-            {metrics.total} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Kejadian</span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f', marginTop: '4px' }}>
-            Terekam permanen untuk audit keamanan
+            {metrics.total}
           </div>
         </div>
 
-        {/* Card 2: Pembatalan Transaksi */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Pembatalan Transaksi (Void)</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: metrics.voidCount > 0 ? '#fee2e2' : '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: metrics.voidCount > 0 ? '#b91c1c' : '#57695b',
-              }}
-            >
-              <AlertTriangle size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Pembatalan (Void)</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: metrics.voidCount > 0 ? '#b91c1c' : '#1c2826' }}>
-            {metrics.voidCount} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Transaksi</span>
-          </div>
-          <div style={{ fontSize: '11px', color: metrics.voidCount > 0 ? '#b91c1c' : '#8b968f', marginTop: '4px' }}>
-            {metrics.voidCount > 0 ? 'Perlu dipantau secara berkala' : 'Tidak ada transaksi dibatalkan'}
+            {metrics.voidCount}
           </div>
         </div>
 
-        {/* Card 3: Aktivitas Stok & Opname */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Aktivitas Stok & Gudang</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <Boxes size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Stok & Gudang</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
-            {metrics.inventoryOps} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Aktivitas</span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f', marginTop: '4px' }}>
-            Opname fisik dan pencatatan limbah
+            {metrics.inventoryOps}
           </div>
         </div>
 
-        {/* Card 4: Pengadaan & Pemasok */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Pengadaan Barang (PO)</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <PackageCheck size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Pengadaan (PO)</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
-            {metrics.purchasingOps} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Pengadaan</span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f', marginTop: '4px' }}>
-            Order pembelian & penerimaan barang
+            {metrics.purchasingOps}
           </div>
         </div>
       </div>
@@ -657,14 +580,8 @@ export function AdminAuditView() {
               ) : filteredLogs.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ padding: '40px 16px', textAlign: 'center', color: '#8b968f' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <ShieldCheck size={28} color="#ccd1c4" />
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#4b5563' }}>
-                        {searchQuery ? 'Tidak ada catatan aktivitas yang cocok dengan pencarian.' : 'Belum ada catatan aktivitas baru.'}
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: '#9ca3af' }}>
-                        Semua aksi staf, transaksi kasir, dan opname stok akan tercatat otomatis di sini.
-                      </div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>
+                      {searchQuery ? 'Tidak ada catatan aktivitas yang cocok.' : 'Belum ada catatan aktivitas.'}
                     </div>
                   </td>
                 </tr>
@@ -672,7 +589,6 @@ export function AdminAuditView() {
                 filteredLogs.map((log) => {
                   const meta = getActionMeta(log.action, log.target_table);
                   const role = getRoleLabel(log.actor_role);
-                  const Icon = meta.icon;
                   const summary = meta.formatSummary(log.details, log.target_id);
 
                   const dateObj = new Date(log.created_at);
@@ -728,9 +644,7 @@ export function AdminAuditView() {
                       <td style={{ padding: '0 12px', verticalAlign: 'middle' }}>
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
+                            display: 'inline-block',
                             padding: '3px 8px',
                             borderRadius: '5px',
                             background: meta.bg,
@@ -739,7 +653,6 @@ export function AdminAuditView() {
                             fontSize: '11px',
                           }}
                         >
-                          <Icon size={12} />
                           {meta.title}
                         </span>
                       </td>
@@ -773,10 +686,7 @@ export function AdminAuditView() {
                             setViewJsonMode(false);
                           }}
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 9px',
+                            padding: '4px 10px',
                             background: '#f2f5f1',
                             color: '#57695b',
                             border: '1px solid #dce2da',
@@ -787,8 +697,7 @@ export function AdminAuditView() {
                             transition: 'all 0.1s ease',
                           }}
                         >
-                          <Eye size={12} />
-                          <span>Rincian</span>
+                          Rincian
                         </button>
                       </td>
                     </tr>
@@ -804,7 +713,6 @@ export function AdminAuditView() {
       {selectedLog && (() => {
         const meta = getActionMeta(selectedLog.action, selectedLog.target_table);
         const role = getRoleLabel(selectedLog.actor_role);
-        const Icon = meta.icon;
         const details = selectedLog.details;
 
         return (
@@ -812,8 +720,8 @@ export function AdminAuditView() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.45)',
-              backdropFilter: 'blur(3px)',
+              background: 'rgba(17, 24, 22, 0.42)',
+              backdropFilter: 'blur(2px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -824,13 +732,14 @@ export function AdminAuditView() {
             <div
               style={{
                 background: '#ffffff',
-                borderRadius: '14px',
-                maxWidth: '540px',
+                borderRadius: '12px',
+                border: '1px solid #e7e8e3',
+                maxWidth: '520px',
                 width: '100%',
                 maxHeight: '85vh',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
                 overflow: 'hidden',
               }}
             >
@@ -841,44 +750,32 @@ export function AdminAuditView() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '14px 18px',
-                  borderBottom: '1px solid #e7e8e3',
-                  background: '#fbfbf9',
+                  borderBottom: '1px solid #f0f0eb',
+                  background: '#ffffff',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: meta.bg,
-                      color: meta.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Icon size={16} />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                      {meta.title}
-                    </h3>
-                    <div style={{ fontSize: '11px', color: '#64746b', marginTop: '2px' }}>
-                      Bagian: {meta.category}
-                    </div>
+                <div>
+                  <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                    {meta.title}
+                  </h3>
+                  <div style={{ fontSize: '11px', color: '#71717a', marginTop: '2px' }}>
+                    {meta.category}
                   </div>
                 </div>
 
                 <button
                   onClick={() => setSelectedLog(null)}
                   style={{
-                    background: '#f0f0eb',
+                    background: 'transparent',
                     border: 'none',
                     borderRadius: '6px',
-                    padding: '5px',
+                    width: '28px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#64746b',
+                    color: '#71717a',
                   }}
                 >
                   <X size={16} />

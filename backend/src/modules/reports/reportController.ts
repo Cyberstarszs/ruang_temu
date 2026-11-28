@@ -218,7 +218,17 @@ export async function getMenuMatrix(req: Request, res: Response, next: NextFunct
             SELECT SUM(pr.quantity * i.unit_cost)
             FROM product_recipes pr
             JOIN ingredients i ON pr.ingredient_id = i.id
-            WHERE pr.product_id = p.id
+            WHERE pr.product_id = p.id AND pr.variant_id IS NULL
+          ),
+          (
+            SELECT AVG(var_hpp) FROM (
+              SELECT SUM(pr2.quantity * i2.unit_cost) as var_hpp
+              FROM product_recipes pr2
+              JOIN ingredients i2 ON pr2.ingredient_id = i2.id
+              JOIN product_variants pv2 ON pr2.variant_id = pv2.id
+              WHERE pr2.product_id = p.id AND pv2.is_active = TRUE
+              GROUP BY pr2.variant_id
+            ) sub
           ),
           p.price * 0.35
         ) as cost,

@@ -139,32 +139,27 @@ export function OrderHistoryModal({
           onClick={(e) => e.stopPropagation()}
         >
           <header className="bo-modal-head">
-            <div>
-              <h2>Riwayat Transaksi</h2>
-              <p>Daftar seluruh transaksi kasir dan status pembayaran.</p>
-            </div>
+            <h2>Riwayat Transaksi</h2>
             <button onClick={onClose} aria-label="Tutup">
-              <Icon name="close" size={20} />
+              <Icon name="close" size={18} />
             </button>
           </header>
 
-          <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 20px' }}>
+          <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px' }}>
             {successMessage && (
               <div
                 style={{
-                  padding: '10px 14px',
-                  backgroundColor: '#eef6ef',
-                  color: '#2d6a4f',
+                  padding: '9px 12px',
+                  backgroundColor: '#f0fdf4',
+                  color: '#15803d',
+                  border: '1px solid #bbf7d0',
                   borderRadius: '8px',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
                   marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
                 }}
               >
-                <Icon name="check" size={16} />
-                <span>{successMessage}</span>
+                {successMessage}
               </div>
             )}
 
@@ -390,22 +385,17 @@ export function OrderHistoryModal({
             style={{ maxWidth: '440px', width: '92%' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <header className="bo-modal-head" style={{ borderBottom: '1px solid #f8b4b4', backgroundColor: '#fde8e8' }}>
+            <header className="bo-modal-head">
               <div>
-                <h2 style={{ color: '#a32424' }}>Otorisasi Void Transaksi</h2>
-                <p style={{ color: '#7a1b1b' }}>Struk #{orderToVoid.order_number}</p>
+                <h2 style={{ color: '#b91c1c' }}>Void #{orderToVoid.order_number}</h2>
+                <p>Masukkan PIN Owner (4–6 digit) untuk otorisasi.</p>
               </div>
               <button onClick={() => setVoidDialogOpen(false)} aria-label="Tutup">
-                <Icon name="close" size={20} />
+                <Icon name="close" size={18} />
               </button>
             </header>
 
-            <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 20px' }}>
-              <p style={{ fontSize: '13px', color: '#555', marginBottom: '14px', lineHeight: 1.4 }}>
-                Sesuai <b>SRS Bab 3.4</b>, pembatalan pesanan berbayar wajib memerlukan otorisasi{' '}
-                <b>PIN Owner (6 Digit)</b>. Sistem akan otomatis mencetak <b>TIKET BATAL (VOID CHECKER)</b> ke Bar & Dapur
-                agar barista dan koki menghentikan racikan, serta mengembalikan stok bahan baku.
-              </p>
+            <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px' }}>
 
               {voidError && (
                 <div

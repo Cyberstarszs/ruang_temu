@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/select';
 import { NumberInput } from '@/components/ui/number-input';
 import {
-  Settings,
   Store,
   Printer,
   Receipt,
@@ -20,22 +19,14 @@ import {
   CheckCircle2,
   RotateCcw,
   Coffee,
-  Utensils,
-  Wifi,
-  Phone,
   MapPin,
-  Tag,
-  Percent,
-  SlidersHorizontal,
-  Smartphone,
-  PrinterIcon,
 } from 'lucide-react';
 
 export function AdminSettingsView() {
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'CASHIER' | 'PRINTERS'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'CASHIER' | 'PRINTERS' | 'ATTENDANCE'>('PROFILE');
   const [previewStation, setPreviewStation] = useState<'CASHIER' | 'BAR' | 'KITCHEN'>('CASHIER');
 
   // Form Fields: Profil
@@ -61,6 +52,15 @@ export function AdminSettingsView() {
   const [cashierPrinterName, setCashierPrinterName] = useState('Printer Kasir');
   const [barPrinterName, setBarPrinterName] = useState('Printer Bar Checker');
   const [kitchenPrinterName, setKitchenPrinterName] = useState('Printer Dapur Checker');
+
+  // Form Fields: Absensi & GPS
+  const [attendanceLat, setAttendanceLat] = useState('-7.160500');
+  const [attendanceLng, setAttendanceLng] = useState('113.479500');
+  const [attendanceRadius, setAttendanceRadius] = useState('100');
+  const [attendanceClockInTime, setAttendanceClockInTime] = useState('09:00');
+  const [attendanceClockOutTime, setAttendanceClockOutTime] = useState('17:00');
+  const [attendanceLateTolerance, setAttendanceLateTolerance] = useState('15');
+  const [isGettingGps, setIsGettingGps] = useState(false);
 
   // Feedback Toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -97,6 +97,24 @@ export function AdminSettingsView() {
         setCashierPrinterName(d.cashier_printer_name || 'Printer Kasir');
         setBarPrinterName(d.bar_printer_name || 'Printer Bar Checker');
         setKitchenPrinterName(d.kitchen_printer_name || 'Printer Dapur Checker');
+        setAttendanceLat(
+          d.attendance_lat !== null && d.attendance_lat !== undefined ? String(d.attendance_lat) : '-7.160500'
+        );
+        setAttendanceLng(
+          d.attendance_lng !== null && d.attendance_lng !== undefined ? String(d.attendance_lng) : '113.479500'
+        );
+        setAttendanceRadius(
+          d.attendance_radius_meters !== null && d.attendance_radius_meters !== undefined
+            ? String(d.attendance_radius_meters)
+            : '100'
+        );
+        setAttendanceClockInTime(d.attendance_clock_in_time || '09:00');
+        setAttendanceClockOutTime(d.attendance_clock_out_time || '17:00');
+        setAttendanceLateTolerance(
+          d.attendance_late_tolerance_minutes !== null && d.attendance_late_tolerance_minutes !== undefined
+            ? String(d.attendance_late_tolerance_minutes)
+            : '15'
+        );
       }
     } catch (err: any) {
       console.error('Failed to load store settings:', err);
@@ -134,11 +152,17 @@ export function AdminSettingsView() {
         cashier_printer_name: cashierPrinterName.trim(),
         bar_printer_name: barPrinterName.trim(),
         kitchen_printer_name: kitchenPrinterName.trim(),
+        attendance_lat: attendanceLat.trim() !== '' ? Number(attendanceLat) : undefined,
+        attendance_lng: attendanceLng.trim() !== '' ? Number(attendanceLng) : undefined,
+        attendance_radius_meters: Math.max(10, Number(attendanceRadius) || 100),
+        attendance_clock_in_time: attendanceClockInTime || '09:00',
+        attendance_clock_out_time: attendanceClockOutTime || '17:00',
+        attendance_late_tolerance_minutes: Math.max(0, Number(attendanceLateTolerance) || 0),
       };
 
       const res = await api.settings.update(payload);
       if (res.success) {
-        showToast('Pengaturan kafe & stasion printer berhasil disimpan!');
+        showToast('Pengaturan kafe & absensi berhasil disimpan!');
         setSettings(res.data);
       }
     } catch (err: any) {
@@ -146,6 +170,27 @@ export function AdminSettingsView() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleUseCurrentGps = () => {
+    if (!navigator.geolocation) {
+      showToast('Browser tidak mendukung geolokasi GPS.', 'error');
+      return;
+    }
+    setIsGettingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setAttendanceLat(pos.coords.latitude.toFixed(6));
+        setAttendanceLng(pos.coords.longitude.toFixed(6));
+        setIsGettingGps(false);
+        showToast('Koordinat lokasi kafe saat ini berhasil diambil.');
+      },
+      (err) => {
+        setIsGettingGps(false);
+        showToast(`Gagal mengambil lokasi GPS: ${err.message}`, 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   // Test Print active preview
@@ -322,6 +367,7 @@ export function AdminSettingsView() {
                 { id: 'PROFILE', label: 'Profil Kafe', icon: Store },
                 { id: 'CASHIER', label: 'Kasir & Struk', icon: Receipt },
                 { id: 'PRINTERS', label: 'Stasion Printer', icon: Printer },
+                { id: 'ATTENDANCE', label: 'Absensi & GPS', icon: MapPin },
               ] as const
             ).map((t) => {
               const isSelected = activeTab === t.id;
@@ -336,7 +382,6 @@ export function AdminSettingsView() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
                     padding: '8px 12px',
                     borderRadius: '7px',
                     border: 'none',
@@ -349,7 +394,6 @@ export function AdminSettingsView() {
                     transition: 'all 0.1s ease',
                   }}
                 >
-                  <Icon size={14} color={isSelected ? '#57695b' : '#71717a'} />
                   <span>{t.label}</span>
                 </button>
               );
@@ -632,10 +676,7 @@ export function AdminSettingsView() {
                 {/* Stasion 1: Kasir */}
                 <div style={{ background: '#fbfbf9', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e7e8e3' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Receipt size={14} color="#57695b" />
-                      <strong style={{ fontSize: '12px', color: '#1c2826' }}>Printer Kasir (Customer Bill)</strong>
-                    </div>
+                    <strong style={{ fontSize: '12px', color: '#1c2826' }}>Printer Kasir (Customer Bill)</strong>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#415245', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
@@ -664,10 +705,7 @@ export function AdminSettingsView() {
                 {/* Stasion 2: Bar Checker */}
                 <div style={{ background: '#fbfbf9', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e7e8e3' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Coffee size={14} color="#57695b" />
-                      <strong style={{ fontSize: '12px', color: '#1c2826' }}>Printer Bar (Checker Minuman)</strong>
-                    </div>
+                    <strong style={{ fontSize: '12px', color: '#1c2826' }}>Printer Bar (Checker Minuman)</strong>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#415245', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
@@ -696,10 +734,7 @@ export function AdminSettingsView() {
                 {/* Stasion 3: Dapur Checker */}
                 <div style={{ background: '#fbfbf9', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e7e8e3' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Utensils size={14} color="#57695b" />
-                      <strong style={{ fontSize: '12px', color: '#1c2826' }}>Printer Dapur (Checker Makanan)</strong>
-                    </div>
+                    <strong style={{ fontSize: '12px', color: '#1c2826' }}>Printer Dapur (Checker Makanan)</strong>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#415245', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
@@ -726,10 +761,249 @@ export function AdminSettingsView() {
                 </div>
               </div>
             )}
+
+            {/* TAB 4: ABSENSI KARYAWAN (GPS & JADWAL) */}
+            {activeTab === 'ATTENDANCE' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div
+                  style={{
+                    background: '#fbfbf9',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e7e8e3',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '12px', color: '#1c2826' }}>Titik Lokasi GPS Kafe</strong>
+                    <button
+                      type="button"
+                      disabled={isGettingGps}
+                      onClick={handleUseCurrentGps}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #ccd5cd',
+                        background: '#ffffff',
+                        color: '#57695b',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: isGettingGps ? 'wait' : 'pointer',
+                      }}
+                    >
+                      <MapPin size={12} />
+                      <span>{isGettingGps ? 'Mengambil GPS...' : 'Gunakan Lokasi Saat Ini'}</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '4px' }}>
+                        Latitude
+                      </label>
+                      <input
+                        type="text"
+                        value={attendanceLat}
+                        onChange={(e) => setAttendanceLat(e.target.value)}
+                        placeholder="-7.160500"
+                        style={{
+                          width: '100%',
+                          padding: '7px 9px',
+                          borderRadius: '7px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '12px',
+                          fontFamily: 'monospace',
+                          outline: 'none',
+                          background: '#ffffff',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '4px' }}>
+                        Longitude
+                      </label>
+                      <input
+                        type="text"
+                        value={attendanceLng}
+                        onChange={(e) => setAttendanceLng(e.target.value)}
+                        placeholder="113.479500"
+                        style={{
+                          width: '100%',
+                          padding: '7px 9px',
+                          borderRadius: '7px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '12px',
+                          fontFamily: 'monospace',
+                          outline: 'none',
+                          background: '#ffffff',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '4px' }}>
+                        Radius (meter)
+                      </label>
+                      <NumberInput
+                        min={10}
+                        value={attendanceRadius}
+                        onValueChange={(v) => setAttendanceRadius(v)}
+                        placeholder="100"
+                        style={{
+                          width: '100%',
+                          padding: '7px 9px',
+                          borderRadius: '7px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '12px',
+                          background: '#ffffff',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: '#fbfbf9',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #e7e8e3',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                  }}
+                >
+                  <strong style={{ fontSize: '12px', color: '#1c2826' }}>Jadwal Jam Kerja & Toleransi</strong>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '4px' }}>
+                        Jam Masuk
+                      </label>
+                      <input
+                        type="time"
+                        value={attendanceClockInTime}
+                        onChange={(e) => setAttendanceClockInTime(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '7px 9px',
+                          borderRadius: '7px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '12px',
+                          outline: 'none',
+                          background: '#ffffff',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '4px' }}>
+                        Jam Pulang
+                      </label>
+                      <input
+                        type="time"
+                        value={attendanceClockOutTime}
+                        onChange={(e) => setAttendanceClockOutTime(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '7px 9px',
+                          borderRadius: '7px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '12px',
+                          outline: 'none',
+                          background: '#ffffff',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4b5563', marginBottom: '4px' }}>
+                        Toleransi (menit)
+                      </label>
+                      <NumberInput
+                        min={0}
+                        value={attendanceLateTolerance}
+                        onValueChange={(v) => setAttendanceLateTolerance(v)}
+                        placeholder="15"
+                        style={{
+                          width: '100%',
+                          padding: '7px 9px',
+                          borderRadius: '7px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '12px',
+                          background: '#ffffff',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 
-        {/* RIGHT COLUMN: INTERACTIVE PRINT PREVIEWS (KASIR, BAR & DAPUR) */}
+        {/* RIGHT COLUMN: INTERACTIVE PRINT PREVIEWS OR ATTENDANCE SUMMARY */}
+        {activeTab === 'ATTENDANCE' ? (
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid #e7e8e3',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <strong style={{ fontSize: '13px', color: '#1c2826' }}>Ringkasan Aturan Absensi</strong>
+              <a
+                href={`https://maps.google.com/?q=${attendanceLat},${attendanceLng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: '11.5px', fontWeight: 600, color: '#57695b', textDecoration: 'underline' }}
+              >
+                Lihat di Maps
+              </a>
+            </div>
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px' }}>
+              {(() => {
+                const [h, m] = (attendanceClockInTime || '09:00').split(':').map(Number);
+                const tol = Number(attendanceLateTolerance) || 0;
+                const totalMin = (Number.isFinite(h) ? h : 9) * 60 + (Number.isFinite(m) ? m : 0) + tol;
+                const dH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+                const dM = String(totalMin % 60).padStart(2, '0');
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#fbfbf9', borderRadius: '8px', border: '1px solid #efeee8' }}>
+                      <span style={{ color: '#64746b' }}>Koordinat Pusat Kafe</span>
+                      <strong style={{ fontFamily: 'monospace', color: '#1c2826' }}>{attendanceLat}, {attendanceLng}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#fbfbf9', borderRadius: '8px', border: '1px solid #efeee8' }}>
+                      <span style={{ color: '#64746b' }}>Radius Valid Absensi</span>
+                      <strong style={{ color: '#15803d' }}>{attendanceRadius || 100} meter</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#fbfbf9', borderRadius: '8px', border: '1px solid #efeee8' }}>
+                      <span style={{ color: '#64746b' }}>Jadwal Masuk & Pulang</span>
+                      <strong style={{ color: '#1c2826' }}>{attendanceClockInTime || '09:00'} – {attendanceClockOutTime || '17:00'} WIB</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#fbfbf9', borderRadius: '8px', border: '1px solid #efeee8' }}>
+                      <span style={{ color: '#64746b' }}>Batas Tepat Waktu</span>
+                      <strong style={{ color: '#b45309' }}>{dH}:{dM} WIB (+{tol} mnt)</strong>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        ) : (
         <div
           style={{
             background: '#ffffff',
@@ -751,10 +1025,7 @@ export function AdminSettingsView() {
               gap: '8px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <PrinterIcon size={16} color="#57695b" />
-              <strong style={{ fontSize: '13px', color: '#1c2826' }}>Pratinjau Cetak Tiket ({paperSize})</strong>
-            </div>
+            <strong style={{ fontSize: '13px', color: '#1c2826' }}>Pratinjau Cetak Tiket ({paperSize})</strong>
 
             <button
               type="button"
@@ -786,13 +1057,12 @@ export function AdminSettingsView() {
           >
             {(
               [
-                { id: 'CASHIER', label: 'Struk Kasir', icon: Receipt },
-                { id: 'BAR', label: 'Checker Bar', icon: Coffee },
-                { id: 'KITCHEN', label: 'Checker Dapur', icon: Utensils },
+                { id: 'CASHIER', label: 'Struk Kasir' },
+                { id: 'BAR', label: 'Checker Bar' },
+                { id: 'KITCHEN', label: 'Checker Dapur' },
               ] as const
             ).map((s) => {
               const isSelected = previewStation === s.id;
-              const Icon = s.icon;
               return (
                 <button
                   key={s.id}
@@ -803,7 +1073,6 @@ export function AdminSettingsView() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '5px',
                     padding: '6px 8px',
                     borderRadius: '6px',
                     border: 'none',
@@ -815,7 +1084,6 @@ export function AdminSettingsView() {
                     transition: 'all 0.1s ease',
                   }}
                 >
-                  <Icon size={12} />
                   <span>{s.label}</span>
                 </button>
               );
@@ -1054,6 +1322,7 @@ export function AdminSettingsView() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

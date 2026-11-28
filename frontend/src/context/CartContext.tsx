@@ -286,7 +286,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [cart]);
 
   const handleQuickAdd = useCallback((product: Product, onNeedsCustomization?: (product: Product) => void) => {
-    if ((product.category === 'Kopi' || product.category === 'Non-Kopi') && onNeedsCustomization) {
+    const needsCustom =
+      (product.variants && product.variants.length > 0) ||
+      product.category === 'Kopi' ||
+      product.category === 'Non-Kopi';
+    if (needsCustom && onNeedsCustomization) {
       onNeedsCustomization(product);
       return;
     }
@@ -320,7 +324,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     quantity: number,
     customization: CartCustomization
   ) => {
-    const finalUnitPrice = product.price + customization.unitPriceAdjustment;
+    const basePrice = customization.variantPrice ?? product.price;
+    const finalUnitPrice = basePrice + (customization.unitPriceAdjustment || 0);
     setCart((prev) => [
       ...prev,
       {
@@ -337,8 +342,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const next = [...prev];
       const item = next[index];
       if (!item) return prev;
+      const basePrice = item.customization?.variantPrice ?? item.product.price;
       const unitPrice = item.customization
-        ? item.product.price + item.customization.unitPriceAdjustment
+        ? basePrice + (item.customization.unitPriceAdjustment || 0)
         : item.product.price;
       next[index] = {
         ...item,

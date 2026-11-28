@@ -13,18 +13,13 @@ import {
 import { Combobox } from '@/components/ui/combobox';
 import { NumberInput, formatThousand } from '@/components/ui/number-input';
 import {
-  Boxes,
   Plus,
   Search,
-  ClipboardCheck,
   Trash2,
   Pencil,
   AlertTriangle,
   X,
   CheckCircle2,
-  Scale,
-  ShieldCheck,
-  RefreshCw,
 } from 'lucide-react';
 
 const cleanNumStr = (val: any, fallback = '0') => {
@@ -466,35 +461,18 @@ export function AdminInventoryView() {
           gap: '14px',
         }}
       >
-        {/* Card 1: Total Bahan */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Bahan Baku</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <Boxes size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Bahan Baku</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             {metrics.totalIngredients} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Bahan</span>
           </div>
@@ -503,35 +481,18 @@ export function AdminInventoryView() {
           </div>
         </div>
 
-        {/* Card 2: Stok Kritis */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Perlu Restok</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: metrics.criticalCount > 0 ? '#fee2e2' : '#dcfce7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: metrics.criticalCount > 0 ? '#b91c1c' : '#15803d',
-              }}
-            >
-              <AlertTriangle size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Perlu Restok</span>
           <div
             style={{
               fontSize: '22px',
@@ -541,7 +502,7 @@ export function AdminInventoryView() {
           >
             {metrics.criticalCount}{' '}
             <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>
-              {metrics.criticalCount > 0 ? 'Bahan Kritis' : 'Semua Aman'}
+              {metrics.criticalCount > 0 ? 'Kritis' : 'Aman'}
             </span>
           </div>
           <div style={{ fontSize: '11px', color: '#8b968f' }}>
@@ -549,72 +510,38 @@ export function AdminInventoryView() {
           </div>
         </div>
 
-        {/* Card 3: Nilai Aset */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Nilai Aset</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <Scale size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Nilai Aset</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             Rp {Math.round(metrics.totalValue).toLocaleString('id-ID')}
           </div>
           <div style={{ fontSize: '11px', color: '#8b968f' }}>
-            Saldo fisik aktual &times; HPP
+            Saldo fisik × HPP
           </div>
         </div>
 
-        {/* Card 4: Kesehatan Stok */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '14px',
+            padding: '14px 16px',
+            borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Status Stok</span>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: metrics.safePercentage >= 80 ? '#dcfce7' : '#fef3c7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: metrics.safePercentage >= 80 ? '#15803d' : '#b45309',
-              }}
-            >
-              <ShieldCheck size={16} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Status Stok</span>
           <div
             style={{
               fontSize: '22px',
@@ -763,9 +690,6 @@ export function AdminInventoryView() {
           <button
             onClick={openOpnameModal}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
               padding: '6px 12px',
               background: '#f2f4ef',
               color: '#57695b',
@@ -776,16 +700,12 @@ export function AdminInventoryView() {
               cursor: 'pointer',
             }}
           >
-            <ClipboardCheck size={14} />
             Opname
           </button>
 
           <button
             onClick={() => openWastageModal()}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
               padding: '6px 12px',
               background: '#fff1f0',
               color: '#cf1322',
@@ -796,7 +716,6 @@ export function AdminInventoryView() {
               cursor: 'pointer',
             }}
           >
-            <Trash2 size={14} />
             Limbah
           </button>
 
@@ -1048,7 +967,7 @@ export function AdminInventoryView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1060,14 +979,15 @@ export function AdminInventoryView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '520px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '500px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             {/* Header */}
@@ -1076,11 +996,11 @@ export function AdminInventoryView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
                 {editingIng ? 'Edit Bahan Baku' : 'Tambah Bahan Baku'}
               </h3>
               <button
@@ -1089,22 +1009,27 @@ export function AdminInventoryView() {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#64746b',
+                  color: '#71717a',
                   cursor: 'pointer',
-                  padding: '4px',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             <form
               onSubmit={handleSaveIngredient}
               style={{
-                padding: '20px',
+                padding: '16px 18px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '14px',
+                gap: '12px',
               }}
             >
               {ingError && (
@@ -1402,7 +1327,7 @@ export function AdminInventoryView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1414,14 +1339,15 @@ export function AdminInventoryView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '780px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '760px',
               width: '100%',
               maxHeight: '88vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             <div
@@ -1429,19 +1355,30 @@ export function AdminInventoryView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                Stok Opname Fisik
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Stok Opname
               </h3>
               <button
                 type="button"
                 onClick={() => setIsOpnameModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
@@ -1617,7 +1554,7 @@ export function AdminInventoryView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1629,14 +1566,15 @@ export function AdminInventoryView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '440px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '420px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             <div
@@ -1644,23 +1582,34 @@ export function AdminInventoryView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
                 Catat Limbah Bahan
               </h3>
               <button
                 type="button"
                 onClick={() => setIsWastageModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#64746b', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#71717a',
+                  cursor: 'pointer',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitWastage} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSubmitWastage} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {wasteError && (
                 <div style={{ padding: '8px 12px', borderRadius: '7px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12px' }}>
                   {wasteError}
@@ -1770,7 +1719,7 @@ export function AdminInventoryView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
+            background: 'rgba(17, 24, 22, 0.42)',
             backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
@@ -1782,40 +1731,22 @@ export function AdminInventoryView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '400px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '380px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
               padding: '20px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: '#fee2e2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#b91c1c',
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={18} />
-              </div>
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  Hapus Bahan Baku?
-                </h3>
-                <span style={{ fontSize: '11px', color: '#687768' }}>Tindakan ini tidak dapat dibatalkan</span>
-              </div>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Hapus Bahan Baku?
+              </h3>
             </div>
 
-            <p style={{ fontSize: '12.5px', color: '#4b5563', lineHeight: '1.4', margin: '0 0 14px 0' }}>
-              Apakah Anda yakin ingin menghapus bahan baku{' '}
-              <strong style={{ color: '#1c2826' }}>{deleteIngTarget.name}</strong> ({deleteIngTarget.code})?
+            <p style={{ fontSize: '12.5px', color: '#64746b', lineHeight: '1.45', margin: '0 0 14px 0' }}>
+              <strong style={{ color: '#1c2826' }}>{deleteIngTarget.name}</strong> ({deleteIngTarget.code}) akan dihapus permanen.
             </p>
 
             {deleteError && (

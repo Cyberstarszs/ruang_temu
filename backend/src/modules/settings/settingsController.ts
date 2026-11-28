@@ -46,8 +46,39 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
       wifi_ssid,
       wifi_password,
       instagram,
+      attendance_lat,
+      attendance_lng,
+      attendance_radius_meters,
+      attendance_clock_in_time,
+      attendance_clock_out_time,
+      attendance_late_tolerance_minutes,
     } = req.body;
     const userId = req.user?.id;
+
+    const validClockIn =
+      typeof attendance_clock_in_time === 'string' && /^\d{2}:\d{2}$/.test(attendance_clock_in_time.trim())
+        ? attendance_clock_in_time.trim()
+        : undefined;
+    const validClockOut =
+      typeof attendance_clock_out_time === 'string' && /^\d{2}:\d{2}$/.test(attendance_clock_out_time.trim())
+        ? attendance_clock_out_time.trim()
+        : undefined;
+    const parsedLat =
+      attendance_lat !== undefined && attendance_lat !== null && attendance_lat !== '' && Number.isFinite(Number(attendance_lat))
+        ? Number(attendance_lat)
+        : undefined;
+    const parsedLng =
+      attendance_lng !== undefined && attendance_lng !== null && attendance_lng !== '' && Number.isFinite(Number(attendance_lng))
+        ? Number(attendance_lng)
+        : undefined;
+    const parsedRadius =
+      attendance_radius_meters !== undefined && Number.isFinite(Number(attendance_radius_meters))
+        ? Math.max(10, Math.round(Number(attendance_radius_meters)))
+        : undefined;
+    const parsedTolerance =
+      attendance_late_tolerance_minutes !== undefined && Number.isFinite(Number(attendance_late_tolerance_minutes))
+        ? Math.max(0, Math.round(Number(attendance_late_tolerance_minutes)))
+        : undefined;
 
     // Check if exists
     let existing = await pool.query(`SELECT id FROM store_settings LIMIT 1`);
@@ -60,9 +91,12 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
           paper_size, tax_rate, service_charge_rate,
           auto_print_receipt, auto_print_bar, auto_print_kitchen,
           cashier_printer_name, bar_printer_name, kitchen_printer_name,
-          wifi_ssid, wifi_password, instagram, updated_at
+          wifi_ssid, wifi_password, instagram,
+          attendance_lat, attendance_lng, attendance_radius_meters,
+          attendance_clock_in_time, attendance_clock_out_time, attendance_late_tolerance_minutes,
+          updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP)
         RETURNING *
       `, [
         store_name || 'RUANG TEMU',
@@ -83,6 +117,12 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
         wifi_ssid || 'Ruang Temu Cafe',
         wifi_password || '',
         instagram || '@ruangtemu.cafe',
+        parsedLat ?? -7.160500,
+        parsedLng ?? 113.479500,
+        parsedRadius ?? 100,
+        validClockIn ?? '09:00',
+        validClockOut ?? '17:00',
+        parsedTolerance ?? 15,
       ]);
     } else {
       result = await pool.query(`
@@ -105,8 +145,14 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
             wifi_ssid = COALESCE($16, wifi_ssid),
             wifi_password = COALESCE($17, wifi_password),
             instagram = COALESCE($18, instagram),
+            attendance_lat = COALESCE($19, attendance_lat),
+            attendance_lng = COALESCE($20, attendance_lng),
+            attendance_radius_meters = COALESCE($21, attendance_radius_meters),
+            attendance_clock_in_time = COALESCE($22, attendance_clock_in_time),
+            attendance_clock_out_time = COALESCE($23, attendance_clock_out_time),
+            attendance_late_tolerance_minutes = COALESCE($24, attendance_late_tolerance_minutes),
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $19
+        WHERE id = $25
         RETURNING *
       `, [
         store_name,
@@ -127,6 +173,12 @@ export async function updateSettings(req: Request, res: Response, next: NextFunc
         wifi_ssid,
         wifi_password,
         instagram,
+        parsedLat,
+        parsedLng,
+        parsedRadius,
+        validClockIn,
+        validClockOut,
+        parsedTolerance,
         existing.rows[0].id,
       ]);
     }

@@ -123,43 +123,8 @@ export function MenuMatrixModal({ onClose }: MenuMatrixModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header
-          className="bo-modal-head"
-          style={{
-            padding: '16px 24px',
-            borderBottom: '1px solid #e7e5dc',
-            backgroundColor: '#fafaf8',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '1px',
-                color: '#57695b',
-                textTransform: 'uppercase',
-                display: 'block',
-                marginBottom: '2px',
-              }}
-            >
-              KEPUTUSAN MENU & REKAYASA PRODUK
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#272727' }}>
-                Matriks Menu (BCG Engineering)
-              </h2>
-              <span
-                title="Memetakan portofolio menu kafe berdasarkan volume transaksi riil versus margin keuntungan."
-                style={{ color: '#888', cursor: 'help' }}
-              >
-                <Icon name="circleHelp" size={16} />
-              </span>
-            </div>
-          </div>
+        <header className="bo-modal-head">
+          <h2>Matriks Menu</h2>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* View Switcher: Chart vs Table */}

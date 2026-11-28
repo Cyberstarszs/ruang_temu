@@ -15,10 +15,12 @@ export default function AdminGroupLayout({ children }: { children: React.ReactNo
       router.replace('/login');
     } else if (user.role === 'CASHIER') {
       router.replace('/pos');
+    } else if (user.role === 'EMPLOYEE') {
+      router.replace('/absensi');
     }
   }, [user, isAuthenticated, isLoading, router]);
 
-  if (isLoading || !isAuthenticated || !user || user.role === 'CASHIER') {
+  if (isLoading || !isAuthenticated || !user || user.role === 'CASHIER' || user.role === 'EMPLOYEE') {
     return (
       <div
         style={{

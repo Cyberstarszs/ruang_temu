@@ -6,20 +6,9 @@ import { MenuMatrixItem, MenuMatrixResponse } from '@/types';
 import { rupiah } from '@/lib/utils';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
-  TrendingUp,
   RotateCcw,
-  HelpCircle,
-  Table as TableIcon,
-  ScatterChart,
   Search,
-  Star,
-  Lightbulb,
-  Zap,
-  AlertTriangle,
-  ArrowUpRight,
-  Boxes,
-  CheckCircle2,
-  Calendar,
+  X,
 } from 'lucide-react';
 
 export function AdminMenuMatrixView() {
@@ -123,47 +112,35 @@ export function AdminMenuMatrixView() {
     switch (quadrant) {
       case 'BINTANG':
         return {
-          title: 'Menu Bintang (Star)',
-          badge: '#2d6a4f',
-          bg: '#eef6ef',
-          border: '#c2e0c7',
-          dotColor: '#2d6a4f',
-          icon: Star,
-          desc: 'Menu sangat laris dengan margin keuntungan tinggi. Pertahankan konsistensi rasa, standarisasi takaran, dan kepastian pasokan bahan baku.',
-          action: 'Pertahankan Kualitas & Pasokan',
+          title: 'Bintang',
+          badge: '#57695b',
+          bg: '#f2f4ef',
+          border: '#dcdfd5',
+          action: 'Pertahankan kualitas',
         };
       case 'POTENSIAL':
         return {
-          title: 'Menu Potensial (Puzzle)',
+          title: 'Potensial',
           badge: '#d97706',
           bg: '#fff4d6',
           border: '#fed7aa',
-          dotColor: '#d97706',
-          icon: Lightbulb,
-          desc: 'Margin keuntungan sangat tinggi, namun volume penjualan masih rendah. Tingkatkan visibilitas promosi, letakkan di banner utama menu, atau rekomendasikan sebagai Upselling di kasir.',
-          action: 'Tingkatkan Promosi & Upselling',
+          action: 'Dorong promosi',
         };
       case 'PEKERJA_KERAS':
         return {
-          title: 'Menu Pekerja Keras (Plowhorse)',
+          title: 'Pekerja Keras',
           badge: '#2563eb',
           bg: '#eff6ff',
           border: '#bfdbfe',
-          dotColor: '#2563eb',
-          icon: Zap,
-          desc: 'Volume pesanan sangat tinggi tetapi margin tipis. Pertimbangkan sedikit renegosiasi harga bahan baku dengan supplier, optimalkan porsi, atau naikkan harga bertahap 3-5%.',
-          action: 'Efisiensi HPP & Naikkan Harga Bertahap',
+          action: 'Optimalkan HPP',
         };
       case 'EVALUASI':
         return {
-          title: 'Menu Evaluasi (Dog)',
+          title: 'Evaluasi',
           badge: '#a32424',
           bg: '#fde8e8',
           border: '#fecaca',
-          dotColor: '#a32424',
-          icon: AlertTriangle,
-          desc: 'Penjualan rendah dan margin tipis. Pertimbangkan untuk merevisi resep, bundling promo dengan Menu Bintang, atau mengganti menu ini di rotasi musim berikutnya.',
-          action: 'Revisi Resep atau Hapus Menu',
+          action: 'Evaluasi menu',
         };
       default:
         return {
@@ -171,9 +148,6 @@ export function AdminMenuMatrixView() {
           badge: '#666',
           bg: '#f3f4f6',
           border: '#e5e7eb',
-          dotColor: '#61432c',
-          icon: Boxes,
-          desc: '',
           action: '-',
         };
     }
@@ -204,210 +178,144 @@ export function AdminMenuMatrixView() {
   }, [data, activeFilter, searchQuery]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '30px' }}>
-      {/* 1. HEADER SECTION (STANDALONE PAGE) */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '24px' }}>
+      {/* Top Bar Minimalis */}
       <div
         style={{
-          background: '#ffffff',
-          padding: '18px 24px',
-          borderRadius: '12px',
-          border: '1px solid #e7e8e3',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '10px',
           flexWrap: 'wrap',
-          gap: '14px',
+          background: '#ffffff',
+          padding: '10px 14px',
+          borderRadius: '12px',
+          border: '1px solid #e7e8e3',
         }}
       >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: '#eef6ef',
-                color: '#2d6a4f',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <TrendingUp size={18} />
-            </span>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <h1 style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                  Matriks Menu (Menu Engineering — BCG Matrix)
-                </h1>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    background: '#eef6ef',
-                    color: '#2d6a4f',
-                    border: '1px solid #c2e0c7',
-                    fontWeight: 700,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <Calendar size={11} />
-                  {dateRange.from && dateRange.to ? `${dateRange.from} s.d. ${dateRange.to}` : 'Semua Waktu'}
-                </span>
-              </div>
-              <p style={{ fontSize: '12.5px', color: '#6b7280', margin: '2px 0 0' }}>
-                Analisis strategis portofolio menu kafe: membandingkan volume penjualan riil terhadap margin laba HPP.
-              </p>
-            </div>
-          </div>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          {(
+            [
+              { key: 'today', label: 'Hari Ini' },
+              { key: '7days', label: '7 Hari' },
+              { key: '30days', label: '30 Hari' },
+              { key: 'all', label: 'Semua' },
+            ] as const
+          ).map((preset) => {
+            const active = isCurrentPreset(preset.key);
+            return (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => setQuickRange(preset.key)}
+                style={{
+                  padding: '0 10px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  border: active ? '1px solid #57695b' : '1px solid #e2e4dc',
+                  background: active ? '#57695b' : '#f7f7f5',
+                  color: active ? '#ffffff' : '#4b5563',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                }}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
 
-        {/* Action Controls: Date Filters, View Mode & Refresh */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {/* Quick Range Presets - Persis seperti AdminOrdersView */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => setQuickRange('today')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: isCurrentPreset('today') ? '1px solid #57695b' : '1px solid #e2e4dc',
-                background: isCurrentPreset('today') ? '#57695b' : '#f7f7f5',
-                color: isCurrentPreset('today') ? '#ffffff' : '#4b5563',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-              }}
-            >
-              Hari Ini
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setQuickRange('7days')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: isCurrentPreset('7days') ? '1px solid #57695b' : '1px solid #e2e4dc',
-                background: isCurrentPreset('7days') ? '#57695b' : '#f7f7f5',
-                color: isCurrentPreset('7days') ? '#ffffff' : '#4b5563',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-              }}
-            >
-              7 Hari
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setQuickRange('30days')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: isCurrentPreset('30days') ? '1px solid #57695b' : '1px solid #e2e4dc',
-                background: isCurrentPreset('30days') ? '#57695b' : '#f7f7f5',
-                color: isCurrentPreset('30days') ? '#ffffff' : '#4b5563',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-              }}
-            >
-              30 Hari
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setQuickRange('all')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: isCurrentPreset('all') ? '1px solid #57695b' : '1px solid #e2e4dc',
-                background: isCurrentPreset('all') ? '#57695b' : '#f7f7f5',
-                color: isCurrentPreset('all') ? '#ffffff' : '#4b5563',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-              }}
-            >
-              Semua
-            </button>
-          </div>
-
-          <div style={{ width: '1px', height: '22px', background: '#e2e4dc', margin: '0 2px' }} />
-
-          {/* DateRangePicker */}
           <DateRangePicker
             value={dateRange}
             onChange={(r) => setDateRange(r)}
-            placeholder="Pilih Tanggal..."
-            align="right"
+            placeholder="Pilih tanggal"
+            align="left"
             showApplyButton={false}
           />
+        </div>
 
-          <div style={{ width: '1px', height: '22px', background: '#e2e4dc', margin: '0 2px' }} />
-
-          {/* Switcher Grafik vs Tabel */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div
             style={{
               display: 'flex',
-              backgroundColor: '#f1f2ed',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#fbfbf9',
+              border: '1px solid #dcdfd5',
+              borderRadius: '8px',
+              padding: '0 10px',
+              height: '32px',
+              width: '190px',
+            }}
+          >
+            <Search size={13} color="#71717a" style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari menu..."
+              style={{
+                border: 'none',
+                background: 'transparent',
+                outline: 'none',
+                fontSize: '12px',
+                width: '100%',
+                color: '#1c2826',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#9ca3af', padding: 0 }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              backgroundColor: '#f5f6f2',
               borderRadius: '8px',
               padding: '3px',
-              border: '1px solid #e2e4dc',
             }}
           >
             <button
               type="button"
               onClick={() => setViewMode('chart')}
               style={{
-                padding: '6px 12px',
+                padding: '4px 12px',
                 borderRadius: '6px',
                 border: 'none',
-                fontSize: '12px',
-                fontWeight: 600,
+                fontSize: '11.5px',
+                fontWeight: viewMode === 'chart' ? 700 : 500,
                 cursor: 'pointer',
                 backgroundColor: viewMode === 'chart' ? '#ffffff' : 'transparent',
-                color: viewMode === 'chart' ? '#1c2826' : '#6b7280',
-                boxShadow: viewMode === 'chart' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.12s ease',
+                color: viewMode === 'chart' ? '#1c2826' : '#64746b',
+                boxShadow: viewMode === 'chart' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
               }}
             >
-              <ScatterChart size={14} />
-              <span>Diagram Sebaran</span>
+              Diagram
             </button>
             <button
               type="button"
               onClick={() => setViewMode('table')}
               style={{
-                padding: '6px 12px',
+                padding: '4px 12px',
                 borderRadius: '6px',
                 border: 'none',
-                fontSize: '12px',
-                fontWeight: 600,
+                fontSize: '11.5px',
+                fontWeight: viewMode === 'table' ? 700 : 500,
                 cursor: 'pointer',
                 backgroundColor: viewMode === 'table' ? '#ffffff' : 'transparent',
-                color: viewMode === 'table' ? '#1c2826' : '#6b7280',
-                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.12s ease',
+                color: viewMode === 'table' ? '#1c2826' : '#64746b',
+                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
               }}
             >
-              <TableIcon size={14} />
-              <span>Tabel Rincian</span>
+              Tabel
             </button>
           </div>
 
@@ -415,388 +323,171 @@ export function AdminMenuMatrixView() {
             type="button"
             onClick={fetchMatrix}
             disabled={loading}
+            title="Muat ulang"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0 14px',
-              background: '#57695b',
-              color: '#ffffff',
-              border: 'none',
+              width: '32px',
+              height: '32px',
               borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '12px',
+              border: '1px solid #dcdfd5',
+              background: '#fbfbf9',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#4b5563',
               cursor: 'pointer',
-              height: '36px',
-              transition: 'background 0.12s ease',
             }}
-            title="Segarkan data analisis matriks"
           >
             <RotateCcw size={13} className={loading ? 'animate-spin' : ''} />
-            Perbarui
           </button>
         </div>
       </div>
 
-      {/* 2. 4 KARTU RINGKASAN KUADRAN STRATEGIS */}
+      {/* 4 Kartu Kuadran Minimalis (Sekaligus Filter Klik) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '14px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))',
+          gap: '12px',
         }}
       >
-        {/* Card 1: Bintang */}
-        <div
-          onClick={() => setActiveFilter('BINTANG')}
-          style={{
-            background: activeFilter === 'BINTANG' ? '#eef6ef' : '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '12px',
-            border: activeFilter === 'BINTANG' ? '2px solid #2d6a4f' : '1px solid #e7e8e3',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#2d6a4f', textTransform: 'uppercase' }}>
-              ⭐ Bintang (Stars)
-            </span>
-            <span
+        {(
+          [
+            { key: 'BINTANG', label: 'Bintang', count: quadrantCounts.BINTANG, accent: '#57695b' },
+            { key: 'POTENSIAL', label: 'Potensial', count: quadrantCounts.POTENSIAL, accent: '#d97706' },
+            { key: 'PEKERJA_KERAS', label: 'Pekerja Keras', count: quadrantCounts.PEKERJA_KERAS, accent: '#2563eb' },
+            { key: 'EVALUASI', label: 'Evaluasi', count: quadrantCounts.EVALUASI, accent: '#b91c1c' },
+          ] as const
+        ).map((card) => {
+          const isSelected = activeFilter === card.key;
+          return (
+            <div
+              key={card.key}
+              onClick={() => setActiveFilter((prev) => (prev === card.key ? 'ALL' : card.key))}
               style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#2d6a4f',
-                backgroundColor: '#d8ecdc',
-                padding: '2px 8px',
-                borderRadius: '999px',
+                background: '#ffffff',
+                padding: '14px 16px',
+                borderRadius: '12px',
+                border: isSelected ? `1.5px solid ${card.accent}` : '1px solid #e7e8e3',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                transition: 'border-color 0.12s ease',
               }}
             >
-              {quadrantCounts.BINTANG} Menu
-            </span>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1c2826' }}>
-            Margin Tinggi · Volume Tinggi
-          </div>
-          <small style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
-            Menu unggulan utama. Pertahankan kualitas & pasokan bahan baku.
-          </small>
-        </div>
-
-        {/* Card 2: Potensial */}
-        <div
-          onClick={() => setActiveFilter('POTENSIAL')}
-          style={{
-            background: activeFilter === 'POTENSIAL' ? '#fff4d6' : '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '12px',
-            border: activeFilter === 'POTENSIAL' ? '2px solid #d97706' : '1px solid #e7e8e3',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>
-              💡 Potensial (Puzzles)
-            </span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#d97706',
-                backgroundColor: '#fed7aa',
-                padding: '2px 8px',
-                borderRadius: '999px',
-              }}
-            >
-              {quadrantCounts.POTENSIAL} Menu
-            </span>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1c2826' }}>
-            Margin Tinggi · Volume Rendah
-          </div>
-          <small style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
-            Untung tebal tapi kurang laku. Tingkatkan promosi & upselling kasir.
-          </small>
-        </div>
-
-        {/* Card 3: Pekerja Keras */}
-        <div
-          onClick={() => setActiveFilter('PEKERJA_KERAS')}
-          style={{
-            background: activeFilter === 'PEKERJA_KERAS' ? '#eff6ff' : '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '12px',
-            border: activeFilter === 'PEKERJA_KERAS' ? '2px solid #2563eb' : '1px solid #e7e8e3',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>
-              ⚡ Pekerja Keras (Plowhorses)
-            </span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#2563eb',
-                backgroundColor: '#dbeafe',
-                padding: '2px 8px',
-                borderRadius: '999px',
-              }}
-            >
-              {quadrantCounts.PEKERJA_KERAS} Menu
-            </span>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1c2826' }}>
-            Margin Tipis · Volume Tinggi
-          </div>
-          <small style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
-            Sangat disukai tamu. Tekan HPP, beli bahan grosir, atau naikkan harga bertahap.
-          </small>
-        </div>
-
-        {/* Card 4: Evaluasi */}
-        <div
-          onClick={() => setActiveFilter('EVALUASI')}
-          style={{
-            background: activeFilter === 'EVALUASI' ? '#fde8e8' : '#ffffff',
-            padding: '16px 18px',
-            borderRadius: '12px',
-            border: activeFilter === 'EVALUASI' ? '2px solid #a32424' : '1px solid #e7e8e3',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#a32424', textTransform: 'uppercase' }}>
-              ⚠️ Evaluasi (Dogs)
-            </span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#a32424',
-                backgroundColor: '#fecaca',
-                padding: '2px 8px',
-                borderRadius: '999px',
-              }}
-            >
-              {quadrantCounts.EVALUASI} Menu
-            </span>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1c2826' }}>
-            Margin Tipis · Volume Rendah
-          </div>
-          <small style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
-            Jarang laku dan keuntungan kecil. Evaluasi resep atau hapus dari menu.
-          </small>
-        </div>
+              <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                {card.label}
+              </span>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: card.key === 'EVALUASI' && card.count > 0 ? '#b91c1c' : '#1c2826' }}>
+                {card.count}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* 3. MAIN SECTION (CHART OR TABLE) */}
       {error && (
-        <div style={{ padding: '12px 16px', backgroundColor: '#fde8e8', color: '#a32424', borderRadius: '8px', fontSize: '13px' }}>
+        <div style={{ padding: '10px 14px', backgroundColor: '#fde8e8', color: '#a32424', borderRadius: '8px', fontSize: '12.5px' }}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '100px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #e7e8e3' }}>
-          <TrendingUp size={36} className="text-[#57695b] mx-auto mb-2 opacity-50 animate-pulse" />
-          <p style={{ fontSize: '14px', fontWeight: 600, color: '#4b5563' }}>
-            Menganalisis matriks menu dan margin HPP dari database transaksi...
+        <div style={{ textAlign: 'center', padding: '72px 20px', background: '#fff', borderRadius: '12px', border: '1px solid #e7e8e3' }}>
+          <RotateCcw size={22} className="animate-spin mx-auto mb-2" color="#57695b" />
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#64746b', margin: 0 }}>
+            Memuat data...
           </p>
         </div>
       ) : data ? (
         <>
-          {Number(data.benchmarks?.unrecipiedCount || 0) > 0 && (
-            <div
-              style={{
-                padding: '10px 14px',
-                backgroundColor: '#fffbeb',
-                border: '1px solid #fde68a',
-                borderRadius: '10px',
-                fontSize: '12.5px',
-                color: '#92400e',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span style={{ fontWeight: 700 }}>Peringatan Akurasi HPP:</span>
-              <span>
-                Terdapat <strong>{data.benchmarks.unrecipiedCount}</strong> menu aktif tanpa resep bahan baku — nilai HPP menu tersebut menggunakan <strong>estimasi default 35%</strong> dari harga jual.
-              </span>
-            </div>
-          )}
-
-          {/* Filter Pills & Search Bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#4b5563' }}>
-                Filter Tampilan:
-              </span>
-              {[
-                { key: 'ALL', label: `Semua Menu (${quadrantCounts.ALL})` },
-                { key: 'BINTANG', label: `⭐ Bintang (${quadrantCounts.BINTANG})` },
-                { key: 'POTENSIAL', label: `💡 Potensial (${quadrantCounts.POTENSIAL})` },
-                { key: 'PEKERJA_KERAS', label: `⚡ Pekerja Keras (${quadrantCounts.PEKERJA_KERAS})` },
-                { key: 'EVALUASI', label: `⚠️ Evaluasi (${quadrantCounts.EVALUASI})` },
-              ].map((tab) => {
-                const isActive = activeFilter === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setActiveFilter(tab.key as any)}
-                    style={{
-                      padding: '5px 12px',
-                      borderRadius: '8px',
-                      border: isActive ? '1px solid #57695b' : '1px solid #e2e4dc',
-                      backgroundColor: isActive ? '#57695b' : '#ffffff',
-                      color: isActive ? '#ffffff' : '#4b5563',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.12s ease',
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Pencarian Menu */}
-            <div style={{ position: 'relative', minWidth: '220px' }}>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama menu / SKU..."
-                style={{
-                  width: '100%',
-                  padding: '7px 12px 7px 32px',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '12.5px',
-                  backgroundColor: '#ffffff',
-                  outline: 'none',
-                }}
-              />
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-            </div>
-          </div>
-
-          {/* View Mode: Diagram Sebaran (Chart) */}
+          {/* View Mode: Diagram Sebaran */}
           {viewMode === 'chart' ? (
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1.8fr) minmax(320px, 1.2fr)',
-                gap: '16px',
+                gridTemplateColumns: 'minmax(0, 1.8fr) minmax(300px, 1.1fr)',
+                gap: '14px',
                 alignItems: 'start',
               }}
             >
-              {/* Kolom Kiri: Matriks 4 Kuadran */}
+              {/* Matriks 4 Kuadran */}
               <div
                 style={{
                   position: 'relative',
                   width: '100%',
-                  height: '480px',
+                  height: '440px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #e7e8e3',
                   borderRadius: '12px',
                   overflow: 'hidden',
                   userSelect: 'none',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}
               >
-                {/* Garis Pembagi Kuadran Sumbu X & Y */}
                 <div
                   style={{
                     position: 'absolute',
-                    left: '50px',
-                    right: '30px',
+                    left: '44px',
+                    right: '24px',
                     top: '50%',
-                    borderTop: '1px dashed #d1d5db',
+                    borderTop: '1px dashed #e2e4dc',
                     zIndex: 1,
                   }}
                 />
                 <div
                   style={{
                     position: 'absolute',
-                    top: '30px',
-                    bottom: '40px',
+                    top: '24px',
+                    bottom: '34px',
                     left: '50%',
-                    borderLeft: '1px dashed #d1d5db',
+                    borderLeft: '1px dashed #e2e4dc',
                     zIndex: 1,
                   }}
                 />
 
-                {/* Indikator Label Sumbu */}
                 <div
                   style={{
                     position: 'absolute',
-                    left: '14px',
+                    left: '10px',
                     top: '50%',
                     transform: 'translateY(-50%) rotate(-90deg)',
                     fontSize: '10px',
-                    fontWeight: 800,
-                    letterSpacing: '1px',
-                    color: '#9ca3af',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    color: '#a1a1aa',
                     zIndex: 2,
                   }}
                 >
-                  MARGIN LABA (%) →
+                  MARGIN (%)
                 </div>
                 <div
                   style={{
                     position: 'absolute',
-                    bottom: '12px',
-                    right: '30px',
+                    bottom: '10px',
+                    right: '24px',
                     fontSize: '10px',
-                    fontWeight: 800,
-                    letterSpacing: '1px',
-                    color: '#9ca3af',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    color: '#a1a1aa',
                     zIndex: 2,
                   }}
                 >
-                  VOLUME TERJUAL (POPULARITAS) →
+                  TERJUAL
                 </div>
 
-                {/* Label 4 Kuadran */}
-                <div style={{ position: 'absolute', top: '16px', left: '56px', zIndex: 2 }}>
-                  <b style={{ fontSize: '13px', color: '#d97706' }}>💡 Potensial (Puzzle)</b>
-                  <small style={{ fontSize: '11px', color: '#6b7280', display: 'block' }}>Margin Tinggi · Volume Rendah</small>
-                </div>
+                <span style={{ position: 'absolute', top: '14px', left: '52px', fontSize: '11.5px', fontWeight: 700, color: '#d97706', opacity: 0.75, zIndex: 2 }}>
+                  Potensial
+                </span>
+                <span style={{ position: 'absolute', top: '14px', right: '24px', fontSize: '11.5px', fontWeight: 700, color: '#57695b', opacity: 0.8, zIndex: 2 }}>
+                  Bintang
+                </span>
+                <span style={{ position: 'absolute', bottom: '32px', left: '52px', fontSize: '11.5px', fontWeight: 700, color: '#b91c1c', opacity: 0.75, zIndex: 2 }}>
+                  Evaluasi
+                </span>
+                <span style={{ position: 'absolute', bottom: '32px', right: '24px', fontSize: '11.5px', fontWeight: 700, color: '#2563eb', opacity: 0.75, zIndex: 2 }}>
+                  Pekerja Keras
+                </span>
 
-                <div style={{ position: 'absolute', top: '16px', right: '30px', textAlign: 'right', zIndex: 2 }}>
-                  <b style={{ fontSize: '13px', color: '#2d6a4f' }}>⭐ Bintang (Star)</b>
-                  <small style={{ fontSize: '11px', color: '#6b7280', display: 'block' }}>Margin Tinggi · Volume Tinggi</small>
-                </div>
-
-                <div style={{ position: 'absolute', bottom: '40px', left: '56px', zIndex: 2 }}>
-                  <b style={{ fontSize: '13px', color: '#a32424' }}>⚠️ Evaluasi (Dog)</b>
-                  <small style={{ fontSize: '11px', color: '#6b7280', display: 'block' }}>Margin Tipis · Volume Rendah</small>
-                </div>
-
-                <div style={{ position: 'absolute', bottom: '40px', right: '30px', textAlign: 'right', zIndex: 2 }}>
-                  <b style={{ fontSize: '13px', color: '#2563eb' }}>⚡ Pekerja Keras (Plowhorse)</b>
-                  <small style={{ fontSize: '11px', color: '#6b7280', display: 'block' }}>Margin Tipis · Volume Tinggi</small>
-                </div>
-
-                {/* Plot Titik Menu */}
                 {data.products.map((p) => {
                   const maxQty = Math.max(1, data.benchmarks.maxQuantity);
                   const xPct = 12 + (p.quantity / maxQty) * 74;
@@ -804,16 +495,17 @@ export function AdminMenuMatrixView() {
 
                   const isSelected = selectedProduct?.id === p.id;
                   const isHovered = hoveredProduct?.id === p.id;
-                  const isFaded = activeFilter !== 'ALL' && p.quadrant !== activeFilter;
+                  const matchesSearch = !searchQuery.trim() || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+                  const isFaded = (activeFilter !== 'ALL' && p.quadrant !== activeFilter) || !matchesSearch;
 
                   const qColor =
                     p.quadrant === 'BINTANG'
-                      ? '#2d6a4f'
+                      ? '#57695b'
                       : p.quadrant === 'POTENSIAL'
                       ? '#d97706'
                       : p.quadrant === 'PEKERJA_KERAS'
                       ? '#2563eb'
-                      : '#a32424';
+                      : '#b91c1c';
 
                   return (
                     <button
@@ -822,30 +514,30 @@ export function AdminMenuMatrixView() {
                       onClick={() => setSelectedProduct(p)}
                       onMouseEnter={() => setHoveredProduct(p)}
                       onMouseLeave={() => setHoveredProduct(null)}
-                      title={`${p.name}: ${p.quantity} porsi terjual (${p.margin}% margin)`}
+                      title={`${p.name} · ${p.quantity} porsi · Margin ${p.margin}%`}
                       style={{
                         position: 'absolute',
                         left: `${xPct}%`,
                         bottom: `${yPct}%`,
                         transform: 'translate(-50%, 50%)',
-                        width: isSelected ? '34px' : isHovered ? '28px' : '22px',
-                        height: isSelected ? '34px' : isHovered ? '28px' : '22px',
+                        width: isSelected ? '32px' : isHovered ? '26px' : '22px',
+                        height: isSelected ? '32px' : isHovered ? '26px' : '22px',
                         borderRadius: '50%',
                         backgroundColor: qColor,
-                        border: isSelected ? '3px solid #1c2826' : '2px solid #ffffff',
+                        border: isSelected ? '2.5px solid #1c2826' : '2px solid #ffffff',
                         boxShadow: isSelected
-                          ? '0 0 0 3px rgba(0,0,0,0.2), 0 4px 10px rgba(0,0,0,0.3)'
-                          : '0 2px 6px rgba(0,0,0,0.18)',
+                          ? '0 0 0 3px rgba(0,0,0,0.14)'
+                          : '0 1px 4px rgba(0,0,0,0.16)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#ffffff',
-                        fontSize: isSelected ? '13px' : '10px',
-                        fontWeight: 800,
+                        fontSize: isSelected ? '12px' : '10px',
+                        fontWeight: 700,
                         zIndex: isSelected ? 20 : isHovered ? 15 : 10,
-                        opacity: isFaded ? 0.2 : 1,
-                        transition: 'all 0.15s ease',
+                        opacity: isFaded ? 0.18 : 1,
+                        transition: 'all 0.12s ease',
                       }}
                     >
                       {p.name.charAt(0)}
@@ -854,23 +546,23 @@ export function AdminMenuMatrixView() {
                 })}
               </div>
 
-              {/* Kolom Kanan: Detail & Rekomendasi Menu Terpilih */}
+              {/* Detail Menu Terpilih */}
               <div
                 style={{
                   background: '#ffffff',
                   border: '1px solid #e7e8e3',
                   borderRadius: '12px',
-                  padding: '20px',
+                  padding: '18px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '14px',
+                  gap: '12px',
                 }}
               >
                 {selectedProduct ? (
                   <>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#71717a' }}>
                           {selectedProduct.sku} · {selectedProduct.category}
                         </span>
                         {(() => {
@@ -892,105 +584,88 @@ export function AdminMenuMatrixView() {
                           );
                         })()}
                       </div>
-                      <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1c2826', margin: '4px 0 0' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826', margin: '4px 0 0' }}>
                         {selectedProduct.name}
                       </h3>
                     </div>
 
-                    {/* Metrik Finansial Menu */}
                     <div
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
-                        gap: '8px',
-                        background: '#f8f9fa',
+                        gap: '10px',
+                        background: '#fafbf9',
                         padding: '12px',
                         borderRadius: '10px',
-                        border: '1px solid #edf0f2',
+                        border: '1px solid #f0f0eb',
                       }}
                     >
                       <div>
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>Harga Jual</span>
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>Harga Jual</span>
                         <b style={{ fontSize: '14px', color: '#1c2826', display: 'block', marginTop: '1px' }}>
                           {rupiah(selectedProduct.price)}
                         </b>
                       </div>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>
-                          HPP Bahan Baku
-                          {selectedProduct.isEstimatedCost && (
-                            <span style={{ marginLeft: '4px', color: '#b45309', fontWeight: 700 }}>
-                              (Est. 35%)
-                            </span>
-                          )}
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>
+                          HPP{selectedProduct.isEstimatedCost ? ' (Est. 35%)' : ''}
                         </span>
                         <b style={{ fontSize: '14px', color: '#b91c1c', display: 'block', marginTop: '1px' }}>
                           {rupiah(selectedProduct.cost)}
                         </b>
                       </div>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>Margin Laba</span>
-                        <b style={{ fontSize: '15px', color: '#2d6a4f', display: 'block', marginTop: '1px' }}>
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>Margin</span>
+                        <b style={{ fontSize: '14px', color: '#15803d', display: 'block', marginTop: '1px' }}>
                           {selectedProduct.margin}%
                         </b>
                       </div>
                       <div>
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>Terjual</span>
+                        <span style={{ fontSize: '11px', color: '#71717a' }}>Terjual</span>
                         <b style={{ fontSize: '14px', color: '#1c2826', display: 'block', marginTop: '1px' }}>
                           {selectedProduct.quantity} porsi
                         </b>
                       </div>
                     </div>
 
-                    {/* Total Pendapatan Menu */}
                     <div
                       style={{
                         padding: '10px 12px',
-                        backgroundColor: '#f3f6f3',
-                        border: '1px solid #d4e0d5',
+                        backgroundColor: '#f2f4ef',
                         borderRadius: '8px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                       }}
                     >
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#57695b' }}>Total Omzet Menu</span>
-                      <b style={{ fontSize: '15px', fontWeight: 800, color: '#2d6a4f' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#57695b' }}>Total Omzet</span>
+                      <b style={{ fontSize: '14px', fontWeight: 800, color: '#15803d' }}>
                         {rupiah(selectedProduct.revenue)}
                       </b>
                     </div>
 
-                    {/* Kotak Rekomendasi Aksi Strategis Owner */}
                     {(() => {
                       const info = getQuadrantInfo(selectedProduct.quadrant);
                       return (
                         <div
                           style={{
-                            padding: '14px',
+                            padding: '8px 12px',
                             backgroundColor: info.bg,
-                            border: `1.5px solid ${info.border}`,
-                            borderRadius: '10px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
+                            border: `1px solid ${info.border}`,
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: info.badge,
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <CheckCircle2 size={16} color={info.badge} />
-                            <b style={{ fontSize: '12.5px', color: info.badge, textTransform: 'uppercase' }}>
-                              Aksi Strategis: {info.action}
-                            </b>
-                          </div>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#374151', lineHeight: 1.45 }}>
-                            {info.desc}
-                          </p>
+                          Saran: {info.action}
                         </div>
                       );
                     })()}
                   </>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '40px 10px', color: '#888' }}>
-                    <p style={{ fontSize: '13px' }}>Klik salah satu titik menu pada diagram untuk melihat rekomendasi aksi.</p>
+                  <div style={{ textAlign: 'center', padding: '40px 10px', color: '#8b968f', fontSize: '12.5px' }}>
+                    Pilih titik menu pada diagram
                   </div>
                 )}
               </div>
@@ -1006,67 +681,85 @@ export function AdminMenuMatrixView() {
               }}
             >
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', whiteSpace: 'nowrap' }}>
                   <thead>
-                    <tr style={{ background: '#fafaf8', borderBottom: '1px solid #e7e8e3', color: '#6b7280', fontSize: '11px', textTransform: 'uppercase' }}>
-                      <th style={{ padding: '12px 16px' }}>Menu & SKU</th>
-                      <th style={{ padding: '12px 14px' }}>Kategori</th>
-                      <th style={{ padding: '12px 14px' }}>Harga Jual</th>
-                      <th style={{ padding: '12px 14px' }}>HPP Resep</th>
-                      <th style={{ padding: '12px 14px' }}>Margin Laba</th>
-                      <th style={{ padding: '12px 14px' }}>Terjual</th>
-                      <th style={{ padding: '12px 14px' }}>Total Omzet</th>
-                      <th style={{ padding: '12px 16px' }}>Kuadran & Status</th>
+                    <tr style={{ background: '#fafbf9', borderBottom: '1px solid #e7e8e3', color: '#71717a', height: '40px' }}>
+                      <th style={{ padding: '0 12px 0 16px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>SKU</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Nama Menu</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Kategori</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>Harga Jual</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>HPP Resep</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>Margin</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>Terjual</th>
+                      <th style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>Total Omzet</th>
+                      <th style={{ padding: '0 16px 0 12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Kuadran</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedProducts.map((p, idx) => {
+                    {displayedProducts.length === 0 && (
+                      <tr>
+                        <td colSpan={9} style={{ padding: '40px 20px', textAlign: 'center', color: '#64746b', whiteSpace: 'normal' }}>
+                          Tidak ada data menu.
+                        </td>
+                      </tr>
+                    )}
+                    {displayedProducts.map((p) => {
                       const info = getQuadrantInfo(p.quadrant);
                       return (
                         <tr
                           key={p.id}
                           style={{
-                            borderBottom: '1px solid #f1f2ed',
-                            backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fcfcfb',
+                            borderBottom: '1px solid #f0f0eb',
+                            height: '46px',
+                            backgroundColor: '#ffffff',
+                            transition: 'background-color 0.1s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fafbf9';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#ffffff';
                           }}
                         >
-                          <td style={{ padding: '12px 16px' }}>
-                            <b style={{ color: '#1c2826', display: 'block' }}>{p.name}</b>
-                            <small style={{ color: '#9ca3af' }}>{p.sku}</small>
+                          <td style={{ padding: '8px 12px 8px 16px', verticalAlign: 'middle', color: '#71717a', fontFamily: 'monospace', fontSize: '11.5px' }}>
+                            {p.sku}
                           </td>
-                          <td style={{ padding: '12px 14px', color: '#4b5563' }}>{p.category}</td>
-                          <td style={{ padding: '12px 14px', fontWeight: 600 }}>{rupiah(p.price)}</td>
-                          <td style={{ padding: '12px 14px', color: '#b91c1c' }}>
-                            <div>{rupiah(p.cost)}</div>
-                            {p.isEstimatedCost && (
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  marginTop: '2px',
-                                  padding: '1px 6px',
-                                  borderRadius: '4px',
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  backgroundColor: '#fef3c7',
-                                  color: '#92400e',
-                                  border: '1px solid #fde68a',
-                                }}
-                                title="Menu belum memiliki resep bahan baku; menggunakan asumsi 35% harga jual"
-                              >
-                                Estimasi 35% (Tanpa Resep)
-                              </span>
-                            )}
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', fontWeight: 600, color: '#1c2826', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={p.name}>
+                            {p.name}
                           </td>
-                          <td style={{ padding: '12px 14px', fontWeight: 700, color: p.margin >= 70 ? '#2d6a4f' : '#b45309' }}>
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', color: '#4b5563' }}>{p.category}</td>
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontWeight: 600, color: '#1c2826', fontVariantNumeric: 'tabular-nums' }}>{rupiah(p.price)}</td>
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                              <span style={{ color: '#b91c1c', fontWeight: 500 }}>{rupiah(p.cost)}</span>
+                              {p.isEstimatedCost && (
+                                <span
+                                  style={{
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    backgroundColor: '#fef3c7',
+                                    color: '#92400e',
+                                    border: '1px solid #fde68a',
+                                  }}
+                                  title="Menu belum memiliki resep bahan baku; menggunakan asumsi 35% harga jual"
+                                >
+                                  Est. 35%
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontWeight: 700, color: p.margin >= 70 ? '#15803d' : '#b45309', fontVariantNumeric: 'tabular-nums' }}>
                             {p.margin}%
                           </td>
-                          <td style={{ padding: '12px 14px', fontWeight: 600 }}>{p.quantity} porsi</td>
-                          <td style={{ padding: '12px 14px', fontWeight: 700, color: '#1c2826' }}>{rupiah(p.revenue)}</td>
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>{p.quantity} porsi</td>
+                          <td style={{ padding: '8px 12px', verticalAlign: 'middle', textAlign: 'right', fontWeight: 700, color: '#1c2826', fontVariantNumeric: 'tabular-nums' }}>{rupiah(p.revenue)}</td>
+                          <td style={{ padding: '8px 16px 8px 12px', verticalAlign: 'middle' }}>
                             <span
                               style={{
                                 display: 'inline-block',
-                                padding: '3px 9px',
+                                padding: '2px 8px',
                                 borderRadius: '999px',
                                 fontSize: '11px',
                                 fontWeight: 700,

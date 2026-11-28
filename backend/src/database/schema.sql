@@ -3,9 +3,9 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. PENGGUNA & PERAN (2 ROLES ONLY: OWNER & CASHIER)
+-- 1. PENGGUNA & PERAN (OWNER, CASHIER, EMPLOYEE)
 DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('OWNER', 'CASHIER');
+    CREATE TYPE user_role AS ENUM ('OWNER', 'CASHIER', 'EMPLOYEE');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     role user_role NOT NULL DEFAULT 'CASHIER',
     pin_code VARCHAR(6) NULL, -- PIN 6 angka untuk otorisasi void & diskon oleh Owner
+    face_descriptor JSONB NULL,
+    face_photo_url TEXT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -76,17 +78,24 @@ CREATE TABLE IF NOT EXISTS ingredients (
 
 -- 5. MASTER PRODUK & TARGET PRINTER
 DO $$ BEGIN
-    CREATE TYPE product_category AS ENUM ('Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on');
     CREATE TYPE target_station_printer AS ENUM ('BAR_PRINTER', 'KITCHEN_PRINTER', 'NONE');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+CREATE TABLE IF NOT EXISTS product_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    default_print_target target_station_printer NOT NULL DEFAULT 'BAR_PRINTER',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     sku VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
-    category product_category NOT NULL,
+    category VARCHAR(50) NOT NULL,
     price NUMERIC(12, 2) NOT NULL, -- Harga Bersih (Nett)
     image_url TEXT NULL,
     print_target target_station_printer NOT NULL DEFAULT 'BAR_PRINTER',
@@ -97,15 +106,32 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. RESEP PRODUK (MEMBEDAKAN BAHAN RESEP VS KEMASAN TAKEAWAY)
+-- 5B. VARIAN / PORSI PRODUK (HARGA & RESEP MASING-MASING VARIAN)
+CREATE TABLE IF NOT EXISTS product_variants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    name VARCHAR(60) NOT NULL,
+    price NUMERIC(12, 2) NOT NULL CHECK (price >= 0),
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. RESEP PRODUK (MEMBEDAKAN BAHAN RESEP VS KEMASAN TAKEAWAY, PER PRODUK / PER VARIAN)
 CREATE TABLE IF NOT EXISTS product_recipes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    variant_id UUID NULL REFERENCES product_variants(id) ON DELETE CASCADE,
     ingredient_id UUID NOT NULL REFERENCES ingredients(id),
     quantity NUMERIC(10, 3) NOT NULL,
-    is_packaging_only BOOLEAN NOT NULL DEFAULT FALSE,
-    UNIQUE (product_id, ingredient_id)
+    is_packaging_only BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_recipes_base_unique
+    ON product_recipes (product_id, ingredient_id) WHERE variant_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_recipes_variant_unique
+    ON product_recipes (product_id, variant_id, ingredient_id) WHERE variant_id IS NOT NULL;
 
 -- 7. KUSTOMISASI MODIFIERS
 CREATE TABLE IF NOT EXISTS modifier_options (
@@ -202,6 +228,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
+    variant_id UUID NULL REFERENCES product_variants(id) ON DELETE SET NULL,
+    variant_name_snapshot VARCHAR(60) NULL,
     product_name_snapshot VARCHAR(100) NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     unit_price_snapshot NUMERIC(12, 2) NOT NULL,
@@ -338,6 +366,19 @@ CREATE TABLE IF NOT EXISTS employee_attendances (
     total_hours NUMERIC(5, 2) NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PRESENT' CHECK (status IN ('PRESENT', 'LATE', 'PERMIT', 'SICK')),
     notes TEXT NULL,
+    clock_in_photo TEXT NULL,
+    clock_out_photo TEXT NULL,
+    clock_in_lat NUMERIC(10, 7) NULL,
+    clock_in_lng NUMERIC(10, 7) NULL,
+    clock_out_lat NUMERIC(10, 7) NULL,
+    clock_out_lng NUMERIC(10, 7) NULL,
+    clock_in_distance_meters NUMERIC(8, 2) NULL,
+    clock_out_distance_meters NUMERIC(8, 2) NULL,
+    clock_in_within_radius BOOLEAN NOT NULL DEFAULT TRUE,
+    clock_out_within_radius BOOLEAN NULL,
+    late_minutes INT NOT NULL DEFAULT 0,
+    face_match_score NUMERIC(5, 3) NULL,
+    clock_out_face_match_score NUMERIC(5, 3) NULL,
     UNIQUE(user_id, work_date)
 );
 
@@ -362,6 +403,12 @@ CREATE TABLE IF NOT EXISTS store_settings (
     cashier_printer_name VARCHAR(100) DEFAULT 'Printer Kasir',
     bar_printer_name VARCHAR(100) DEFAULT 'Printer Bar Checker',
     kitchen_printer_name VARCHAR(100) DEFAULT 'Printer Dapur Checker',
+    attendance_lat NUMERIC(10, 7) NULL DEFAULT -7.160500,
+    attendance_lng NUMERIC(10, 7) NULL DEFAULT 113.479500,
+    attendance_radius_meters INT NOT NULL DEFAULT 100,
+    attendance_clock_in_time VARCHAR(5) NOT NULL DEFAULT '09:00',
+    attendance_clock_out_time VARCHAR(5) NOT NULL DEFAULT '17:00',
+    attendance_late_tolerance_minutes INT NOT NULL DEFAULT 15,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

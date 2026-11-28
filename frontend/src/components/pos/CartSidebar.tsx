@@ -497,8 +497,9 @@ export function CartSidebar({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {cart.map((item, index) => {
+                const basePrice = item.customization?.variantPrice ?? item.product.price;
                 const unitPrice = item.customization
-                  ? item.product.price + item.customization.unitPriceAdjustment
+                  ? basePrice + (item.customization.unitPriceAdjustment || 0)
                   : item.product.price;
                 const optionText =
                   item.customization?.selectedOptions && item.customization.selectedOptions.length > 0
@@ -1199,11 +1200,8 @@ export function CartSidebar({
       {clearConfirm && (
         <div className="bo-modal-layer">
           <div className="bo-confirm" role="alertdialog">
-            <span>
-              <Trash2 size={28} />
-            </span>
-            <h2>Kosongkan Pesanan?</h2>
-            <p>Seluruh item dalam keranjang belanja saat ini akan dihapus.</p>
+            <h2>Kosongkan Keranjang?</h2>
+            <p>Semua item dalam keranjang saat ini akan dihapus.</p>
             <div>
               <button type="button" onClick={() => setClearConfirm(false)}>
                 Batal

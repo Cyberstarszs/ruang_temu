@@ -10,6 +10,8 @@ export const directCheckoutSchema = z.object({
   items: z.array(
     z.object({
       productId: z.string().uuid({ message: 'Product ID wajib berupa UUID yang valid' }),
+      variantId: z.string().uuid().nullable().optional(),
+      variantName: z.string().optional(),
       quantity: z.number().int().positive({ message: 'Kuantitas harus bilangan positif' }),
       notes: z.string().optional(),
       modifiers: z.array(z.string()).optional(),

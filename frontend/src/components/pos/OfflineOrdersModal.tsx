@@ -83,33 +83,15 @@ export function OfflineOrdersModal({ onClose }: OfflineOrdersModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="bo-modal-head" style={{ borderBottom: '1px solid #eeece6' }}>
+        <header className="bo-modal-head">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: failedCount > 0 ? '#fee2e2' : '#f0f4f0',
-                  color: failedCount > 0 ? '#dc2626' : '#57695b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name={isOnline ? 'refreshCw' : 'wifiOff'} size={16} />
-              </div>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#272727' }}>
-                Antrean Transaksi Offline ({offlineOrders.length})
-              </h2>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#64748b' }}>
-              Status koneksi: <b style={{ color: isOnline ? '#16a34a' : '#dc2626' }}>{isOnline ? 'ONLINE' : 'OFFLINE (Terputus)'}</b>. Transaksi kasir disimpan aman di memori lokal.
+            <h2>Antrean Offline ({offlineOrders.length})</h2>
+            <p>
+              Status: <b style={{ color: isOnline ? '#15803d' : '#b91c1c' }}>{isOnline ? 'Online' : 'Offline'}</b>
             </p>
           </div>
-          <button onClick={onClose} aria-label="Tutup" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-            <Icon name="close" size={20} />
+          <button onClick={onClose} aria-label="Tutup">
+            <Icon name="close" size={18} />
           </button>
         </header>
 
@@ -117,11 +99,11 @@ export function OfflineOrdersModal({ onClose }: OfflineOrdersModalProps) {
         {feedbackMsg && (
           <div
             style={{
-              padding: '10px 16px',
+              padding: '10px 18px',
               backgroundColor: feedbackMsg.type === 'success' ? '#f0fdf4' : '#fef2f2',
               color: feedbackMsg.type === 'success' ? '#15803d' : '#b91c1c',
               borderBottom: feedbackMsg.type === 'success' ? '1px solid #bbf7d0' : '1px solid #fecaca',
-              fontSize: '13px',
+              fontSize: '12.5px',
               fontWeight: 600,
             }}
           >
@@ -132,12 +114,8 @@ export function OfflineOrdersModal({ onClose }: OfflineOrdersModalProps) {
         {/* Body Content */}
         <div className="bo-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
           {offlineOrders.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#888' }}>
-              <Icon name="checkCircle" size={42} className="text-emerald-500 mb-2 opacity-80" />
-              <h4 style={{ margin: '6px 0 2px', fontSize: '15px', color: '#333' }}>Semua Transaksi Tersinkron</h4>
-              <p style={{ margin: 0, fontSize: '12.5px', color: '#777' }}>
-                Tidak ada pesanan offline yang tertahan di memori lokal kasir.
-              </p>
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#71717a', fontSize: '13px' }}>
+              Semua transaksi tersinkron.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

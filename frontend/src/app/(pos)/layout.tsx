@@ -12,10 +12,12 @@ export default function PosGroupLayout({ children }: { children: React.ReactNode
     if (isLoading) return;
     if (!isAuthenticated || !user) {
       router.replace('/login');
+    } else if (user.role === 'EMPLOYEE') {
+      router.replace('/absensi');
     }
   }, [user, isAuthenticated, isLoading, router]);
 
-  if (isLoading || !isAuthenticated || !user) {
+  if (isLoading || !isAuthenticated || !user || user.role === 'EMPLOYEE') {
     return (
       <div
         style={{

@@ -4,6 +4,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { StaffUser, UserRole } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { FaceScanner, FaceCaptureResult } from '@/components/common/FaceScanner';
+import { AdminAttendanceReportView } from './AdminAttendanceReportView';
 import {
   Select,
   SelectContent,
@@ -12,24 +14,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Users,
   Plus,
-  Shield,
-  UserCheck,
-  UserX,
-  Lock,
   RotateCcw,
   X,
   Search,
-  Pencil,
-  Key,
   Check,
+  Camera,
 } from 'lucide-react';
+
+const API_ORIGIN = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1').replace(/\/api\/v1\/?$/, '');
+
+function resolveFacePhotoUrl(path: string | null | undefined): string {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  return `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+}
 
 export function AdminUsersView() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<'ACCOUNTS' | 'ATTENDANCE_REPORT'>('ACCOUNTS');
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,9 +48,16 @@ export function AdminUsersView() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('CASHIER');
+  const [role, setRole] = useState<UserRole>('EMPLOYEE');
   const [pinCode, setPinCode] = useState('');
+  const [addFaceCapture, setAddFaceCapture] = useState<FaceCaptureResult | null>(null);
   const [modalError, setModalError] = useState('');
+
+  // Quick Face Enrollment Modal (1-click Scan Wajah per row)
+  const [scanningFaceUser, setScanningFaceUser] = useState<StaffUser | null>(null);
+  const [quickFaceCapture, setQuickFaceCapture] = useState<FaceCaptureResult | null>(null);
+  const [isSavingQuickFace, setIsSavingQuickFace] = useState(false);
+  const [quickFaceError, setQuickFaceError] = useState('');
 
   // Edit / Detail Modal State
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
@@ -53,6 +67,7 @@ export function AdminUsersView() {
   const [editPassword, setEditPassword] = useState('');
   const [editPinMode, setEditPinMode] = useState<'keep' | 'change' | 'reset'>('keep');
   const [editPinCode, setEditPinCode] = useState('');
+  const [editFaceCapture, setEditFaceCapture] = useState<FaceCaptureResult | null>(null);
   const [editError, setEditError] = useState('');
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
@@ -127,10 +142,12 @@ export function AdminUsersView() {
 
   // Counts for filter pills
   const totalCount = users.length;
+  const employeeCount = users.filter((u) => u.role === 'EMPLOYEE').length;
   const cashierCount = users.filter((u) => u.role === 'CASHIER').length;
   const ownerCount = users.filter((u) => u.role === 'OWNER').length;
   const activeCount = users.filter((u) => u.is_active).length;
   const inactiveCount = users.filter((u) => !u.is_active).length;
+  const faceRegisteredCount = users.filter((u) => u.has_face).length;
 
   const handleToggleActive = async (user: StaffUser) => {
     // Safety Guard 1: Prevent user from deactivating their own account
@@ -178,6 +195,8 @@ export function AdminUsersView() {
         password,
         role,
         pin_code: pinCode.trim() || undefined,
+        face_descriptor: addFaceCapture?.descriptor,
+        face_photo: addFaceCapture?.photoBase64,
       });
 
       if (res.success) {
@@ -186,11 +205,35 @@ export function AdminUsersView() {
         setName('');
         setUsername('');
         setPassword('');
+        setRole('EMPLOYEE');
         setPinCode('');
+        setAddFaceCapture(null);
         loadUsers();
       }
     } catch (err: any) {
       setModalError(err.message || 'Gagal mendaftarkan pengguna.');
+    }
+  };
+
+  const handleSaveQuickFace = async () => {
+    if (!scanningFaceUser || !quickFaceCapture) return;
+    setIsSavingQuickFace(true);
+    setQuickFaceError('');
+    try {
+      const res = await api.users.update(scanningFaceUser.id, {
+        face_descriptor: quickFaceCapture.descriptor,
+        face_photo: quickFaceCapture.photoBase64,
+      });
+      if (res.success) {
+        showToast(`Wajah "${scanningFaceUser.name}" berhasil didaftarkan.`);
+        setScanningFaceUser(null);
+        setQuickFaceCapture(null);
+        loadUsers();
+      }
+    } catch (err: any) {
+      setQuickFaceError(err.message || 'Gagal menyimpan data wajah.');
+    } finally {
+      setIsSavingQuickFace(false);
     }
   };
 
@@ -203,6 +246,7 @@ export function AdminUsersView() {
     setEditPassword('');
     setEditPinMode('keep');
     setEditPinCode('');
+    setEditFaceCapture(null);
     setEditError('');
   };
 
@@ -226,6 +270,8 @@ export function AdminUsersView() {
         role: string;
         pin_code?: string | null;
         password?: string;
+        face_descriptor?: number[];
+        face_photo?: string;
       } = {
         name: editName.trim(),
         username: editUsername.trim().toLowerCase(),
@@ -247,6 +293,12 @@ export function AdminUsersView() {
       // Password logic
       if (editPassword.trim()) {
         payload.password = editPassword.trim();
+      }
+
+      // Face update if re-scanned inside edit modal
+      if (editFaceCapture) {
+        payload.face_descriptor = editFaceCapture.descriptor;
+        payload.face_photo = editFaceCapture.photoBase64;
       }
 
       const res = await api.users.update(editingUser.id, payload);
@@ -291,7 +343,7 @@ export function AdminUsersView() {
         </div>
       )}
 
-      {/* Action Bar: Title, Search, and Add Button */}
+      {/* Action Bar: Title, Sub-Tabs & Add Button */}
       <div
         style={{
           display: 'flex',
@@ -301,50 +353,97 @@ export function AdminUsersView() {
           gap: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-            Manajemen Karyawan & Hak Akses
+            Karyawan & Absensi
           </h2>
-          <span
+
+          {/* Minimalist Sub-Tab Switcher */}
+          <div
             style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#57695b',
-              background: '#edf3ee',
-              padding: '2px 8px',
-              borderRadius: '999px',
+              display: 'inline-flex',
+              background: '#f1f2ed',
+              padding: '3px',
+              borderRadius: '8px',
+              border: '1px solid #e5e7e0',
+              gap: '2px',
             }}
           >
-            {users.length} Total Staf
-          </span>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('ACCOUNTS')}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: activeSubTab === 'ACCOUNTS' ? 700 : 500,
+                background: activeSubTab === 'ACCOUNTS' ? '#ffffff' : 'transparent',
+                color: activeSubTab === 'ACCOUNTS' ? '#1c2826' : '#64746b',
+                boxShadow: activeSubTab === 'ACCOUNTS' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Daftar Karyawan ({users.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('ATTENDANCE_REPORT')}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: activeSubTab === 'ATTENDANCE_REPORT' ? 700 : 500,
+                background: activeSubTab === 'ATTENDANCE_REPORT' ? '#ffffff' : 'transparent',
+                color: activeSubTab === 'ATTENDANCE_REPORT' ? '#1c2826' : '#64746b',
+                boxShadow: activeSubTab === 'ATTENDANCE_REPORT' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Laporan Absensi
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={() => {
-            setIsModalOpen(true);
-            setModalError('');
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 16px',
-            background: '#57695b',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: 700,
-            fontSize: '13px',
-            cursor: 'pointer',
-            boxShadow: '0 1px 3px rgba(87, 105, 91, 0.2)',
-            transition: 'background 0.15s ease',
-          }}
-        >
-          <Plus size={16} />
-          Tambah Staf Baru
-        </button>
+        {activeSubTab === 'ACCOUNTS' && (
+          <button
+            onClick={() => {
+              setIsModalOpen(true);
+              setName('');
+              setUsername('');
+              setPassword('');
+              setPinCode('');
+              setModalError('');
+              setRole('EMPLOYEE');
+              setAddFaceCapture(null);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              background: '#57695b',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(87, 105, 91, 0.2)',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            <Plus size={16} />
+            Tambah Karyawan
+          </button>
+        )}
       </div>
 
+      {activeSubTab === 'ATTENDANCE_REPORT' ? (
+        <AdminAttendanceReportView users={users} />
+      ) : (
+      <>
       {/* 4 KPI METRIC CARDS */}
       <div
         style={{
@@ -356,136 +455,68 @@ export function AdminUsersView() {
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: '#edf3ee',
-              color: '#57695b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Users size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Total Seluruh Staf</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
-              {totalCount}
-            </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Staf</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
+            {totalCount}
           </div>
         </div>
 
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: '#e0f2fe',
-              color: '#0369a1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <UserCheck size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Kasir Aktif</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
-              {users.filter((u) => u.role === 'CASHIER' && u.is_active).length}
-            </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Karyawan</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#15803d' }}>
+            {users.filter((u) => u.role === 'EMPLOYEE' && u.is_active).length}
           </div>
         </div>
 
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: '#fef3c7',
-              color: '#92400e',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Shield size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Owner / Manajer</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
-              {users.filter((u) => u.role === 'OWNER' && u.is_active).length}
-            </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Kasir Aktif</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#0369a1' }}>
+            {users.filter((u) => u.role === 'CASHIER' && u.is_active).length}
           </div>
         </div>
 
         <div
           style={{
             background: '#ffffff',
-            padding: '14px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
             display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: '#fee2e2',
-              color: '#b91c1c',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <UserX size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '11.5px', color: '#71717a', fontWeight: 600 }}>Akun Nonaktif</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', marginTop: '2px' }}>
-              {inactiveCount}
-            </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Wajah Terdaftar</span>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#57695b' }}>
+            {faceRegisteredCount} / {totalCount}
           </div>
         </div>
       </div>
@@ -578,7 +609,23 @@ export function AdminUsersView() {
                 cursor: 'pointer',
               }}
             >
-              Semua Peran ({totalCount})
+              Semua ({totalCount})
+            </button>
+            <button
+              onClick={() => setRoleFilter('EMPLOYEE')}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: roleFilter === 'EMPLOYEE' ? 700 : 500,
+                background: roleFilter === 'EMPLOYEE' ? '#ffffff' : 'transparent',
+                color: roleFilter === 'EMPLOYEE' ? '#15803d' : '#52525b',
+                boxShadow: roleFilter === 'EMPLOYEE' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Karyawan ({employeeCount})
             </button>
             <button
               onClick={() => setRoleFilter('CASHIER')}
@@ -681,6 +728,7 @@ export function AdminUsersView() {
                 <th style={{ padding: '0 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Nama Staf</th>
                 <th style={{ padding: '0 12px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Username</th>
                 <th style={{ padding: '0 12px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Peran (Role)</th>
+                <th style={{ padding: '0 12px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wajah Absensi</th>
                 <th style={{ padding: '0 12px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>PIN Kasir</th>
                 <th style={{ padding: '0 12px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status Akun</th>
                 <th style={{ padding: '0 12px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Terdaftar</th>
@@ -690,13 +738,13 @@ export function AdminUsersView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
+                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#64746b' }}>
                     Memuat daftar karyawan...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#8b968f' }}>
+                  <td colSpan={8} style={{ padding: '36px', textAlign: 'center', color: '#8b968f' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '14px', fontWeight: 600 }}>Tidak ada staf yang sesuai</span>
                       <small style={{ fontSize: '12px', color: '#a1a1aa' }}>
@@ -748,7 +796,15 @@ export function AdminUsersView() {
                                 openUserPopover(e, `Staf: ${cleanDisplayName}`, [
                                   { label: 'Nama Lengkap', value: u.name },
                                   { label: 'Username Login', value: `@${u.username}` },
-                                  { label: 'Peran', value: u.role === 'OWNER' ? 'Owner (Pemilik Toko)' : 'Kasir (Operator POS)' },
+                                  {
+                                    label: 'Peran',
+                                    value:
+                                      u.role === 'OWNER'
+                                        ? 'Owner (Pemilik Toko)'
+                                        : u.role === 'CASHIER'
+                                        ? 'Kasir (Operator POS)'
+                                        : 'Karyawan (Absensi)',
+                                  },
                                   { label: 'PIN Otorisasi', value: u.has_pin ? 'Aktif' : 'Belum Dipasang' },
                                   { label: 'Status Akun', value: u.is_active ? 'Aktif' : 'Dinonaktifkan' },
                                   { label: 'Terdaftar', value: new Date(u.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) },
@@ -793,20 +849,79 @@ export function AdminUsersView() {
                       <td style={{ padding: '0 12px', verticalAlign: 'middle' }}>
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
+                            display: 'inline-block',
                             padding: '3px 9px',
                             borderRadius: '6px',
-                            background: isOwner ? '#fef3c7' : '#e0f2fe',
-                            color: isOwner ? '#92400e' : '#0369a1',
+                            background: isOwner ? '#fef3c7' : u.role === 'CASHIER' ? '#e0f2fe' : '#dcfce7',
+                            color: isOwner ? '#92400e' : u.role === 'CASHIER' ? '#0369a1' : '#15803d',
                             fontWeight: 700,
                             fontSize: '11px',
                           }}
                         >
-                          <Shield size={12} />
-                          {isOwner ? 'OWNER' : 'KASIR'}
+                          {isOwner ? 'OWNER' : u.role === 'CASHIER' ? 'KASIR' : 'KARYAWAN'}
                         </span>
+                      </td>
+
+                      {/* 4. Wajah Absensi */}
+                      <td style={{ padding: '0 12px', verticalAlign: 'middle' }}>
+                        {u.has_face ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setScanningFaceUser(u);
+                              setQuickFaceCapture(null);
+                              setQuickFaceError('');
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '3px 8px 3px 4px',
+                              borderRadius: '6px',
+                              border: '1px solid #d4ded6',
+                              background: '#f3f7f4',
+                              color: '#15803d',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                            title="Klik untuk scan ulang wajah"
+                          >
+                            {u.face_photo_url && (
+                              <img
+                                src={resolveFacePhotoUrl(u.face_photo_url)}
+                                alt={cleanDisplayName}
+                                style={{ width: '18px', height: '18px', borderRadius: '4px', objectFit: 'cover' }}
+                              />
+                            )}
+                            <span>Terdaftar</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setScanningFaceUser(u);
+                              setQuickFaceCapture(null);
+                              setQuickFaceError('');
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              border: '1px dashed #cbd5cc',
+                              background: '#fbfbf9',
+                              color: '#57695b',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Camera size={12} />
+                            <span>Scan Wajah</span>
+                          </button>
+                        )}
                       </td>
 
                       {/* 4. PIN */}
@@ -814,15 +929,11 @@ export function AdminUsersView() {
                         {u.has_pin ? (
                           <span
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
                               color: '#15803d',
                               fontWeight: 700,
                               fontSize: '11.5px',
                             }}
                           >
-                            <Key size={12} />
                             Terpasang
                           </span>
                         ) : (
@@ -862,9 +973,6 @@ export function AdminUsersView() {
                           <button
                             onClick={() => openEditModal(u)}
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
                               padding: '4px 10px',
                               borderRadius: '6px',
                               border: '1px solid #dcdfd5',
@@ -873,22 +981,18 @@ export function AdminUsersView() {
                               fontWeight: 600,
                               fontSize: '11.5px',
                               cursor: 'pointer',
-                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                               transition: 'all 0.15s ease',
                             }}
                             title={`Edit profil, peran, atau reset PIN staf ${cleanDisplayName}`}
                           >
-                            <Pencil size={12} color="#57695b" />
-                            <span>Edit</span>
+                            Edit
                           </button>
 
                           {/* Tombol Nonaktifkan: Diamankan untuk akun sendiri */}
                           {isSelf ? (
                             <span
                               style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
+                                display: 'inline-block',
                                 padding: '4px 9px',
                                 borderRadius: '6px',
                                 background: '#f4f5f1',
@@ -900,7 +1004,6 @@ export function AdminUsersView() {
                               }}
                               title="Anda sedang masuk dengan akun ini. Akun sendiri tidak dapat dinonaktifkan demi keamanan sistem."
                             >
-                              <Shield size={11} color="#57695b" />
                               Akun Anda
                             </span>
                           ) : (
@@ -936,15 +1039,17 @@ export function AdminUsersView() {
           </table>
         </div>
       </div>
+      </>
+      )}
 
-      {/* EDIT / DETAIL USER MODAL */}
-      {editingUser && (
+      {/* QUICK SCAN FACE MODAL */}
+      {scanningFaceUser && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -955,15 +1060,12 @@ export function AdminUsersView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
-              maxWidth: '480px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '420px',
               width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              animation: 'fadeIn 0.15s ease-out',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
+              overflow: 'hidden',
             }}
           >
             <div
@@ -971,35 +1073,153 @@ export function AdminUsersView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 24px',
-                borderBottom: '1px solid #e7e8e3',
-                background: '#fafafa',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                  Edit Data & Akses Staf
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  Scan Wajah: {scanningFaceUser.name}
                 </h3>
-                <small style={{ color: '#71717a', fontSize: '12px' }}>
-                  Perbarui profil, ganti peran, atau kelola PIN kasir.
-                </small>
+                <div style={{ fontSize: '11px', color: '#64746b', marginTop: '1px' }}>
+                  @{scanningFaceUser.username}
+                </div>
               </div>
               <button
-                onClick={() => setEditingUser(null)}
+                onClick={() => setScanningFaceUser(null)}
                 style={{
-                  background: '#f0f0eb',
+                  background: 'transparent',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
+                  borderRadius: '6px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateUser} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {quickFaceError && (
+                <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', fontSize: '12px', fontWeight: 600 }}>
+                  {quickFaceError}
+                </div>
+              )}
+
+              <FaceScanner
+                mode="enroll"
+                height={230}
+                initialPhotoUrl={resolveFacePhotoUrl(scanningFaceUser.face_photo_url)}
+                onCapture={(res) => setQuickFaceCapture(res)}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid #f0f0eb' }}>
+                <button
+                  type="button"
+                  onClick={() => setScanningFaceUser(null)}
+                  style={{
+                    padding: '8px 14px',
+                    background: '#f0f0eb',
+                    border: '1px solid #dcdfd5',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: '#4b5563',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={!quickFaceCapture || isSavingQuickFace}
+                  onClick={handleSaveQuickFace}
+                  style={{
+                    padding: '8px 16px',
+                    background: !quickFaceCapture ? '#cbd5cc' : '#57695b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: !quickFaceCapture || isSavingQuickFace ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {isSavingQuickFace ? 'Menyimpan...' : 'Simpan Wajah'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT / DETAIL USER MODAL */}
+      {editingUser && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '460px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+                background: '#ffffff',
+              }}
+            >
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Edit Staf
+              </h3>
+              <button
+                onClick={() => setEditingUser(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '6px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#71717a',
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {editError && (
                 <div
                   style={{
@@ -1071,6 +1291,7 @@ export function AdminUsersView() {
                       <SelectValue placeholder="Pilih Role" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="EMPLOYEE">Karyawan (Absensi)</SelectItem>
                       <SelectItem value="CASHIER">Kasir (POS Kasir)</SelectItem>
                       <SelectItem value="OWNER">Owner (Akses Penuh)</SelectItem>
                     </SelectContent>
@@ -1091,8 +1312,7 @@ export function AdminUsersView() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Key size={13} color="#57695b" />
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>
                     PIN Kasir / Otorisasi
                   </label>
                   <span
@@ -1196,6 +1416,19 @@ export function AdminUsersView() {
                 )}
               </div>
 
+              {/* Scan Wajah Karyawan (Edit) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  Data Wajah Absensi (Opsional)
+                </label>
+                <FaceScanner
+                  mode="enroll"
+                  height={180}
+                  initialPhotoUrl={resolveFacePhotoUrl(editingUser.face_photo_url)}
+                  onCapture={(res) => setEditFaceCapture(res)}
+                />
+              </div>
+
               {/* Password Baru (Opsional) */}
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
@@ -1277,8 +1510,8 @@ export function AdminUsersView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1289,12 +1522,13 @@ export function AdminUsersView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '20px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
               maxWidth: '460px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              overflow: 'hidden',
-              animation: 'fadeIn 0.15s ease-out',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             <div
@@ -1302,30 +1536,37 @@ export function AdminUsersView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 24px',
-                borderBottom: '1px solid #e7e8e3',
-                background: '#fafafa',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+                background: '#ffffff',
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
               }}
             >
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                Tambah Akun Staf Kafe
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                Tambah Karyawan
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 style={{
-                  background: '#f0f0eb',
+                  background: 'transparent',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px',
+                  borderRadius: '6px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleCreateUser} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {modalError && (
                 <div
                   style={{
@@ -1393,6 +1634,7 @@ export function AdminUsersView() {
                       <SelectValue placeholder="Pilih Role" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="EMPLOYEE">Karyawan (Absensi)</SelectItem>
                       <SelectItem value="CASHIER">Kasir (POS Only)</SelectItem>
                       <SelectItem value="OWNER">Owner / Manajer</SelectItem>
                     </SelectContent>
@@ -1423,12 +1665,12 @@ export function AdminUsersView() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
-                    PIN Otorisasi (6 Angka)
+                    PIN Otorisasi (Opsional)
                   </label>
                   <input
                     type="password"
                     maxLength={6}
-                    placeholder="Opsional"
+                    placeholder="4-6 digit angka"
                     value={pinCode}
                     onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
                     style={{
@@ -1440,6 +1682,17 @@ export function AdminUsersView() {
                     }}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#4b5563', marginBottom: '6px' }}>
+                  Scan Wajah Karyawan (Untuk Absensi)
+                </label>
+                <FaceScanner
+                  mode="enroll"
+                  height={190}
+                  onCapture={(res) => setAddFaceCapture(res)}
+                />
               </div>
 
               <div

@@ -110,6 +110,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState('');
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 2500);
@@ -121,9 +122,10 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
   const loadData = useCallback(async () => {
     try {
       setLoadingData(true);
-      const [prodRes, tableRes] = await Promise.all([
+      const [prodRes, tableRes, catRes] = await Promise.all([
         api.products.getAll(),
         api.tables.getAll(),
+        api.products.getCategories().catch(() => ({ success: false, data: [] })),
       ]);
 
       if (prodRes.success && prodRes.data) {
@@ -144,12 +146,22 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
         setTables(tableRes.data);
         await cacheCatalogData('tables', tableRes.data);
       }
+      if (catRes.success && Array.isArray(catRes.data) && catRes.data.length > 0) {
+        const names = catRes.data.map((c: any) => c.name).filter(Boolean);
+        setCategoryNames(names);
+        await cacheCatalogData('categories', names);
+      }
     } catch (err) {
       console.warn('Error loading master data, fallback to IndexedDB cache:', err);
-      const [cachedProds, cachedTables] = await Promise.all([
+      const [cachedProds, cachedTables, cachedCats] = await Promise.all([
         getCachedCatalogData<Product[]>('products'),
         getCachedCatalogData<DiningTable[]>('tables'),
+        getCachedCatalogData<string[]>('categories'),
       ]);
+
+      if (cachedCats && cachedCats.length > 0) {
+        setCategoryNames(cachedCats);
+      }
 
       if (cachedProds && cachedProds.length > 0) {
         setProducts(cachedProds);
@@ -265,7 +277,8 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
 
   // Cart handlers delegating to CartContext
   const handleQuickAdd = (product: Product) => {
-    if (product.category === 'Kopi' || product.category === 'Non-Kopi') {
+    const hasVariants = Boolean(product.variants && product.variants.length > 0);
+    if (hasVariants || product.category === 'Kopi' || product.category === 'Non-Kopi') {
       setCustomizingProduct(product);
       return;
     }
@@ -373,6 +386,8 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       reservationId: reservationId || null,
       items: cart.map((item) => ({
         productId: item.product.id,
+        variantId: item.customization?.variantId || null,
+        variantName: item.customization?.variantName || undefined,
         quantity: item.quantity,
         notes: item.customization?.notes || undefined,
         modifiers: item.customization?.selectedOptions || undefined,
@@ -401,10 +416,12 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
         customerName: customer?.name || (orderType === 'TAKEAWAY' ? takeawayName : undefined),
         createdAt: new Date().toISOString(),
         items: cart.map((item) => ({
-          productName: item.product.name,
+          productName: item.customization?.variantName
+            ? `${item.product.name} (${item.customization.variantName})`
+            : item.product.name,
           quantity: item.quantity,
           unitPrice: item.customization
-            ? item.product.price + item.customization.unitPriceAdjustment
+            ? (item.customization.variantPrice ?? item.product.price) + (item.customization.unitPriceAdjustment || 0)
             : item.product.price,
           subtotal: item.itemSubtotal,
           printTarget: item.product.print_target,
@@ -455,10 +472,12 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
           customerName: customer?.name || (orderType === 'TAKEAWAY' ? takeawayName : undefined),
           createdAt: createdOrder.created_at,
           items: cart.map((item) => ({
-            productName: item.product.name,
+            productName: item.customization?.variantName
+              ? `${item.product.name} (${item.customization.variantName})`
+              : item.product.name,
             quantity: item.quantity,
             unitPrice: item.customization
-              ? item.product.price + item.customization.unitPriceAdjustment
+              ? (item.customization.variantPrice ?? item.product.price) + (item.customization.unitPriceAdjustment || 0)
               : item.product.price,
             subtotal: item.itemSubtotal,
             printTarget: item.product.print_target,
@@ -581,7 +600,15 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
     return matchesCategory && matchesSearch;
   });
 
-  const categories = ['Semua', 'Favorit', 'Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on'];
+  const dynamicCats = Array.from(
+    new Set([
+      ...(categoryNames.length > 0
+        ? categoryNames
+        : ['Kopi', 'Non-Kopi', 'Makanan', 'Camilan', 'Add-on']),
+      ...products.map((p) => p.category).filter(Boolean),
+    ])
+  );
+  const categories = ['Semua', 'Favorit', ...dynamicCats];
 
   return (
     <div className="new-pos">
@@ -744,7 +771,8 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
                     product={p}
                     quantityInCart={inCart}
                     onSelect={(prod) => {
-                      if (prod.category === 'Kopi' || prod.category === 'Non-Kopi') {
+                      const hasVariants = Boolean(prod.variants && prod.variants.length > 0);
+                      if (hasVariants || prod.category === 'Kopi' || prod.category === 'Non-Kopi') {
                         setCustomizingProduct(prod);
                       } else {
                         handleQuickAdd(prod);
@@ -914,7 +942,7 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
       )}
 
       {/* Shift Management Modals: Mandatory on first login */}
-      {!hasActiveShift && !shiftLoading && (
+      {!hasActiveShift && !shiftLoading && activeShiftModal !== 'close' && (
         <OpenShiftModal isMandatory={true} onClose={() => {}} />
       )}
       {activeShiftModal === 'open' && hasActiveShift && (
@@ -970,12 +998,9 @@ export function PosScreen({ onSwitchToAdmin }: PosScreenProps = {}) {
             onClick={(e) => e.stopPropagation()}
           >
             <header className="bo-modal-head">
-              <div>
-                <h2>Pisah Tagihan (Split Bill)</h2>
-                <p>Bagi rata total belanja untuk pembayaran rombongan.</p>
-              </div>
+              <h2>Pisah Tagihan</h2>
               <button onClick={() => setSplitBillOpen(false)} aria-label="Tutup">
-                <Icon name="close" size={20} />
+                <Icon name="close" size={18} />
               </button>
             </header>
 

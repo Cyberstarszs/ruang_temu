@@ -19,7 +19,6 @@ import {
   X,
   ChevronDown,
   Eye,
-  AlertTriangle,
 } from 'lucide-react';
 
 // Helper to safely format modifiers (can be array of objects or strings)
@@ -1250,8 +1249,8 @@ export function AdminOrdersView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1263,12 +1262,13 @@ export function AdminOrdersView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '520px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '500px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1278,21 +1278,21 @@ export function AdminOrdersView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
-                background: '#fafaf8',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+                background: '#ffffff',
               }}
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826', margin: 0, fontFamily: 'monospace' }}>
+                  <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0, fontFamily: 'monospace' }}>
                     {selectedOrder.order_number}
                   </h3>
                   <span
                     style={{
                       padding: '2px 7px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
+                      borderRadius: '999px',
+                      fontSize: '10.5px',
                       fontWeight: 700,
                       background: selectedOrder.status === 'PAID' ? '#dcfce7' : '#fee2e2',
                       color: selectedOrder.status === 'PAID' ? '#15803d' : '#b91c1c',
@@ -1310,12 +1310,16 @@ export function AdminOrdersView() {
               <button
                 onClick={() => setSelectedOrder(null)}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e4dc',
+                  background: 'transparent',
+                  border: 'none',
                   borderRadius: '6px',
-                  padding: '5px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
@@ -1323,7 +1327,7 @@ export function AdminOrdersView() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Order Info Pills */}
               <div
                 style={{
@@ -1568,8 +1572,8 @@ export function AdminOrdersView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.48)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1581,11 +1585,12 @@ export function AdminOrdersView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
               maxWidth: '380px',
               width: '100%',
               overflow: 'hidden',
-              boxShadow: '0 20px 48px rgba(0,0,0,0.25)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.16)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1596,12 +1601,12 @@ export function AdminOrdersView() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '12px 18px',
-                background: '#fafaf8',
-                borderBottom: '1px solid #e7e8e3',
+                background: '#ffffff',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#1c2826' }}>
-                Pratinjau Struk Kasir
+              <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#1c2826' }}>
+                Struk #{receiptOrder.order_number}
               </span>
               <button
                 onClick={() => setReceiptOrder(null)}
@@ -1609,7 +1614,13 @@ export function AdminOrdersView() {
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 <X size={16} />
@@ -1851,8 +1862,8 @@ export function AdminOrdersView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1864,10 +1875,11 @@ export function AdminOrdersView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '440px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '420px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
               overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1877,16 +1889,18 @@ export function AdminOrdersView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #fee2e2',
-                background: '#fff5f5',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+                background: '#ffffff',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cf1322' }}>
-                <AlertTriangle size={18} />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                  Otorisasi Void Transaksi
+              <div>
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, margin: 0, color: '#b91c1c' }}>
+                  Void #{voidingOrder.order_number}
                 </h3>
+                <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
+                  Rp {Number(voidingOrder.total_amount).toLocaleString('id-ID')} · Perlu PIN Owner
+                </div>
               </div>
               <button
                 onClick={() => setVoidingOrder(null)}
@@ -1894,23 +1908,20 @@ export function AdminOrdersView() {
                   background: 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '4px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleExecuteVoid} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ fontSize: '12.5px', color: '#4b5563', lineHeight: 1.5 }}>
-                Membatalkan pesanan <strong>{voidingOrder.order_number}</strong> senilai{' '}
-                <strong style={{ color: '#1c2826' }}>
-                  Rp {Number(voidingOrder.total_amount).toLocaleString('id-ID')}
-                </strong>
-                . Stok bahan baku akan otomatis dikembalikan jika opsi restock dicentang.
-              </div>
+            <form onSubmit={handleExecuteVoid} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
               {voidError && (
                 <div

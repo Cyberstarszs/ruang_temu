@@ -17,7 +17,6 @@ import {
   Search,
   X,
   Clock,
-  BookOpen,
   ShieldAlert,
   ArrowDownLeft,
   ArrowUpRight,
@@ -1008,13 +1007,9 @@ export function AdminShiftsView() {
                               fontSize: '11px',
                               cursor: 'pointer',
                               whiteSpace: 'nowrap',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
                             }}
                             title="Buka jurnal mutasi kas"
                           >
-                            <BookOpen size={12} />
                             Jurnal Kas
                           </button>
 
@@ -1032,12 +1027,8 @@ export function AdminShiftsView() {
                                 fontSize: '11px',
                                 cursor: 'pointer',
                                 whiteSpace: 'nowrap',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
                               }}
                             >
-                              <ShieldAlert size={12} color="#be123c" />
                               Tutup Paksa
                             </button>
                           )}
@@ -1058,8 +1049,8 @@ export function AdminShiftsView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1071,12 +1062,13 @@ export function AdminShiftsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '580px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '560px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1085,14 +1077,14 @@ export function AdminShiftsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #e7e8e3',
-                background: '#fafaf8',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+                background: '#ffffff',
               }}
             >
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1c2826', margin: 0 }}>
-                  Jurnal Mutasi Kas: {selectedShift.cashier_name}
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                  Jurnal Kas: {selectedShift.cashier_name}
                 </h3>
                 <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
                   Modal Awal: Rp {Number(selectedShift.opening_cash).toLocaleString('id-ID')}
@@ -1101,19 +1093,23 @@ export function AdminShiftsView() {
               <button
                 onClick={() => setSelectedShift(null)}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e4dc',
+                  background: 'transparent',
+                  border: 'none',
                   borderRadius: '6px',
-                  padding: '5px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {selectedShift.closing_notes && (
                 <div
                   style={{
@@ -1274,8 +1270,8 @@ export function AdminShiftsView() {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(17, 24, 22, 0.68)',
+            backdropFilter: 'blur(3px)',
             zIndex: 10000,
             display: 'flex',
             alignItems: 'center',
@@ -1287,11 +1283,12 @@ export function AdminShiftsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
               overflow: 'hidden',
-              maxWidth: '560px',
+              maxWidth: '540px',
               width: '100%',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+              boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1300,26 +1297,27 @@ export function AdminShiftsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '12px 18px',
-                borderBottom: '1px solid #f1f5f9',
+                padding: '12px 16px',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <b style={{ fontSize: '14px', color: '#1e293b' }}>Foto Bukti Nota / Kwitansi Fisik</b>
+              <b style={{ fontSize: '14px', color: '#1c2826' }}>Bukti Nota</b>
               <button
                 onClick={() => setViewingReceipt(null)}
                 style={{
-                  background: '#f1f5f9',
+                  background: 'transparent',
                   border: 'none',
-                  borderRadius: '50%',
+                  borderRadius: '6px',
                   width: '28px',
                   height: '28px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  color: '#71717a',
                 }}
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             </div>
             <div style={{ padding: '16px', textAlign: 'center', background: '#0f172a', maxHeight: '70vh', overflowY: 'auto' }}>
@@ -1371,8 +1369,8 @@ export function AdminShiftsView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1384,10 +1382,11 @@ export function AdminShiftsView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '500px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '460px',
               width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
               overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1398,16 +1397,18 @@ export function AdminShiftsView() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid #fee2e2',
-                background: '#fff5f5',
+                padding: '14px 18px',
+                borderBottom: '1px solid #f0f0eb',
+                background: '#ffffff',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b' }}>
-                <ShieldAlert size={18} />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                  Tutup Shift Paksa (Otoritas Owner)
+              <div>
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, margin: 0, color: '#b91c1c' }}>
+                  Tutup Paksa Shift
                 </h3>
+                <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
+                  {forceCloseTarget.cashier_name} · Sesi kasir akan ditutup
+                </div>
               </div>
               <button
                 onClick={() => setForceCloseTarget(null)}
@@ -1416,9 +1417,13 @@ export function AdminShiftsView() {
                   background: 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '4px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
@@ -1426,20 +1431,7 @@ export function AdminShiftsView() {
             </div>
 
             {/* Content */}
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  background: '#fff1f2',
-                  border: '1px solid #fecdd3',
-                  fontSize: '12px',
-                  color: '#9f1239',
-                  lineHeight: '1.5',
-                }}
-              >
-                Menutup paksa sesi kasir <strong>{forceCloseTarget.cashier_name}</strong> secara administratif. Terminal kasir akan otomatis keluar dari sesi saat ini.
-              </div>
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
               {/* Shift Breakdown Summary */}
               {(() => {

@@ -68,20 +68,16 @@ export function OpenShiftModal({
         style={{ maxWidth: '480px', width: '92%' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="bo-modal-head" style={{ backgroundColor: '#fcfbf8' }}>
+        <header className="bo-modal-head">
           <div>
-            <h2 style={{ color: '#57695b' }}>
-              {isMandatory ? 'Wajib Buka Sif Kasir' : 'Buka Sif Kasir Baru'}
-            </h2>
-            <p>
-              {isMandatory
-                ? `Halo ${user?.name || 'Kasir'}, masukkan modal kas awal untuk mulai transaksi.`
-                : 'Masukkan modal uang kas kecil awal (float cash) di laci uang kasir.'}
-            </p>
+            <h2>{isMandatory ? 'Buka Sif Kasir' : 'Buka Sif Baru'}</h2>
+            {isMandatory && (
+              <p>Halo {user?.name || 'Kasir'}, masukkan modal awal laci kasir.</p>
+            )}
           </div>
           {!isMandatory && (
             <button onClick={onClose} aria-label="Tutup">
-              <Icon name="close" size={20} />
+              <Icon name="close" size={18} />
             </button>
           )}
         </header>
@@ -226,11 +222,11 @@ export function ShiftRecapModal({ onClose }: { onClose: () => void }) {
       >
         <header className="bo-modal-head">
           <div>
-            <h2>Rekap Sif Kasir Berjalan</h2>
-            <p>Dibuka sejak {shift ? formatDateTime(shift.opened_at) : '—'}</p>
+            <h2>Rekap Sif</h2>
+            <p>{shift ? formatDateTime(shift.opened_at) : '—'}</p>
           </div>
           <button onClick={onClose} aria-label="Tutup">
-            <Icon name="close" size={20} />
+            <Icon name="close" size={18} />
           </button>
         </header>
 
@@ -579,63 +575,10 @@ export function CashMovementModal({ onClose }: { onClose: () => void }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <header
-          className="bo-modal-head"
-          style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid #f1f5f9',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
-                background: type === 'CASH_OUT' ? '#fef2f2' : '#edf3ee',
-                color: type === 'CASH_OUT' ? '#dc2626' : '#57695b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Icon name="wallet" size={20} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: 0, lineHeight: 1.3 }}>
-                {type === 'CASH_OUT' ? 'Catat Pengeluaran Kasir' : 'Catat Kas Masuk'}
-              </h2>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0, marginTop: '2px' }}>
-                {type === 'CASH_OUT'
-                  ? 'Catat biaya operasional kasir (es batu, gas, dsb) secara akurat.'
-                  : 'Catat setoran tambahan modal atau uang masuk kasir.'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Tutup"
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid #e2e8f0',
-              background: '#f8fafc',
-              color: '#64748b',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <Icon name="close" size={16} />
+        <header className="bo-modal-head">
+          <h2>{type === 'CASH_OUT' ? 'Catat Kas Keluar' : 'Catat Kas Masuk'}</h2>
+          <button onClick={onClose} aria-label="Tutup">
+            <Icon name="close" size={18} />
           </button>
         </header>
 
@@ -1126,6 +1069,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
   const [notes, setNotes] = useState('');
   const [managerPin, setManagerPin] = useState('');
   const [requiresPin, setRequiresPin] = useState(false);
+  const [rejectedCashAmount, setRejectedCashAmount] = useState<number | null>(null);
   const [closedReconciliation, setClosedReconciliation] = useState<{
     openingCash: number;
     cashSales: number;
@@ -1147,6 +1091,16 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
 
   const physicalCash = useDetailedDenomination ? calculatedFromDenominations : manualPhysicalCash;
 
+  // Reset PIN authorization prompt automatically whenever the cashier corrects the physical cash input
+  useEffect(() => {
+    if (rejectedCashAmount !== null && physicalCash !== rejectedCashAmount) {
+      setRequiresPin(false);
+      setRejectedCashAmount(null);
+      setManagerPin('');
+      setError('');
+    }
+  }, [physicalCash, rejectedCashAmount]);
+
   const handleDenomChange = (denom: string, val: number) => {
     setDenominations((prev) => ({
       ...prev,
@@ -1167,6 +1121,10 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       '1000': 0,
       'coins': 0,
     });
+    setRequiresPin(false);
+    setRejectedCashAmount(null);
+    setManagerPin('');
+    setError('');
   };
 
   const handleFinishAndLogout = () => {
@@ -1197,7 +1155,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       const res = await closeShift({
         blindCountedCash: physicalCash,
         notes: notes.trim() || undefined,
-        managerPin: managerPin.trim() || undefined,
+        managerPin: requiresPin ? managerPin.trim() || undefined : undefined,
       });
 
       if (res.success && res.reconciliation) {
@@ -1208,6 +1166,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
       } else {
         if (res.requiresManagerPin) {
           setRequiresPin(true);
+          setRejectedCashAmount(physicalCash);
         }
         setError(res.message || 'Gagal menutup sif kasir.');
         setLoading(false);
@@ -1232,12 +1191,9 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
           onClick={(e) => e.stopPropagation()}
         >
           <header className="bo-modal-head">
-            <div>
-              <h2>Rekonsiliasi Akhir Sif Selesai</h2>
-              <p>Data sif telah dikunci. Tinjau ringkasan akhir sebelum keluar akun.</p>
-            </div>
+            <h2>Rekap Akhir Sif</h2>
             <button onClick={handleFinishAndLogout} aria-label="Tutup & Keluar">
-              <Icon name="close" size={20} />
+              <Icon name="close" size={18} />
             </button>
           </header>
 
@@ -1326,79 +1282,29 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="bo-modal-head">
-          <div>
-            <h2>Tutup Sif Kasir (Blind Close)</h2>
-            <p>Hitung uang fisik di laci tanpa melihat angka ekspektasi sistem. Sistem akan mencatat & mengaudit selisih.</p>
-          </div>
+          <h2>Tutup Sif Kasir</h2>
           <button onClick={onClose} aria-label="Tutup">
-            <Icon name="close" size={20} />
+            <Icon name="close" size={18} />
           </button>
         </header>
 
-        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 20px' }}>
+        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 18px' }}>
           {error && (
             <div
               style={{
-                padding: '10px 14px',
-                backgroundColor: '#fde8e8',
-                color: '#a32424',
+                padding: '9px 12px',
+                backgroundColor: '#fef2f2',
+                color: '#b91c1c',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: '12.5px',
                 marginBottom: '14px',
                 lineHeight: 1.4,
-                border: '1px solid #f87171',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
+                border: '1px solid #fecaca',
               }}
             >
-              <Icon name="alertTriangle" size={16} />
-              <span>{error}</span>
+              {error}
             </div>
           )}
-
-          {/* 1. PANDUAN BLIND DROP */}
-          <div
-            style={{
-              background: '#f8faf9',
-              borderRadius: '10px',
-              border: '1px solid #dce4dd',
-              padding: '11px 14px',
-              marginBottom: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px',
-              fontSize: '12px',
-              color: '#374151',
-            }}
-          >
-            <div>
-              <b style={{ display: 'block', color: '#1c2826', marginBottom: '2px' }}>
-                🔒 Prosedur Blind Cash Drop Aktif
-              </b>
-              <span>Hitung seluruh uang tunai riil di laci. Jika terdapat selisih dengan sistem, otorisasi PIN Owner diperlukan.</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleResetCash}
-              style={{
-                height: '32px',
-                padding: '0 12px',
-                borderRadius: '7px',
-                border: '1px solid #d1d5db',
-                background: '#ffffff',
-                color: '#6b7280',
-                fontSize: '11.5px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-              title="Kosongkan hitungan kas fisik"
-            >
-              Reset Hitungan
-            </button>
-          </div>
 
           {/* 2. METODE HITUNG FISIK (PECAHAN LEMBAR vs TOTAL LANGSUNG) */}
           <div
@@ -1406,12 +1312,10 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '10px',
+              gap: '8px',
+              marginBottom: '12px',
             }}
           >
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-              Metode Hitung Kas Fisik:
-            </span>
             <button
               type="button"
               onClick={() => setUseDetailedDenomination(!useDetailedDenomination)}
@@ -1423,9 +1327,28 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                 fontWeight: 600,
                 cursor: 'pointer',
                 textDecoration: 'underline',
+                padding: 0,
               }}
             >
-              {useDetailedDenomination ? 'Beralih ke Input Total Langsung' : 'Beralih ke Hitung Pecahan Lembar'}
+              {useDetailedDenomination ? 'Input Total Langsung' : 'Hitung Pecahan Lembar'}
+            </button>
+            <button
+              type="button"
+              onClick={handleResetCash}
+              style={{
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: '6px',
+                border: '1px solid #dcdfd5',
+                background: '#fbfbf9',
+                color: '#64746b',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Kosongkan hitungan kas fisik"
+            >
+              Reset
             </button>
           </div>
 
@@ -1551,7 +1474,7 @@ export function CloseShiftModal({ onClose }: { onClose: () => void }) {
                 ⚠️ Otorisasi PIN Owner Diperlukan (Terdeteksi Selisih Kas)
               </b>
               <p style={{ fontSize: '11.5px', color: '#78350f', margin: '0 0 8px' }}>
-                Silakan cek kembali uang laci atau panggil Owner untuk memasukkan PIN 6-digit dan isi alasan selisih di bawah.
+                Silakan cek kembali atau koreksi nominal uang laci di atas (panel PIN otomatis tertutup bila nominal diubah), atau panggil Owner untuk memasukkan PIN 6-digit dan isi alasan selisih di bawah.
               </p>
               <input
                 type="password"

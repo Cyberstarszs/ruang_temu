@@ -13,22 +13,15 @@ import {
 import { DatePicker } from '@/components/ui/date-picker';
 import { NumberInput } from '@/components/ui/number-input';
 import {
-  BadgePercent,
   Plus,
   Check,
   X,
   Search,
   RotateCcw,
-  Calendar,
   Trash2,
   Pencil,
-  CheckCircle2,
-  Clock,
   AlertCircle,
-  TrendingUp,
-  Sparkles,
   AlertTriangle,
-  Layers,
 } from 'lucide-react';
 
 export function AdminPromosView() {
@@ -352,143 +345,71 @@ export function AdminPromosView() {
           gap: '14px',
         }}
       >
-        {/* Card 1: Total Promo */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Voucher Promo</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <BadgePercent size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Voucher Promo</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
             {metrics.total} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Voucher</span>
           </div>
-          <div style={{ fontSize: '11px', color: '#8b968f', marginTop: '4px' }}>
-            Terdaftar di sistem kasir & POS
-          </div>
         </div>
 
-        {/* Card 2: Promo Aktif Berjalan */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Promo Aktif Berjalan</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#dcfce7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#15803d',
-              }}
-            >
-              <CheckCircle2 size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Promo Aktif Berjalan</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#15803d' }}>
             {metrics.running} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Aktif</span>
           </div>
-          <div style={{ fontSize: '11px', color: '#15803d', marginTop: '4px' }}>
-            Siap digunakan pelanggan saat ini
-          </div>
         </div>
 
-        {/* Card 3: Total Penggunaan */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Total Penggunaan</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#57695b',
-              }}
-            >
-              <TrendingUp size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Total Penggunaan</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1c2826' }}>
-            {metrics.totalUsed} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Kali Diklaim</span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f', marginTop: '4px' }}>
-            Total klaim voucher di transaksi
+            {metrics.totalUsed} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Kali</span>
           </div>
         </div>
 
-        {/* Card 4: Kedaluwarsa / Kuota Habis */}
         <div
           style={{
             background: '#ffffff',
-            padding: '16px 18px',
+            padding: '14px 16px',
             borderRadius: '12px',
             border: '1px solid #e7e8e3',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64746b' }}>Kedaluwarsa / Habis</span>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: metrics.expiredOrDepleted > 0 ? '#fef3c7' : '#f2f4ef',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: metrics.expiredOrDepleted > 0 ? '#b45309' : '#57695b',
-              }}
-            >
-              <Clock size={17} />
-            </div>
-          </div>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase' }}>Kedaluwarsa / Habis</span>
           <div style={{ fontSize: '22px', fontWeight: 800, color: metrics.expiredOrDepleted > 0 ? '#b45309' : '#1c2826' }}>
             {metrics.expiredOrDepleted} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64746b' }}>Promo</span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#8b968f', marginTop: '4px' }}>
-            {metrics.expiredOrDepleted > 0 ? 'Perlu perpanjangan tanggal / kuota' : 'Semua kuota & masa aktif aman'}
           </div>
         </div>
       </div>
@@ -680,14 +601,8 @@ export function AdminPromosView() {
               ) : filteredPromos.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '40px 16px', textAlign: 'center', color: '#8b968f' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <BadgePercent size={28} color="#ccd1c4" />
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#4b5563' }}>
-                        {searchQuery ? 'Tidak ada voucher promo yang cocok.' : 'Belum ada voucher promo.'}
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: '#9ca3af' }}>
-                        Klik &quot;Buat Promo Baru&quot; untuk menyusun skema diskon kasir.
-                      </div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#4b5563' }}>
+                      {searchQuery ? 'Tidak ada voucher promo yang cocok.' : 'Belum ada voucher promo.'}
                     </div>
                   </td>
                 </tr>
@@ -898,8 +813,8 @@ export function AdminPromosView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -910,14 +825,15 @@ export function AdminPromosView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '560px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '540px',
               width: '100%',
               maxHeight: '92vh',
               overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
             {/* Header */}
@@ -927,26 +843,25 @@ export function AdminPromosView() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '14px 18px',
-                borderBottom: '1px solid #e7e8e3',
+                borderBottom: '1px solid #f0f0eb',
               }}
             >
-              <div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
-                  {editingPromo ? 'Edit Voucher Promo' : 'Buat Voucher Promo Baru'}
-                </h3>
-                <div style={{ fontSize: '11.5px', color: '#71717a', marginTop: '2px' }}>
-                  Atur skema potongan harga, minimal belanja, dan batas kuota
-                </div>
-              </div>
+              <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c2826', margin: 0 }}>
+                {editingPromo ? 'Edit Voucher Promo' : 'Buat Voucher Promo'}
+              </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 style={{
-                  background: '#f7f7f5',
+                  background: 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '5px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64746b',
+                  color: '#71717a',
                 }}
               >
                 <X size={16} />
@@ -1160,16 +1075,12 @@ export function AdminPromosView() {
                   padding: '9px 12px',
                   borderRadius: '8px',
                   border: '1px solid #e2e6de',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '8px',
                   fontSize: '12px',
                   color: '#47564a',
                   lineHeight: '1.4',
                 }}
               >
-                <Sparkles size={14} color="#57695b" style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div style={{ flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+                <div style={{ wordBreak: 'break-word' }}>
                   <strong style={{ color: '#1c2826' }}>Simulasi: </strong>
                   <span>{simulationText}</span>
                 </div>
@@ -1222,8 +1133,8 @@ export function AdminPromosView() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(3px)',
+            background: 'rgba(17, 24, 22, 0.42)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1234,41 +1145,20 @@ export function AdminPromosView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '400px',
+              borderRadius: '12px',
+              border: '1px solid #e7e8e3',
+              maxWidth: '380px',
               width: '100%',
-              padding: '18px',
+              padding: '20px',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '50%',
-                  background: '#fee2e2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#b91c1c',
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={16} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1c2826' }}>
-                  Hapus Voucher Promo?
-                </h4>
-                <div style={{ fontSize: '11.5px', color: '#71717a' }}>
-                  Voucher promo ini akan dihapus dari sistem.
-                </div>
-              </div>
-            </div>
+            <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700, color: '#1c2826' }}>
+              Hapus Voucher Promo?
+            </h4>
 
             {deleteError && (
               <div

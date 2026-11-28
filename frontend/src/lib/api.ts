@@ -95,6 +95,12 @@ export const api = {
   // Products
   products: {
     getAll: () => request<{ success: boolean; data: any[] }>('/products'),
+    getCategories: () => request<{ success: boolean; data: any[] }>('/products/categories'),
+    createCategory: (payload: { name: string; default_print_target?: 'BAR_PRINTER' | 'KITCHEN_PRINTER' | 'NONE' }) =>
+      request<{ success: boolean; data: any; message: string }>('/products/categories', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
     toggleSoldOut: (id: string, isForceSoldOut: boolean) =>
       request<{ success: boolean; data: any; message: string }>(`/products/${id}/toggle-soldout`, {
         method: 'PATCH',
@@ -119,12 +125,32 @@ export const api = {
       request<{ success: boolean; data: any; message: string }>(`/products/${id}`, {
         method: 'DELETE',
       }),
-    getRecipes: (id: string) =>
-      request<{ success: boolean; data: { recipes: any[]; totalHpp: number } }>(`/products/${id}/recipes`),
-    updateRecipes: (id: string, recipes: Array<{ ingredient_id: string; quantity: number; is_packaging_only?: boolean }>) =>
+    getRecipes: (id: string, variantId?: string | null) =>
+      request<{ success: boolean; data: { recipes: any[]; totalHpp: number; variantId?: string | null } }>(
+        variantId ? `/products/${id}/recipes?variantId=${encodeURIComponent(variantId)}` : `/products/${id}/recipes`
+      ),
+    updateRecipes: (
+      id: string,
+      recipes: Array<{ ingredient_id: string; quantity: number; is_packaging_only?: boolean }>,
+      variantId?: string | null
+    ) =>
       request<{ success: boolean; message: string }>(`/products/${id}/recipes`, {
         method: 'PUT',
-        body: JSON.stringify({ recipes }),
+        body: JSON.stringify({ recipes, variantId: variantId || null }),
+      }),
+    createVariant: (productId: string, payload: { name: string; price: number }) =>
+      request<{ success: boolean; data: any; message: string }>(`/products/${productId}/variants`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    updateVariant: (productId: string, variantId: string, payload: { name: string; price: number }) =>
+      request<{ success: boolean; data: any; message: string }>(`/products/${productId}/variants/${variantId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    deleteVariant: (productId: string, variantId: string) =>
+      request<{ success: boolean; data: any; message: string }>(`/products/${productId}/variants/${variantId}`, {
+        method: 'DELETE',
       }),
   },
 
@@ -325,12 +351,32 @@ export const api = {
   // Users & Staff
   users: {
     getAll: () => request<{ success: boolean; data: any[] }>('/auth/users'),
-    create: (payload: { name: string; username: string; password: string; role: string; pin_code?: string }) =>
+    create: (payload: {
+      name: string;
+      username: string;
+      password: string;
+      role: string;
+      pin_code?: string;
+      face_descriptor?: number[];
+      face_photo?: string;
+    }) =>
       request<{ success: boolean; data: any; message: string }>('/auth/users', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
-    update: (id: string, payload: { name?: string; username?: string; role?: string; pin_code?: string | null; password?: string }) =>
+    update: (
+      id: string,
+      payload: {
+        name?: string;
+        username?: string;
+        role?: string;
+        pin_code?: string | null;
+        password?: string;
+        face_descriptor?: number[];
+        face_photo?: string;
+        clear_face?: boolean;
+      }
+    ) =>
       request<{ success: boolean; data: any; message: string }>(`/auth/users/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
@@ -340,6 +386,59 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ is_active }),
       }),
+  },
+
+  // Employee Attendance
+  attendance: {
+    getToday: () =>
+      request<{
+        success: boolean;
+        data: any | null;
+        meta?: {
+          workDate: string;
+          config: any;
+          hasFace: boolean;
+          facePhotoUrl: string | null;
+          faceDescriptor: number[] | null;
+          myRecent: any[];
+        };
+      }>('/attendance/today'),
+    clockIn: (payload: {
+      latitude: number;
+      longitude: number;
+      photoBase64: string;
+      faceDescriptor: number[];
+      notes?: string;
+    }) =>
+      request<{ success: boolean; data: any; message: string }>('/attendance/clock-in', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    clockOut: (payload: {
+      latitude: number;
+      longitude: number;
+      photoBase64: string;
+      faceDescriptor: number[];
+      notes?: string;
+    }) =>
+      request<{ success: boolean; data: any; message: string }>('/attendance/clock-out', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getList: (params?: { startDate?: string; endDate?: string; userId?: string; status?: string; role?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.startDate) q.append('startDate', params.startDate);
+      if (params?.endDate) q.append('endDate', params.endDate);
+      if (params?.userId && params.userId !== 'ALL') q.append('userId', params.userId);
+      if (params?.status && params.status !== 'ALL') q.append('status', params.status);
+      if (params?.role && params.role !== 'ALL') q.append('role', params.role);
+      const qs = q.toString();
+      return request<{
+        success: boolean;
+        data: any[];
+        meta?: { total: number; presentCount: number; lateCount: number; completedCount: number; avgHours: number };
+      }>(`/attendance/list${qs ? `?${qs}` : ''}`);
+    },
   },
 
   // Tables

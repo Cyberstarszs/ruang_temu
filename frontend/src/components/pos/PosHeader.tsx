@@ -98,30 +98,30 @@ export function PosHeader({
             title={shiftDropdownOpen ? 'Tutup Menu Sif Kasir (Esc)' : 'Buka Menu Sif & Profil Kasir'}
             aria-expanded={shiftDropdownOpen}
             style={{
-              height: '42px',
+              height: '34px',
               width: 'fit-content',
               minWidth: 'unset',
               maxWidth: 'fit-content',
               display: 'inline-flex',
               alignItems: 'center',
-              padding: '0 12px 0 5px',
-              gap: '8px',
+              padding: '0 9px 0 4px',
+              gap: '6px',
               borderRadius: '9999px',
               background: 'rgba(255, 255, 255, 0.12)',
               border: '1px solid rgba(255, 255, 255, 0.22)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.12)',
             }}
           >
-            <div style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: '24px', height: '24px', flexShrink: 0 }}>
               <img
                 className="shift-photo"
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
                 alt={user?.name || 'Kasir'}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '24px',
+                  height: '24px',
                   borderRadius: '50%',
                   border: '1.5px solid #d4a373',
                   display: 'block',
@@ -133,8 +133,8 @@ export function PosHeader({
                     position: 'absolute',
                     bottom: '-1px',
                     right: '-1px',
-                    width: '8px',
-                    height: '8px',
+                    width: '7px',
+                    height: '7px',
                     backgroundColor: '#22c55e',
                     borderRadius: '50%',
                     border: '1.5px solid #324036',
@@ -143,11 +143,11 @@ export function PosHeader({
                 />
               )}
             </div>
-            <span style={{ textAlign: 'left', lineHeight: '1.2' }}>
-              <b style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', display: 'block' }}>
+            <span style={{ textAlign: 'left', lineHeight: '1.15' }}>
+              <b style={{ fontSize: '12px', fontWeight: 600, color: '#ffffff', display: 'block' }}>
                 {user?.name || 'Kasir RUANG TEMU'}
               </b>
-              <small style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.82)', display: 'block' }}>
+              <small style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.82)', display: 'block' }}>
                 {hasActiveShift ? (
                   <>Sif Aktif · {hours > 0 ? `${hours}j ` : ''}{mins}m</>
                 ) : (
@@ -156,7 +156,7 @@ export function PosHeader({
               </small>
             </span>
             <span className={`pos-shift-chevron ${shiftDropdownOpen ? 'is-open' : ''}`} aria-hidden="true" style={{ color: '#ffffff' }}>
-              <Icon name="chevronDown" size={14} />
+              <Icon name="chevronDown" size={12} />
             </span>
           </button>
 
@@ -568,7 +568,7 @@ export function PosHeader({
           title="Catat Pengeluaran Kas Operasional (Beli Es Batu, Gas LPG, Bahan Baku, dll)"
           aria-label="Catat Pengeluaran Kas Operasional"
         >
-          <Icon name="wallet" size={14} />
+          <Icon name="wallet" size={13} />
           <span className="pos-nav-text">Pengeluaran</span>
         </button>
 
@@ -585,16 +585,16 @@ export function PosHeader({
               fontWeight: 700,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '0 10px',
+              gap: '5px',
+              padding: '0 8px',
               cursor: 'pointer',
             }}
             title="Koneksi terputus! Mode Offline aktif. Klik untuk melihat antrean transaksi offline."
           >
             <span
               style={{
-                width: '8px',
-                height: '8px',
+                width: '7px',
+                height: '7px',
                 borderRadius: '50%',
                 backgroundColor: '#ef4444',
                 boxShadow: '0 0 6px #ef4444',
@@ -634,7 +634,7 @@ export function PosHeader({
             }}
             title="Klik untuk membuka pengelola dan resolusi transaksi offline"
           >
-            <Icon name="rotateCcw" size={14} className={isSyncing ? 'spin' : ''} />
+            <Icon name="rotateCcw" size={13} className={isSyncing ? 'spin' : ''} />
             <span className="pos-nav-text">
               {failedCount > 0
                 ? `Sinkron Bermasalah (${failedCount})`
@@ -653,12 +653,12 @@ export function PosHeader({
             alt="ruang temu."
             className="brand-wordmark"
             style={{
-              height: '42px',
-              maxHeight: '44px',
+              height: '32px',
+              maxHeight: '34px',
               width: 'auto',
               objectFit: 'contain',
               display: 'block',
-              filter: 'drop-shadow(0 1px 3px rgba(0, 0, 0, 0.22))',
+              filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.22))',
               transition: 'all 0.2s ease',
             }}
           />
@@ -666,22 +666,6 @@ export function PosHeader({
 
         {/* Right: Quick Operational Tools */}
         <div className="pos-navbar-actions">
-          {/* Held Orders (Pesanan Ditahan) */}
-          <button
-            onClick={onOpenHeldOrders}
-            className={`pos-nav-btn ${heldOrdersCount > 0 ? 'pos-nav-btn-active' : ''}`}
-            title="Daftar Pesanan Ditahan (Parked Orders)"
-            aria-label="Pesanan Ditahan"
-          >
-            <Icon name="pause" size={14} />
-            <span className="pos-nav-text">Tahan</span>
-            {heldOrdersCount > 0 && (
-              <span className="pos-nav-badge">
-                {heldOrdersCount}
-              </span>
-            )}
-          </button>
-
           {/* Order History */}
           <button
             onClick={onOpenHistory}
@@ -689,7 +673,7 @@ export function PosHeader({
             title="Riwayat Transaksi POS & Cetak Ulang Struk"
             aria-label="Riwayat Transaksi"
           >
-            <Icon name="history" size={14} />
+            <Icon name="history" size={13} />
             <span className="pos-nav-text">Riwayat</span>
           </button>
 
@@ -700,7 +684,7 @@ export function PosHeader({
             title={`Status Printer: ${printerOnline ? 'Dapur & Bar Online' : 'Printer Offline'}`}
             aria-label="Status Printer"
           >
-            <Icon name="printer" size={14} />
+            <Icon name="printer" size={13} />
             <span className="pos-nav-text">Printer</span>
             <span className="pos-printer-dots">
               <i style={{ backgroundColor: printerOnline ? '#2e7d32' : '#c62828' }} />
@@ -716,7 +700,7 @@ export function PosHeader({
               title={isCartOpen ? 'Sembunyikan Panel Keranjang' : 'Buka Panel Keranjang'}
               aria-label="Toggle Keranjang"
             >
-              <Icon name="bag" size={14} />
+              <Icon name="bag" size={13} />
               <span className="pos-nav-text">Keranjang</span>
               {cartItemCount > 0 && (
                 <span className="pos-nav-badge-accent">
@@ -733,7 +717,7 @@ export function PosHeader({
             title="Keluar dari Akun Kasir"
             aria-label="Keluar"
           >
-            <Icon name="logout" size={15} />
+            <Icon name="logout" size={13} />
           </button>
         </div>
       </header>
@@ -742,13 +726,8 @@ export function PosHeader({
       {logoutConfirmOpen && (
         <div className="bo-modal-layer">
           <div className="bo-confirm pos-logout-confirm" role="alertdialog">
-            <span>
-              <Icon name="logout" size={28} />
-            </span>
             <h2>Keluar dari Akun Kasir?</h2>
-            <p>
-              Pastikan Anda telah menyelesaikan transaksi aktif sebelum keluar dari terminal kasir.
-            </p>
+            <p>Pastikan transaksi aktif sudah selesai.</p>
             <div>
               <button onClick={() => setLogoutConfirmOpen(false)}>Batal</button>
               <button

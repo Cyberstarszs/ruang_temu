@@ -29,69 +29,18 @@ export function HeldOrdersModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="bo-modal-head" style={{ borderBottom: '1px solid #eeece6' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f0f4f0',
-                  color: '#57695b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name="pause" size={16} />
-              </div>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#272727' }}>
-                Pesanan Ditahan ({heldOrders.length})
-              </h2>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#777' }}>
-              Daftar transaksi yang diparkir sementara oleh kasir untuk memproses antrean lain.
-            </p>
-          </div>
-          <button onClick={onClose} aria-label="Tutup" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-            <Icon name="close" size={20} />
+        <header className="bo-modal-head">
+          <h2>Pesanan Ditahan ({heldOrders.length})</h2>
+          <button onClick={onClose} aria-label="Tutup">
+            <Icon name="close" size={18} />
           </button>
         </header>
 
         {/* Content Body */}
         <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
           {heldOrders.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '60px 20px',
-                backgroundColor: '#fbfbfa',
-                borderRadius: '12px',
-                border: '1px dashed #dedcd5',
-              }}
-            >
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: '#f3f4f1',
-                  color: '#8b8a85',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 12px',
-                }}
-              >
-                <Icon name="pause" size={24} />
-              </div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#333', margin: '0 0 6px' }}>
-                Belum Ada Pesanan yang Ditahan
-              </h3>
-              <p style={{ fontSize: '13px', color: '#888', maxWidth: '340px', margin: '0 auto', lineHeight: 1.5 }}>
-                Saat kasir sedang menyusun pesanan pelanggan dan pelanggan ingin menunggu atau menambah teman, klik tombol <b>"Tahan"</b> di bilah keranjang.
-              </p>
+            <div style={{ textAlign: 'center', padding: '44px 20px', color: '#71717a', fontSize: '13px' }}>
+              Belum ada pesanan ditahan.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -327,12 +276,8 @@ export function HeldOrdersModal({
             role="alertdialog"
             onClick={(e) => e.stopPropagation()}
           >
-            <span>
-              <Icon name="trash" size={26} />
-            </span>
-            <h2>Hapus Pesanan Tahanan?</h2>
+            <h2>Hapus Pesanan Ditahan?</h2>
             <p>
-              Pesanan untuk{' '}
               <strong>
                 {orderToDelete.customer?.name
                   ? orderToDelete.customer.name
@@ -344,7 +289,7 @@ export function HeldOrdersModal({
                   ? `Takeaway (${orderToDelete.takeawayName})`
                   : 'Takeaway'}
               </strong>{' '}
-              ({rupiah(orderToDelete.grandTotal)}) akan dihapus permanen dari daftar antrean tahan.
+              ({rupiah(orderToDelete.grandTotal)}) akan dihapus permanen.
             </p>
             <div>
               <button

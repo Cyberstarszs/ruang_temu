@@ -3,6 +3,9 @@ import dotenv from 'dotenv';
 import { createApp } from './app';
 import { initializeWebSocket, emitToClients } from './services/websocketService';
 import { testConnection, pool } from './config/database';
+import { ensureCategorySchema } from './database/ensureCategorySchema';
+import { ensureVariantSchema } from './database/ensureVariantSchema';
+import { ensureAttendanceSchema } from './database/ensureAttendanceSchema';
 import { initializePrintListener } from './modules/printing/printListener';
 import { initializeOrderSocketListener } from './modules/orders/orderSocketListener';
 
@@ -25,9 +28,12 @@ async function bootstrap() {
   initializePrintListener();
   initializeOrderSocketListener();
 
-  // Test Database Connection
+  // Test Database Connection & Ensure Schemas
   console.log('[System] Verifying database connectivity...');
   await testConnection();
+  await ensureCategorySchema();
+  await ensureVariantSchema();
+  await ensureAttendanceSchema();
 
   server.listen(PORT, () => {
     console.log(`====================================================`);

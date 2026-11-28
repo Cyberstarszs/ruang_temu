@@ -1,7 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { pool } from '../../config/database';
+
+function saveFacePhotoBase64(base64Str: string, prefix: string): string | null {
+  const matches = base64Str.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/i);
+  if (!matches) return null;
+  const ext = matches[1].toLowerCase() === 'jpeg' ? 'jpg' : matches[1].toLowerCase();
+  const buffer = Buffer.from(matches[2], 'base64');
+  if (buffer.length > 5 * 1024 * 1024) {
+    throw { statusCode: 400, message: 'Ukuran foto wajah maksimal 5MB.' };
+  }
+  const facesDir = path.resolve(__dirname, '../../../uploads/faces');
+  if (!fs.existsSync(facesDir)) {
+    fs.mkdirSync(facesDir, { recursive: true });
+  }
+  const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `${safePrefix}_${Date.now()}_${crypto.randomBytes(3).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(facesDir, filename), buffer);
+  return `/uploads/faces/${filename}`;
+}
+
+function parseFaceDescriptor(raw: any): number[] | null {
+  if (!Array.isArray(raw) || raw.length !== 128) return null;
+  const nums = raw.map(Number);
+  if (nums.some((n) => !Number.isFinite(n))) return null;
+  return nums;
+}
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -12,7 +40,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     const userRes = await pool.query(
-      `SELECT id, name, username, password_hash, role, pin_code, is_active FROM users WHERE username = $1`,
+      `SELECT id, name, username, password_hash, role, pin_code, is_active,
+              (face_descriptor IS NOT NULL) as has_face, face_photo_url
+       FROM users WHERE username = $1`,
       [username.trim().toLowerCase()]
     );
 
@@ -57,6 +87,8 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
           username: user.username,
           role: user.role,
           hasPin: !!user.pin_code,
+          hasFace: Boolean(user.has_face),
+          facePhotoUrl: user.face_photo_url || null,
         },
       },
     });
@@ -104,7 +136,11 @@ export async function verifyPin(req: Request, res: Response, next: NextFunction)
 export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await pool.query(`
-      SELECT id, name, username, role, pin_code IS NOT NULL as has_pin, is_active, created_at, updated_at
+      SELECT id, name, username, role,
+             pin_code IS NOT NULL as has_pin,
+             (face_descriptor IS NOT NULL) as has_face,
+             face_photo_url,
+             is_active, created_at, updated_at
       FROM users
       ORDER BY role ASC, name ASC
     `);
@@ -116,14 +152,14 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
 
 export async function createUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { name, username, password, role, pin_code } = req.body;
+    const { name, username, password, role, pin_code, face_descriptor, face_photo } = req.body;
     if (!name || !username || !password || !role) {
       res.status(400).json({ success: false, message: 'Nama, username, password, dan peran (role) wajib diisi.' });
       return;
     }
 
-    if (!['OWNER', 'CASHIER'].includes(role)) {
-      res.status(400).json({ success: false, message: 'Role harus OWNER atau CASHIER.' });
+    if (!['OWNER', 'CASHIER', 'EMPLOYEE'].includes(role)) {
+      res.status(400).json({ success: false, message: 'Role harus OWNER, CASHIER, atau EMPLOYEE.' });
       return;
     }
 
@@ -134,14 +170,34 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       }
     }
 
+    const parsedDescriptor = face_descriptor ? parseFaceDescriptor(face_descriptor) : null;
+    if (face_descriptor && !parsedDescriptor) {
+      res.status(400).json({ success: false, message: 'Data scan wajah tidak valid.' });
+      return;
+    }
+
+    let facePhotoUrl: string | null = null;
+    if (typeof face_photo === 'string' && face_photo.trim().startsWith('data:image/')) {
+      facePhotoUrl = saveFacePhotoBase64(face_photo.trim(), username.trim().toLowerCase());
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const result = await pool.query(`
-      INSERT INTO users (name, username, password_hash, role, pin_code)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, name, username, role, is_active, created_at
-    `, [name.trim(), username.trim().toLowerCase(), passwordHash, role, pin_code ? pin_code.trim() : null]);
+      INSERT INTO users (name, username, password_hash, role, pin_code, face_descriptor, face_photo_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, name, username, role, pin_code IS NOT NULL as has_pin,
+                (face_descriptor IS NOT NULL) as has_face, face_photo_url, is_active, created_at
+    `, [
+      name.trim(),
+      username.trim().toLowerCase(),
+      passwordHash,
+      role,
+      pin_code ? pin_code.trim() : null,
+      parsedDescriptor ? JSON.stringify(parsedDescriptor) : null,
+      facePhotoUrl,
+    ]);
 
     res.status(201).json({
       success: true,
@@ -149,6 +205,10 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       data: result.rows[0],
     });
   } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ success: false, message: err.message });
+      return;
+    }
     if (err.code === '23505') {
       res.status(409).json({ success: false, message: 'Username sudah digunakan.' });
       return;
@@ -160,7 +220,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 export async function updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { name, username, role, pin_code, password } = req.body;
+    const { name, username, role, pin_code, password, face_descriptor, face_photo, clear_face } = req.body;
 
     const userRes = await pool.query('SELECT id, name, username, role, pin_code, is_active FROM users WHERE id = $1', [id]);
     if (userRes.rows.length === 0) {
@@ -169,8 +229,8 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     }
     const targetUser = userRes.rows[0];
 
-    // If changing role from OWNER to CASHIER, verify there is another active OWNER
-    if (targetUser.role === 'OWNER' && role === 'CASHIER') {
+    // If changing role from OWNER to non-OWNER, verify there is another active OWNER
+    if (targetUser.role === 'OWNER' && role && role !== 'OWNER') {
       const activeOwners = await pool.query(
         `SELECT COUNT(*) as count FROM users WHERE role = 'OWNER' AND is_active = TRUE AND id != $1`,
         [id]
@@ -178,7 +238,7 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       if (parseInt(activeOwners.rows[0].count, 10) === 0) {
         res.status(400).json({
           success: false,
-          message: 'Keamanan Sistem: Tidak dapat mengubah peran Owner terakhir menjadi Kasir. Harus ada minimal satu Owner aktif.',
+          message: 'Keamanan Sistem: Tidak dapat mengubah peran Owner terakhir. Harus ada minimal satu Owner aktif.',
         });
         return;
       }
@@ -205,14 +265,12 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       values.push(cleanUsername);
     }
 
-    if (role && ['OWNER', 'CASHIER'].includes(role)) {
+    if (role && ['OWNER', 'CASHIER', 'EMPLOYEE'].includes(role)) {
       updates.push(`role = $${idx++}`);
       values.push(role);
     }
 
-    // PIN code handling:
-    // If pin_code is provided as string: set or change PIN
-    // If pin_code is null or empty string: reset/clear PIN
+    // PIN code handling
     if (pin_code !== undefined) {
       if (pin_code === null || (typeof pin_code === 'string' && pin_code.trim() === '')) {
         updates.push(`pin_code = NULL`);
@@ -227,12 +285,34 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       }
     }
 
-    // Password handling:
+    // Password handling
     if (password && typeof password === 'string' && password.trim().length > 0) {
       const salt = await bcrypt.genSalt(10);
       const hash = await bcrypt.hash(password.trim(), salt);
       updates.push(`password_hash = $${idx++}`);
       values.push(hash);
+    }
+
+    // Face biometric update / reset
+    if (clear_face === true) {
+      updates.push(`face_descriptor = NULL`);
+      updates.push(`face_photo_url = NULL`);
+    } else if (face_descriptor !== undefined) {
+      const parsedDescriptor = parseFaceDescriptor(face_descriptor);
+      if (!parsedDescriptor) {
+        res.status(400).json({ success: false, message: 'Data scan wajah tidak valid.' });
+        return;
+      }
+      updates.push(`face_descriptor = $${idx++}`);
+      values.push(JSON.stringify(parsedDescriptor));
+
+      if (typeof face_photo === 'string' && face_photo.trim().startsWith('data:image/')) {
+        const savedUrl = saveFacePhotoBase64(face_photo.trim(), targetUser.username);
+        if (savedUrl) {
+          updates.push(`face_photo_url = $${idx++}`);
+          values.push(savedUrl);
+        }
+      }
     }
 
     if (updates.length === 0) {
@@ -247,7 +327,8 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       UPDATE users
       SET ${updates.join(', ')}
       WHERE id = $${idx}
-      RETURNING id, name, username, role, pin_code IS NOT NULL as has_pin, is_active, updated_at
+      RETURNING id, name, username, role, pin_code IS NOT NULL as has_pin,
+                (face_descriptor IS NOT NULL) as has_face, face_photo_url, is_active, updated_at
     `;
 
     const result = await pool.query(query, values);
@@ -258,6 +339,10 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
       data: result.rows[0],
     });
   } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ success: false, message: err.message });
+      return;
+    }
     if (err.code === '23505') {
       res.status(409).json({ success: false, message: 'Username sudah digunakan.' });
       return;
